@@ -1,0 +1,22 @@
+.fleets-screen {
+    padding: 20px;
+}
+
+.filters {
+    margin-bottom: 20px;
+}
+
+.fleets-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.fleets-table th, .fleets-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+.fleets-table th {
+    background-color: #f2f2f2;
+}

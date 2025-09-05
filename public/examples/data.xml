@@ -1,0 +1,31 @@
+<DATA>
+    <TECHNOLOGIES>
+        <T base="cyb_vs_te_" code="cyb_vs_te_V" niv="4" nom="Centre d'espionnage embarqué" recherche="80000" type="1">
+            <SPECIFICATION case="100" min="5" prix="10.0" type="autre"/>
+            <CARACTERISTIQUE code="18" value="5500"/>
+            <MARCHANDISE code="0" nb="6"/>
+            <MARCHANDISE code="8" nb="5"/>
+            <MARCHANDISE code="5" nb="3"/>
+            <MARCHANDISE code="3" nb="3"/>
+            <MARCHANDISE code="11" nb="2"/>
+            <DESCRIPTION>Un centre d'espionnage est un centre d'entrainement de vos espions. Il permet d'effectuer des missions
+                spéciales en fonction de la population travaillant dans le centre.
+            </DESCRIPTION>
+            <PARENT code="cyb_vs_te_IV"/>
+        </T>
+    </TECHNOLOGIES>
+    <CARACTERISTIQUES_COMPOSANT>
+        <C code="18" nom="ville spatiale espionnage"/>
+    </CARACTERISTIQUES_COMPOSANT>
+    <CARACTERISTIQUES_BATIMENT>
+        <C code="1" nom="production"/>
+    </CARACTERISTIQUES_BATIMENT>
+    <RACES>
+        <R code="1" nom="Atalantes" couleur="#CC00FF"/>
+        <R code="2" nom="race2" couleur="#0066CC"/>
+    </RACES>
+    <MARCHANDISES>
+        <M code="0" nom="marchandise 1"/>
+        <M code="1" nom="marchandise 2"/>
+    </MARCHANDISES>
+</DATA>

@@ -1,0 +1,22 @@
+.systems-screen {
+    padding: 20px;
+}
+
+.filters {
+    margin-bottom: 20px;
+}
+
+.systems-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.systems-table th, .systems-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+.systems-table th {
+    background-color: #f2f2f2;
+}

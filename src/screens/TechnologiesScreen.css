@@ -1,0 +1,24 @@
+.technologies-screen {
+    padding: 20px;
+}
+
+.filters {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 20px;
+}
+
+.technologies-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.technologies-table th, .technologies-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+.technologies-table th {
+    background-color: #f2f2f2;
+}
