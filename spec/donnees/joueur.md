@@ -5,7 +5,7 @@
 les positions dans la grille sont stocké sous l'attribut "pos" des éléments XML.
 La structure est la suivante : GALAXIE_POSY_POSX
 
-Ainsi "0_4_6" , signifie que le joueur se trouve sur la position 4,6 de la galaxie 0.
+Ainsi "0_4_6" , signifie que le joueur se trouve sur la position Y=4, et X=6 de la galaxie 0.
 
 ## Fichier :
 
