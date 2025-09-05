@@ -74,11 +74,11 @@ Si l'utilisateur appuis sur la touche control en plus de la fleche directionnel,
 de 5.
 
 la partie interraction est divisée en 3 partie :
-* à gauche : une mini carte carrée, représentant toute la carte. lorsqu'on clique sur un endroit de cette mini carte, la carte
-principale doit se centrer sur le point visé sur la mini carte
-* au centre: la partie détail des informations, c'est la plus grande.
-* à droite: une liste des actions possibles quand on a sélectionné un élément affiché dans la partie "centre" de l'information.
 
+* une mini carte carrée, représentant toute la carte. lorsqu'on clique sur un endroit de cette mini carte, la carte
+  principale doit se centrer sur le point visé sur la mini carte
+* la partie détail des informations, c'est la plus grande.
+* une liste des actions possibles quand on a sélectionné un élément affiché dans la partie "centre" de l'information.
 
 ## données à afficher
 
@@ -123,4 +123,18 @@ de la case :
 
 * coordonnées
 * détail système
+    * liste des propriétaires du systeme
+    * liste des planètes dans le cas où il est possédé par le joueur qui a chargé son rapport et pour chaque planète :
+        * le propriétaire de cette planète
+        * afficher le nombre de chaque batiment ( qui dépend d'une technologie ) et afficher au survol la description de
+          ce batiment avec la liste des caractèristiques
+        * la liste des population
+        * le minerai
+        * les points de construction
+
 * liste des flottes
+  * propriétaire
+  * liste des vaisseaux
+    * nom
+    * puissance
+    * nombre de vaisseaux
