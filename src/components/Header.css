@@ -1,0 +1,12 @@
+.App-header {
+  background-color: #282c34;
+  padding: 10px 20px;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.App-header span {
+  margin-right: 20px;
+}

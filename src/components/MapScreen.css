@@ -1,0 +1,20 @@
+.map-screen {
+  display: flex;
+  padding: 20px;
+}
+
+.map-container {
+  flex-grow: 1;
+  margin-right: 20px;
+}
+
+#map-canvas {
+  border: 1px solid #ccc;
+  background-color: black;
+}
+
+.info-panel {
+  width: 300px;
+  border-left: 1px solid #ccc;
+  padding-left: 20px;
+}
