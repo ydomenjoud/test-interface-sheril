@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import { useAppStore } from './store';
 import { parseGlobalData } from './services/xmlParser';
@@ -28,23 +28,21 @@ const App: React.FC = () => {
     }, [setGlobalData]);
 
     return (
-        <Router>
-            <Layout>
-                {rapport ? (
-                    <Routes>
-                        <Route path="/carte" element={<MapScreen />} />
-                        <Route path="/technologies" element={<TechnologiesScreen />} />
-                        <Route path="/systemes" element={<SystemsScreen />} />
-                        <Route path="/flottes" element={<FleetsScreen />} />
-                        <Route path="/" element={<MapScreen />} />
-                    </Routes>
-                ) : (
-                    <div className="centered-message">
-                        <h1>Veuillez charger un rapport</h1>
-                    </div>
-                )}
-            </Layout>
-        </Router>
+        <Layout>
+            {rapport ? (
+                <Routes>
+                    <Route path="/carte" element={<MapScreen />} />
+                    <Route path="/technologies" element={<TechnologiesScreen />} />
+                    <Route path="/systemes" element={<SystemsScreen />} />
+                    <Route path="/flottes" element={<FleetsScreen />} />
+                    <Route path="/" element={<MapScreen />} />
+                </Routes>
+            ) : (
+                <div className="centered-message">
+                    <h1>Veuillez charger un rapport</h1>
+                </div>
+            )}
+        </Layout>
     );
 };
 
