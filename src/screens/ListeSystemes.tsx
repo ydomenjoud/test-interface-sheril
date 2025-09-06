@@ -167,7 +167,7 @@ export default function ListeSystemes() {
               <tr key={`${s.nom}-${idx}`}>
                 <td>
                   <img
-                    src={`/img/etoile${s.typeEtoile}.jpg`}
+                    src={`/img/etoile${s.typeEtoile}.png`}
                     alt={`étoile ${s.typeEtoile}`}
                     width={24}
                     height={24}

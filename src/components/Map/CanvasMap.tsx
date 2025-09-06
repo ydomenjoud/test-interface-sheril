@@ -139,7 +139,7 @@ export default function CanvasMap({onSelect}: Props) {
             if (!etoileCache[t]) {
                 const img = new Image();
                 img.onload = () => setAssetsVersion(v => v + 1);
-                img.src = `/img/etoile${t}.jpg`;
+                img.src = `/img/etoile${t}.png`;
                 etoileCache[t] = img;
             }
             return etoileCache[t];
