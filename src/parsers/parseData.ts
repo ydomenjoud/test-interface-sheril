@@ -34,25 +34,26 @@ export function parseDataXml(text: string): GlobalData {
     });
 
     const marchandises: Marchandise[] = [];
-    doc.querySelectorAll('data > marchandises > marchandise')?.forEach(m => {
+    doc.querySelectorAll('data > marchandises > m')?.forEach(m => {
         marchandises.push({
             code: Number(m.getAttribute('code') || 0), nom: m.getAttribute('nom') || 'Marchandise',
         });
     });
 
     const caracteristiquesBatiment: Record<number, string> = {};
-    doc.querySelectorAll('data > caracteristiques_batiment > caracteristique')?.forEach(c => {
+    doc.querySelectorAll('data > caracteristiques_batiment > c')?.forEach(c => {
         const code = Number(c.getAttribute('code') || 0);
         const nom = c.getAttribute('nom') || '';
         caracteristiquesBatiment[code] = nom;
     });
 
     const caracteristiquesComposant: Record<number, string> = {};
-    doc.querySelectorAll('data > caracteristiques_composant > caracteristique')?.forEach(c => {
+    doc.querySelectorAll('data > caracteristiques_composant > c')?.forEach(c => {
         const code = Number(c.getAttribute('code') || 0);
         const nom = c.getAttribute('nom') || '';
         caracteristiquesComposant[code] = nom;
     });
+
     const commandants: Commandant[] = [];
     doc.querySelectorAll('data > commandants > c')?.forEach((r, idx) => {
         commandants.push({

@@ -253,6 +253,8 @@ export default function ListeTechnologies() {
                     <td style={{ textAlign: 'right' }}>{t.recherche}</td>
                     <td>
                       <span
+                          className={'information'}
+                          style={{ fontSize: '0.8rem' }}
                         dangerouslySetInnerHTML={{ __html: t.description ?? '' }}
                       />
                     </td>

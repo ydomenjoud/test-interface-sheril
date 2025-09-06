@@ -60,27 +60,25 @@ si la borne max X est 40 : les coordonnées représentée vont de 33 à 12 en pa
 | 3  |
 | 4  |
 
+La carte occupe toute la hauteur disponible (pas de scroll vertical de la page), la grille se redimensionne en
+conséquence.
+
 #### interaction
 
-lorsque l'utilisateur clique sur une position de la carte, la carte doit afficher les informations de la position
-cliquée dans la partie "information".
+- Clic: lorsqu'on clique sur une position de la carte, la carte affiche les informations de la position cliquée dans la
+  partie "information".
+- Clavier: flèches directionnelles (gauche, droite, haut, bas) déplacent le centre d'une case; avec Ctrl, déplacement
+  par pas de 5 cases.
+- Drag souris: en maintenant le bouton gauche, on peut "panner" la carte; le centre se décale au rythme d'un pas de
+  case dès qu'un multiple de la taille de case est parcouru, puis s'arrête au relâchement.
+- Mini-carte:
+  - La mini-carte représente l'univers complet et est toujours centrée sur le centre courant de la carte principale.
+  - Un rectangle (bleu clair) y affiche le viewport courant (zones visibles de la carte principale); gestion du wrap
+    torique lorsque le viewport chevauche un bord.
+  - Un clic sur la mini-carte recadre la carte principale autour du point visé (par offset relatif au centre).
+- Header: un bouton "Capitale" recentre la carte principale sur la capitale du joueur.
 
-lorsque l'utilisateur appuis sur une flêche directionnelle ( gauche, droite, haut, bas ), l'affichage de la carte doit
-se recalculer et afficher la carte avec le centre décallé de 1 par rapport au précédent centre.
-Par exemple si la carte était centrée sur la position "20-40", et que l'utilisateur appuis sur la flêche du haut, la
-carte doit se recalculer pour être centrée sur la position "19-40"
-
-Si l'utilisateur appuis sur la touche control en plus de la fleche directionnel, le décallage doit se faire par tranche
-de 5.
-
-la partie interraction est divisée en 3 partie :
-
-* une mini carte carrée, représentant toute la carte. lorsqu'on clique sur un endroit de cette mini carte, la carte
-  principale doit se centrer sur le point visé sur la mini carte
-* la partie détail des informations, c'est la plus grande.
-* une liste des actions possibles quand on a sélectionné un élément affiché dans la partie "centre" de l'information.
-
-## données à afficher
+### données à afficher
 
 les points à afficher sur la grille sont :
 
@@ -89,52 +87,45 @@ les points à afficher sur la grille sont :
 
 l'affichage de ces points va dépendre de leur caractéristiques.
 
-### système
+#### système
 
 L'image du système prend toute la case de la grille.
 
-il faudra utiliser une image correspondante à sa propriété "typeEtoile" et utiliser l'image
-public/img/etoile{typeEtoile}.png .
+il faut utiliser une image correspondante à sa propriété "typeEtoile" et utiliser l'image
+public/img/etoile{typeEtoile}.gif (images pack étoiles).
 Si le système est :
 
 * complètement possédé par le joueur courant, il faut lui faire une bordure verte.
-* est possédé par un autre joueur avec lequel on partage une alliance : il faut lui faire une bordure bleu.
-* possédé par un autre joueur avec lequel on partage Pacte de Non Agression (PNA) et pas d'alliance : il faut lui faire
-  une bordure jaune.
-* possédé par un autre joueur qui ne rentre pas dans les autre cas : il faut lui faire une bordure rouge.
+* possédé par un autre joueur avec lequel on partage une alliance : bordure bleue.
+* possédé par un autre joueur avec lequel on partage Pacte de Non Agression (PNA) et pas d'alliance : bordure jaune.
+* possédé par un autre joueur qui ne rentre pas dans les autres cas : bordure rouge.
+* sans propriétaire connu: bordure grise.
 
-### flotte
+#### flotte
 
-l'image de la flotte s'affiche en haut à droite de la case de la grille, elle doit donc être affichée en plus petit.
+l'image de la flotte s'affiche en haut à droite de la case de la grille, elle est donc plus petite que la case.
 
-il faudra utiliser une image de vaisseau : public/img/flotte.png .
+il faut utiliser une image de vaisseau : public/img/flotte.png.
 Si la flotte est :
 
-* complètement possédé par le joueur courant, il faut lui faire une bordure verte.
-* est possédé par un autre joueur avec lequel on partage une alliance : il faut lui faire une bordure bleu.
-* possédé par un autre joueur avec lequel on partage Pacte de Non Agression (PNA) et pas d'alliance : il faut lui faire
-  une bordure jaune.
-* possédé par un autre joueur qui ne rentre pas dans les autre cas : il faut lui faire une bordure rouge.
+* complètement possédée par le joueur courant: bordure verte.
+* alliance: bordure bleue.
+* PNA: bordure jaune.
+* autre: bordure rouge.
 
-## interaction
+Pour les flottes du joueur uniquement: si l'attribut "direction" est défini (format "galaxie_Y_X"), afficher une flèche
+orange allant du centre de la case actuelle vers le centre de la case cible (visible), en tenant compte du viewport.
 
-Lorsqu'on clique sur une case qui n'est pas vide, la partie information de la page doit se remplir avec les informations
-de la case :
+### partie information
 
-* coordonnées
-* détail système
-    * liste des propriétaires du systeme
-    * liste des planètes dans le cas où il est possédé par le joueur qui a chargé son rapport et pour chaque planète :
-        * le propriétaire de cette planète
-        * afficher le nombre de chaque batiment ( qui dépend d'une technologie ) et afficher au survol la description de
-          ce batiment avec la liste des caractèristiques
-        * la liste des population
-        * le minerai
-        * les points de construction
+Lorsqu'on clique sur une case non vide, la partie information affiche les informations de la case :
 
-* liste des flottes
-  * propriétaire
-  * liste des vaisseaux
-    * nom
-    * puissance
-    * nombre de vaisseaux
+- coordonnées
+- détail système (s'il y en a un sur la case)
+  - nom, nombre de planètes
+  - liste des propriétaires (numéro de commandant)
+  - si système possédé par le joueur: détails planètes (propriétaire, bâtiment(s) avec info au survol, populations,
+    minerai, points de construction)
+- liste des flottes de la case
+  - propriétaire
+  - liste des vaisseaux (nom, puissance, nombre)

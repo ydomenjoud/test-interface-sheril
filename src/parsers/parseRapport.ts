@@ -161,7 +161,6 @@ export function parseRapportXml(text: string): Rapport {
                 type: getAttr(v, ['type']) || getAttr(v, ['plan']) || 'Vaisseau', plan: getAttr(v, ['plan']) || '',
             });
         });
-        console.log('plop ', getAttr(f, ['direction']))
         flottesJoueur.push({type: 'joueur', num, nom, pos, vaisseaux, direction: getAttr(f, ['direction']) || ''});
     });
 

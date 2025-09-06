@@ -37,6 +37,9 @@ export default function CanvasMap({onSelect}: Props) {
     const [assetsVersion, setAssetsVersion] = useState(0);
     const shipImgRef = useRef<HTMLImageElement | null>(null);
 
+    // Redraw quand le canvas change de taille (évite l'étirement non proportionnel)
+    const [canvasSizeVersion, setCanvasSizeVersion] = useState(0);
+
     useEffect(() => {
         if (!shipImgRef.current) {
             const img = new Image();
@@ -44,6 +47,16 @@ export default function CanvasMap({onSelect}: Props) {
             img.src = `${process.env.PUBLIC_URL}/img/flotte.png`;
             shipImgRef.current = img;
         }
+    }, []);
+
+    useEffect(() => {
+        const cvs = canvasRef.current;
+        if (!cvs) return;
+        const ro = new ResizeObserver(() => {
+            setCanvasSizeVersion(v => v + 1);
+        });
+        ro.observe(cvs);
+        return () => ro.disconnect();
     }, []);
 
     const currentPlayerId = rapport?.joueur.numero || 0; // placeholder si besoin d'ID joueur
@@ -80,12 +93,14 @@ export default function CanvasMap({onSelect}: Props) {
         const cvs = canvasRef.current;
         if (!cvs || !center) return;
         const dpr = window.devicePixelRatio || 1;
-        const width = cvs.clientWidth * dpr;
-        const height = cvs.clientHeight * dpr;
-        cvs.width = width;
-        cvs.height = height;
+        const width = Math.round(cvs.clientWidth * dpr);
+        const height = Math.round(cvs.clientHeight * dpr);
+        if (cvs.width !== width) cvs.width = width;
+        if (cvs.height !== height) cvs.height = height;
         const ctx = cvs.getContext('2d');
         if (!ctx) return;
+        // Toujours repartir d'une transform neutre avant d'appliquer le scale DPR
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.scale(dpr, dpr);
 
         // fond
@@ -238,7 +253,7 @@ export default function CanvasMap({onSelect}: Props) {
             }
         });
 
-    }, [rapport, systems, fleets, cellSize, center, currentPlayerId, assetsVersion, setViewportDims]);
+    }, [rapport, systems, fleets, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
