@@ -30,7 +30,7 @@ système ( présent dans SYSTEM>PROPRIO)
 
 ### les systèmes du joueur
 
-les systèmes du joueurs sont décris dans le rapport.xml au path suivant : Rapport>Commandant>systemes
+les systèmes du joueurs sont décris dans le rapport.xml au path suivant : rapport>commandant>systemes
 
 Chaque élément "S" représente le système.
 
@@ -49,7 +49,7 @@ Chaque élément "S" représente le système.
 
 Chaque système est composée de plusieurs planète et d'un ou plusieurs poste commercial ( un par joueur présent sur le
 système )
-les informations des planètes sont présentes dans le noeud xml du système : Rapport>Commandant>systemes>S>PLANETES
+les informations des planètes sont présentes dans le noeud xml du système : rapport>commandant>systemes>s>planetes
 
 ```xml
 
@@ -59,7 +59,7 @@ les informations des planètes sont présentes dans le noeud xml du système : R
 
 ### les systèmes détectés appartenant aux autres joueurs
 
-les systèmes des autres joueurs sont décrites dans le rapport.xml au path suivant : Rapport>Commandant>detection>SYSTEME
+les systèmes des autres joueurs sont décrites dans le rapport.xml au path suivant : rapport>commandant>detection>SYSTEME
 
 ```xml
 
@@ -72,7 +72,7 @@ les numéro des commandants présents sur ce  système ( présent dans SYSTEM>PR
 ## les flottes
 
 ### les flottes du joueur
-les flottes du joueurs sont décrites dans le rapport.xml au path suivant : Rapport>Commandant>flottes
+les flottes du joueurs sont décrites dans le rapport.xml au path suivant : rapport>commandant>flottes
 
 ```xml
 
@@ -85,7 +85,7 @@ les flottes du joueurs sont décrites dans le rapport.xml au path suivant : Rapp
 
 ### les flottes détectés appartenant autres joueurs
 
-les flottes des autres joueurs sont décrites dans le rapport.xml au path suivant : Rapport>Commandant>detection>Flotte
+les flottes des autres joueurs sont décrites dans le rapport.xml au path suivant : rapport>commandant>detections>Flotte
 
 ```xml
 

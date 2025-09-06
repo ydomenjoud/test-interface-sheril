@@ -39,72 +39,67 @@ function qAll(root: ParentNode | null | undefined, selectors: string[]): Element
 export function parseRapportXml(text: string): Rapport {
   const doc = new DOMParser().parseFromString(text, 'text/xml');
 
-  const rapportNode = qOne(doc, ['Rapport', 'rapport', 'RAPPORT']);
-  const joueurNode = qOne(rapportNode, ['Commandant', 'commandant', 'COMMANDANT']);
+  // Nœuds racines strictement en lowercase
+  const rapportNode = qOne(doc, ['rapport']);
+  const joueurNode = qOne(rapportNode, ['commandant']);
 
   const joueur = {
-    nom: getAttr(joueurNode, ['nom', 'Nom', 'NOM']),
-    raceId: getAttrNum(joueurNode, ['race', 'Race', 'RACE']),
-    reputation: getAttr(joueurNode, ['reputation', 'Reputation', 'REPUTATION']),
-    statut: getAttr(joueurNode, ['statut', 'Statut', 'STATUT']),
-    puissance: getAttrNum(joueurNode, ['puissance', 'Puissance', 'PUISSANCE']),
-    argent: getAttrNum(joueurNode, ['argent', 'Argent', 'ARGENT']),
+    numero: getAttrNum(joueurNode, ['numero']),
+    nom: getAttr(joueurNode, ['nom']),
+    raceId: getAttrNum(joueurNode, ['race']),
+    reputation: getAttr(joueurNode, ['reputation']),
+    statut: getAttr(joueurNode, ['statut']),
+    puissance: getAttrNum(joueurNode, ['puissance']),
+    argent: getAttrNum(joueurNode, ['argent']),
     capitale: (() => {
       const cap =
-        getAttr(joueurNode, ['pos', 'POS']) ??
-        getAttr(qOne(joueurNode, ['capitale', 'CAPITALE']), ['pos', 'POS']);
+        getAttr(joueurNode, ['pos']) ??
+        getAttr(qOne(joueurNode, ['capitale']), ['pos']);
       return cap ? parsePosString(cap) : undefined;
     })(),
     alliances: [],
     pna: [],
   };
 
-  // Systèmes du joueur
+  // Systèmes du joueur (lowercase only)
   const systemesJoueur: SystemeJoueur[] = [];
   const sysNodes = qAll(joueurNode, [
-    'systemes > S',
-    'Systemes > S',
-    'SYSTEMES > S',
-    'systemes > Systeme',
-    'Systemes > Systeme',
-    'SYSTEMES > SYSTEME',
+    'systemes > s',
   ]);
   sysNodes.forEach((s) => {
-    const pos = parsePosString(getAttr(s, ['pos', 'POS']) || '0_1_1');
-    const nom = getAttr(s, ['nom', 'Nom', 'NOM']) || 'Système';
-    const typeEtoile = getAttrNum(s, ['typeEtoile', 'typeetoile', 'TYPEETOILE']) ?? 1;
-    const nombrePla = getAttrNum(s, ['nombrePla', 'nbPla', 'NOMBREPLA', 'NBPLA']) ?? 0;
+    const pos = parsePosString(getAttr(s, ['pos']) || '0_1_1');
+    const nom = getAttr(s, ['nom']) || 'Système';
+    const rawStar = getAttrNum(s, ['typeetoile']) ?? getAttrNum(s, ['type']);
+    const typeEtoile = (rawStar ?? 0);
+    const nombrePla = getAttrNum(s, ['nombrepla']) ?? getAttrNum(s, ['nbpla']) ?? 0;
 
-    const proprietaires: number[] = [];
-    qAll(s, ['PROPRIO', 'Proprio', 'proprio']).forEach((p) => {
-      const v = Number((p.textContent || '').trim());
-      if (!Number.isNaN(v)) proprietaires.push(v);
-    });
+    const proprietaires: number[] = [joueur.numero || 0];
 
     const planetes: any[] = [];
     const pNodes = qAll(s, [
-      'PLANETES > P',
-      'Planetes > P',
-      'PLANETES > Planete',
-      'Planetes > Planete',
       'planetes > p',
     ]);
     pNodes.forEach((p) => {
-      const num = getAttrNum(p, ['num', 'Num', 'NUM']) ?? 0;
-      const pdc = getAttrNum(p, ['pdc', 'PDC']) ?? 0;
-      const proprietaire = getAttrNum(p, ['prop', 'Prop', 'PROP']);
-      const minerai = getAttrNum(p, ['stockmin', 'StockMin', 'STOCKMIN']) ?? getAttrNum(p, ['minerai', 'Minerai', 'MINERAI']);
+      const num = getAttrNum(p, ['num']) ?? 0;
+      const pdc = getAttrNum(p, ['pdc']) ?? 0;
+      const proprietaire = getAttrNum(p, ['prop']);
+      const minerai =
+        getAttrNum(p, ['stockmin']) ??
+        getAttrNum(p, ['minerai']);
 
       const batiments: { techCode: string; count: number }[] = [];
       const batNodes = [
-        ...qAll(p, ['BAT', 'Bat', 'bat']),
-        ...qAll(p, ['BATIMENT', 'Batiment', 'batiment']),
-        ...qAll(p, ['BATS > BAT', 'Bats > Bat']),
+        ...qAll(p, ['batiment']),
+        ...qAll(p, ['bat']),
+        ...qAll(p, ['bats > bat']),
       ];
       batNodes.forEach((b) => {
-        const techCode = getAttr(b, ['code', 'CODE', 'tech', 'TECH']) || '';
+        const techCode = getAttr(b, ['code']) || getAttr(b, ['tech']) || '';
         const countStr =
-          getAttr(b, ['nb', 'NB', 'count', 'COUNT']) || (b.textContent || '0').trim();
+          getAttr(b, ['nombre']) ||
+          getAttr(b, ['nb']) ||
+          getAttr(b, ['count']) ||
+          (b.textContent || '0').trim();
         const count = Number(countStr);
         if (techCode && !Number.isNaN(count) && count > 0) {
           batiments.push({ techCode, count });
@@ -113,12 +108,13 @@ export function parseRapportXml(text: string): Rapport {
 
       const populations: { raceId: number; nb: number }[] = [];
       const popNodes = [
-        ...qAll(p, ['POP', 'Pop', 'pop']),
-        ...qAll(p, ['POPULATION', 'Population', 'population']),
+        ...qAll(p, ['pop']),
+        ...qAll(p, ['population']),
       ];
       popNodes.forEach((pop) => {
-        const raceStr = getAttr(pop, ['race', 'RACE', 'code', 'CODE']) || (pop.textContent || '').trim();
-        const nbStr = getAttr(pop, ['nb', 'NB', 'count', 'COUNT']) || '0';
+        const raceStr = getAttr(pop, ['race']) || getAttr(pop, ['code']) || (pop.textContent || '').trim();
+        // nb peut être dans nb, count, ou popact (cas fréquent)
+        const nbStr = getAttr(pop, ['nb']) || getAttr(pop, ['count']) || getAttr(pop, ['popact']) || '0';
         const raceId = Number(raceStr);
         const nb = Number(nbStr);
         if (!Number.isNaN(raceId) && !Number.isNaN(nb) && nb > 0) {
@@ -147,70 +143,56 @@ export function parseRapportXml(text: string): Rapport {
     });
   });
 
-  // Systèmes détectés
+  // Systèmes détectés (lowercase only)
   const systemesDetectes: SystemeDetecte[] = [];
-  const sysDetNodes = qAll(joueurNode, [
-    'detection > SYSTEME',
-    'Detection > SYSTEME',
-    'DETECTION > SYSTEME',
-    'detection > Systeme',
-    'Detection > Systeme',
-  ]);
+  let sysDetNodes = qAll(joueurNode, ['detections > systeme']);
   sysDetNodes.forEach((s) => {
-    const pos = parsePosString(getAttr(s, ['pos', 'POS']) || '0_1_1');
-    const nom = getAttr(s, ['nom', 'Nom', 'NOM']) || 'Système';
-    const typeEtoile = getAttrNum(s, ['typeEtoile', 'typeetoile', 'TYPEETOILE']) ?? 1;
-    const nbPla = getAttrNum(s, ['nbPla', 'nombrePla', 'NBPLA', 'NOMBREPLA']) ?? 0;
+    const pos = parsePosString(getAttr(s, ['pos']) || '0_1_1');
+    const nom = getAttr(s, ['nom']) || 'Système';
+    const rawStar = getAttrNum(s, ['typeetoile']) ?? getAttrNum(s, ['type']);
+    const typeEtoile = rawStar ?? 0;
+    const nbPla = getAttrNum(s, ['nbpla']) ?? getAttrNum(s, ['nombrepla']) ?? 0;
     const proprietaires: number[] = [];
-    qAll(s, ['PROPRIO', 'Proprio', 'proprio']).forEach((p) => {
+    qAll(s, ['proprio']).forEach((p) => {
       const v = Number((p.textContent || '').trim());
       if (!Number.isNaN(v)) proprietaires.push(v);
     });
     systemesDetectes.push({ type: 'detecte', nom, pos, typeEtoile, nbPla, proprietaires });
   });
 
-  // Flottes du joueur
+  // Flottes du joueur (lowercase only)
   const flottesJoueur: FlotteJoueur[] = [];
-  const fltNodes = qAll(joueurNode, [
-    'flottes > F',
-    'Flottes > F',
-    'FLOTTES > F',
-    'flottes > Flotte',
-    'Flottes > Flotte',
-  ]);
+  const fltNodes = qAll(joueurNode, ['flottes > f', 'flottes > flotte']);
   fltNodes.forEach((f) => {
-    const pos = parsePosString(getAttr(f, ['pos', 'POS']) || '0_1_1');
-    const nom = getAttr(f, ['nom', 'Nom', 'NOM']) || 'Flotte';
-    const num = getAttrNum(f, ['num', 'Num', 'NUM']) ?? 0;
+    const pos = parsePosString(getAttr(f, ['pos']) || '0_1_1');
+    const nom = getAttr(f, ['nom']) || 'Flotte';
+    const num = getAttrNum(f, ['num']) ?? 0;
     const vaisseaux: { type: string; plan: string; nb?: number; puissance?: string }[] = [];
-    qAll(f, ['VAISSEAU', 'Vaisseau', 'vaisseau']).forEach((v) => {
+    qAll(f, ['vaisseau']).forEach((v) => {
       vaisseaux.push({
-        type: getAttr(v, ['type', 'TYPE']) || getAttr(v, ['plan', 'PLAN']) || 'Vaisseau',
-        plan: getAttr(v, ['plan', 'PLAN']) || '',
+        type: getAttr(v, ['type']) || getAttr(v, ['plan']) || 'Vaisseau',
+        plan: getAttr(v, ['plan']) || '',
       });
     });
     flottesJoueur.push({ type: 'joueur', num, nom, pos, vaisseaux });
   });
 
-  // Flottes détectées
+  // Flottes détectées (lowercase only)
   const flottesDetectees: FlotteDetectee[] = [];
-  const fltDetNodes = qAll(joueurNode, [
-    'detection > FLOTTE',
-    'Detection > FLOTTE',
-    'DETECTION > FLOTTE',
-    'detection > Flotte',
-  ]);
+  let fltDetNodes = qAll(joueurNode, ['detections > flotte']);
   fltDetNodes.forEach((f) => {
-    const pos = parsePosString(getAttr(f, ['pos', 'POS']) || '0_1_1');
+    const pos = parsePosString(getAttr(f, ['pos']) || '0_1_1');
     flottesDetectees.push({
       type: 'detecte',
-      num: getAttrNum(f, ['num', 'Num', 'NUM']) ?? 0,
-      nom: getAttr(f, ['nom', 'Nom', 'NOM']) || 'Flotte',
+      num: getAttrNum(f, ['num']) ?? 0,
+      nom: getAttr(f, ['nom']) || 'Flotte',
       pos,
-      proprio: getAttrNum(f, ['proprio', 'Proprio', 'PROPRIO']) ?? 0,
-      puiss: getAttr(f, ['puiss', 'Puiss', 'PUISS']) || 'inconnue',
+      proprio: getAttrNum(f, ['proprio']) ?? 0,
+      puiss: getAttr(f, ['puiss']) || 'inconnue',
     });
   });
+
+  console.log('RAPPORT', {systemesJoueur})
 
   return {
     joueur,

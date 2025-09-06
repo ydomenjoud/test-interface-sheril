@@ -147,7 +147,11 @@ export default function CanvasMap({ onSelect }: Props) {
       if (px < 0 || py < 0 || px >= cols * cellSize || py >= rows * cellSize) return;
 
       const size = Math.max(16, Math.floor(cellSize * 0.5));
-      try { (ctx as CanvasRenderingContext2D).drawImage(shipImg, px + cellSize - size, py, size, size); } catch {}
+      try {
+          (ctx as CanvasRenderingContext2D).drawImage(shipImg, px + cellSize - size, py, size, size);
+          // console.log(shipImg, px + cellSize - size, py, size, size)
+
+      } catch(e) { console.error(e);}
       const col = colorForOwnership(currentPlayerId, [ (f as any).owner ], rapport?.joueur.alliances, rapport?.joueur.pna);
       ctx.strokeStyle = col;
       ctx.lineWidth = 1.5;
