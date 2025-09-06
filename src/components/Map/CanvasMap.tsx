@@ -17,6 +17,9 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return 'red';
 }
 
+// Cache persistant des images d'étoiles (évite de recréer les Image à chaque rendu)
+const starImageCache: Record<number, HTMLImageElement> = {};
+
 export default function CanvasMap({onSelect}: Props) {
     const {rapport, cellSize, center, setCenter, setViewportDims} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -38,7 +41,7 @@ export default function CanvasMap({onSelect}: Props) {
         if (!shipImgRef.current) {
             const img = new Image();
             img.onload = () => setAssetsVersion(v => v + 1);
-            img.src = '/img/flotte.png';
+            img.src = `${process.env.PUBLIC_URL}/img/flotte.png`;
             shipImgRef.current = img;
         }
     }, []);
@@ -133,16 +136,16 @@ export default function CanvasMap({onSelect}: Props) {
             ctx.fillText(String(yCoord), xPos + 4, 12);
         }
 
-        // cache images avec relance du rendu quand elles se chargent
-        const etoileCache: Record<number, HTMLImageElement> = {};
+        // Utilise le cache persistant des images d'étoiles
         function getStarImg(t: number): HTMLImageElement {
-            if (!etoileCache[t]) {
-                const img = new Image();
+            let img = starImageCache[t];
+            if (!img) {
+                img = new Image();
                 img.onload = () => setAssetsVersion(v => v + 1);
-                img.src = `/img/etoile${t}.png`;
-                etoileCache[t] = img;
+                img.src = `${process.env.PUBLIC_URL}/img/etoile${t}.gif`;
+                starImageCache[t] = img;
             }
-            return etoileCache[t];
+            return img;
         }
 
         const shipImg = shipImgRef.current;

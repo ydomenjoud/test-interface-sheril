@@ -1,4 +1,4 @@
-import React, {createContext, useContext, useEffect, useMemo, useState} from 'react';
+import React, {createContext, useContext, useEffect, useMemo, useState, useCallback} from 'react';
 import {GlobalData, Rapport, XY} from '../types';
 import {parseRapportXml} from '../parsers/parseRapport';
 import {parseDataXml} from '../parsers/parseData';
@@ -27,28 +27,21 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
     const [viewportCols, setViewportCols] = useState<number>(0);
     const [viewportRows, setViewportRows] = useState<number>(0);
 
-    const setViewportDims = (cols: number, rows: number) => {
+    const setViewportDims = useCallback((cols: number, rows: number) => {
         setViewportCols(cols);
         setViewportRows(rows);
-    };
+    }, []);
 
-    const loadRapportFile = async (file: File) => {
+    const loadRapportFile = useCallback(async (file: File) => {
         const text = await file.text();
         const r = parseRapportXml(text);
         setRapport(r);
         if (!center && r.joueur.capitale) setCenter(r.joueur.capitale);
-    };
+    }, [center]);
 
-    // Charge automatiquement data.xml via le proxy CRA (/stats/data.xml)
     useEffect(() => {
         let alive = true;
         (async () => {
-            // try {
-            //   const txt = await fetch('/stats/data.xml', { cache: 'no-cache' }).then(r => r.text());
-            //   if (!alive) return;
-            //   setGlobal(parseDataXml(txt));
-            // } catch {
-            // fallback local utile en dev si proxy indisponible
             try {
                 const txt = await fetch('/examples/data.xml').then(r => r.text());
                 if (!alive) return;
@@ -83,7 +76,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         viewportCols,
         viewportRows,
         setViewportDims,
-    }), [rapport, global, cellSize, center, viewportCols, viewportRows]);
+    }), [rapport, global, loadRapportFile, cellSize, center, viewportCols, viewportRows, setViewportDims]);
 
     return <ReportContext.Provider value={value}>{children}</ReportContext.Provider>;
 }

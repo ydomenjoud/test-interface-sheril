@@ -1,14 +1,13 @@
-import React, { useMemo } from 'react';
-import { useReport } from '../../context/ReportContext';
-import { XY } from '../../types';
-import Commandant from "../utils/Commandant";
+import React, {useMemo} from 'react';
+import {useReport} from '../../context/ReportContext';
+import {XY} from '../../types';
 
 type Props = {
   selected?: XY;
 };
 
 export default function InfoPanel({ selected }: Props) {
-  const { rapport, global } = useReport();
+  const { rapport } = useReport();
 
   const atPos = useMemo(() => {
     if (!selected || !rapport) return { systems: [], fleets: [] as any[] };
