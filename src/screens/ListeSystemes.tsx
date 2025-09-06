@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useReport } from '../context/ReportContext';
+import Commandant from "../components/utils/Commandant";
 
 type SortKey =
   | 'etoile' | 'pos' | 'nom' | 'nbpla' | 'proprietaires'
@@ -25,7 +26,7 @@ export default function ListeSystemes() {
       ...(rapport?.systemesDetectes ?? []),
     ].map((s) => ({
       ...s,
-      commandantsStr: s.proprietaires?.length ? s.proprietaires.join(', ') : '',
+      proprietaires: s.proprietaires || [],
       posStr: `${s.pos.x}-${s.pos.y}`,
       owned: currentId ? (s.proprietaires || []).includes(currentId) || (s as any).type === 'joueur' : false,
     }));
@@ -63,7 +64,7 @@ export default function ListeSystemes() {
         case 'pos': av = a.pos.x * 1000 + a.pos.y; bv = b.pos.x * 1000 + b.pos.y; break;
         case 'nom': av = a.nom.toLowerCase(); bv = b.nom.toLowerCase(); break;
         case 'nbpla': av = a.nbPla ?? a.nombrePla ?? 0; bv = b.nbPla ?? b.nombrePla ?? 0; break;
-        case 'proprietaires': av = a.commandantsStr; bv = b.commandantsStr; break;
+        case 'proprietaires': av = a.proprietaires; bv = b.proprietaires; break;
         case 'politique': av = a.politique ?? -9999; bv = b.politique ?? -9999; break;
         case 'entretien': av = a.entretien ?? 0; bv = b.entretien ?? 0; break;
         case 'revenu': av = a.revenu ?? 0; bv = b.revenu ?? 0; break;
@@ -167,7 +168,7 @@ export default function ListeSystemes() {
               <tr key={`${s.nom}-${idx}`}>
                 <td>
                   <img
-                    src={`/img/etoile${s.typeEtoile}.png`}
+                    src={`${process.env.PUBLIC_URL}/img/etoile${s.typeEtoile}.png`}
                     alt={`étoile ${s.typeEtoile}`}
                     width={24}
                     height={24}
@@ -177,7 +178,9 @@ export default function ListeSystemes() {
                 <td style={{ whiteSpace: 'nowrap' }}>{s.pos.x}-{s.pos.y}</td>
                 <td>{s.nom}</td>
                 <td style={{ textAlign: 'right' }}>{s.nbPla ?? 0}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>{s.commandantsStr || '—'}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{s.proprietaires.map((p: number, key: number) =>
+                    <Commandant num={p} key={key} />
+                )}</td>
                 <td style={{ textAlign: 'right' }}>{s.politique ?? '—'}</td>
                 <td style={{ textAlign: 'right' }}>{typeof s.entretien === 'number' ? s.entretien.toFixed(1) : '—'}</td>
                 <td style={{ textAlign: 'right' }}>{typeof s.revenu === 'number' ? s.revenu.toFixed(1) : '—'}</td>

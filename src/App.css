@@ -1,8 +1,31 @@
+
+:root{
+    --accent: #9c27b0;
+    --information: #00e6e6;
+    --important: #1de9b6;
+}
 html, body, #root {
     height: 100%;
     margin: 0;
     background: #111111;
     color: #ffffff;
+}
+
+.information {
+    color: var(--information);
+}
+
+.important {
+    color: var(--important);
+}
+
+.accent {
+    color: var(--accent);
+}
+
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--accent);
 }
 
 .app-root {
@@ -26,6 +49,7 @@ html, body, #root {
 
 .header-title {
     font-weight: 600;
+    color: var(--accent);
 }
 
 .header-spacer {

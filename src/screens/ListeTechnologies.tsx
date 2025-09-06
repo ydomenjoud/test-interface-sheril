@@ -9,6 +9,23 @@ function typeLabel(t: 0 | 1) {
   return t === 0 ? 'Bâtiment' : 'Composant';
 }
 
+// Helpers affichage niveau en chiffres romains (niv est 0-based)
+function toRoman(n: number): string {
+  const romans = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+  if (n <= 0) return romans[0];
+  if (n >= romans.length) return romans[romans.length - 1];
+  return romans[n];
+}
+function romanFromNiv(niv?: number): string {
+  // niv 0 => 1 => I, niv 4 => 5 => V ; cap à X
+  const lvl = Math.max(1, Math.min(10, ((niv ?? 0) + 1)));
+  return toRoman(lvl);
+}
+function formatTechName(t?: Technologie): string {
+  if (!t) return '';
+  return `${t.nom} ${romanFromNiv(t.niv)}`;
+}
+
 export default function ListeTechnologies() {
   const { global, rapport } = useReport();
   const [page, setPage] = useState(1);
@@ -123,7 +140,10 @@ export default function ListeTechnologies() {
             <span>Filtres parents:</span>
             {parentFilters.map((code) => (
               <span key={code} className="badge" style={{ background: '#235', color: '#ddd' }}>
-                {global?.technologies.find(t => t.code === code)?.nom || code}
+                {(() => {
+                  const tt = global?.technologies.find(t => t.code === code);
+                  return tt ? formatTechName(tt) : code;
+                })()}
                 <button
                   onClick={() => setParentFilters(p => p.filter(c => c !== code))}
                   style={{ marginLeft: 6 }}
@@ -211,7 +231,7 @@ export default function ListeTechnologies() {
                 const parentsContent = t.parents?.length
                   ? t.parents.map((code, idx) => {
                       const pTech = global?.technologies.find(tt => tt.code === code);
-                      const name = pTech?.nom || code;
+                      const name = pTech ? formatTechName(pTech) : code;
                       return (
                         <span
                           key={code}
@@ -229,9 +249,13 @@ export default function ListeTechnologies() {
                   <tr key={t.code} style={rowStyle(t as any)}>
                     <td>{(t as any).connu ? 'Oui' : 'Non'}</td>
                     <td>{typeLabel(t.type)}</td>
-                    <td title={t.code} style={{ whiteSpace: 'nowrap' }}>{t.nom}</td>
+                    <td title={t.code} style={{ whiteSpace: 'nowrap' }}>{formatTechName(t)}</td>
                     <td style={{ textAlign: 'right' }}>{t.recherche}</td>
-                    <td>{t.description}</td>
+                    <td>
+                      <span
+                        dangerouslySetInnerHTML={{ __html: t.description ?? '' }}
+                      />
+                    </td>
                     <td>{carac}</td>
                     <td>{parentsContent}</td>
                   </tr>

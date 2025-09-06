@@ -11,10 +11,10 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     if (owners && owners?.length === 1 && owners[0] === 0) return 'grey';
     if (!owners || owners.length === 0) return '#999';
     const owner = owners[0];
-    if (currentPlayerId && owners.includes(currentPlayerId)) return 'green';
-    if (alliances && alliances.some(a => a.commandants.includes(owner))) return 'blue';
+    if (currentPlayerId && owners.includes(currentPlayerId)) return '#09ca31';
+    if (alliances && alliances.some(a => a.commandants.includes(owner))) return '#4945e4';
     if (pna && pna.includes(owner)) return 'yellow';
-    return 'red';
+    return '#fb3a3a';
 }
 
 // Cache persistant des images d'étoiles (évite de recréer les Image à chaque rendu)
@@ -142,7 +142,7 @@ export default function CanvasMap({onSelect}: Props) {
             if (!img) {
                 img = new Image();
                 img.onload = () => setAssetsVersion(v => v + 1);
-                img.src = `${process.env.PUBLIC_URL}/img/etoile${t}.gif`;
+                img.src = `${process.env.PUBLIC_URL}/img/etoile${t}.png`;
                 starImageCache[t] = img;
             }
             return img;

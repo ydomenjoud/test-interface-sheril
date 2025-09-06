@@ -1,6 +1,7 @@
 import React, {useMemo} from 'react';
 import {useReport} from '../../context/ReportContext';
 import {XY} from '../../types';
+import Commandant from "../utils/Commandant";
 
 type Props = {
   selected?: XY;
@@ -100,9 +101,8 @@ export default function InfoPanel({ selected }: Props) {
           <tr>
             {sortHeader('Nom', sysSort, setSysSort, 'nom')}
             {sortHeader('Planètes', sysSort, setSysSort, 'nbPla')}
-            {sortHeader('Politique', sysSort, setSysSort, 'politique')}
-            {sortHeader('Entretien', sysSort, setSysSort, 'entretien')}
-            {sortHeader('Revenu', sysSort, setSysSort, 'revenu')}
+            {sortHeader('Commandant', sysSort, setSysSort, 'politique')}
+
           </tr>
           </thead>
           <tbody>
@@ -110,9 +110,10 @@ export default function InfoPanel({ selected }: Props) {
             <tr key={`sys-${i}`}>
               <td>{s.nom}</td>
               <td style={{ textAlign: 'right' }}>{s.nbPla ?? '—'}</td>
-              <td style={{ textAlign: 'right' }}>{s.politique ?? '—'}</td>
-              <td style={{ textAlign: 'right' }}>{typeof s.entretien === 'number' ? s.entretien.toFixed(1) : '—'}</td>
-              <td style={{ textAlign: 'right' }}>{typeof s.revenu === 'number' ? s.revenu.toFixed(1) : '—'}</td>
+                <td style={{ textAlign: 'right' }}>{s.politique ?? '—'}</td>
+                <td style={{ textAlign: 'right' }}>{s.proprietaires.map((p: number, key: number) =>
+                    <Commandant num={p} key={key} />
+                )}</td>
             </tr>
           ))}
           {sysRows.length === 0 && (

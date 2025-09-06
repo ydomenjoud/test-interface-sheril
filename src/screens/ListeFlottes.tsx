@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useReport } from '../context/ReportContext';
+import Commandant from "../components/utils/Commandant";
 
 type SortKey = 'pos' | 'nom' | 'direction' | 'directive' | 'vitesse' | 'as' | 'ap' | 'nbv' | 'proprio';
 type SortDir = 'asc' | 'desc';
@@ -85,7 +86,7 @@ export default function ListeFlottes() {
   if (!rapport) return <div style={{ padding: 16 }}>Chargez les données pour voir la liste des flottes.</div>;
 
   return (
-    <div style={{ padding: 12, overflow: 'auto', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ padding: 12, overflow: 'auto', width: '100%', height: 'calc(100% - 20px)', display: 'flex', flexDirection: 'column' }}>
       <h3>Flottes</h3>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
@@ -147,7 +148,7 @@ export default function ListeFlottes() {
                 <td style={{ textAlign: 'right' }}>{f.as ?? '—'}</td>
                 <td style={{ textAlign: 'right' }}>{f.ap ?? '—'}</td>
                 <td style={{ textAlign: 'right' }}>{f.nbv ?? '—'}</td>
-                <td style={{ textAlign: 'right' }}>{f.proprio ?? '—'}</td>
+                <td style={{ textAlign: 'right' }}><Commandant num={f.proprio || 0} /></td>
               </tr>
             ))}
             {pageItems.length === 0 && (

@@ -20,6 +20,6 @@ export default function Commandant({num}: Props) {
 
 
     return (<span className={'commandant race' + commandant.raceId}>
-            {commandant.nom} ({commandant.numero})
+            {commandant.nom} ({commandant.numero}) &nbsp;
         </span>);
 }
