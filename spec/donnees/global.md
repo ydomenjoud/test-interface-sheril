@@ -63,8 +63,7 @@ Il suffit de récupérer la caractéristique par son numéro ( dans cet exemple 
 
 ## les races
 chaque peuple ou commandant est d'une race . la liste des races est disponible dans le fichier dans le noeud `RACES`.
-la race 1 par exemple est "Atalantes". Il manque pour l'instant la couleur de chacune des races qui sera rajouté prochainement dans l'attribut "couleur".
-Voici la liste des couleurs en attendant `{ "#CC00FF", "#0066CC", "#FFCC00", "#CC0033", "#009933", "#777777"}`
+la race 1 par exemple est "Atalantes". la couleur de chacune des races est dns l'attribut "color".
 
 ## les marchandises
 les marchandises sont disponibles dans le fichier dans le noeud `MARCHANDISES`. avec un code numérique pour les identifier et un nom.

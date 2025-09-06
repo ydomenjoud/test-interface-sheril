@@ -1,27 +1,261 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { useReport } from '../context/ReportContext';
+import { Technologie } from '../types';
+
+type SortKey = 'connu' | 'type' | 'nom' | 'recherche' | 'description' | 'caracteristiques' | 'parents';
+type SortDir = 'asc' | 'desc';
+
+function typeLabel(t: 0 | 1) {
+  return t === 0 ? 'Bâtiment' : 'Composant';
+}
 
 export default function ListeTechnologies() {
-  const { global } = useReport();
-  if (!global) return <div style={{ padding: 16 }}>Chargement des données globales…</div>;
+  const { global, rapport } = useReport();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [sortKey, setSortKey] = useState<SortKey>('nom');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  const [filterConnu, setFilterConnu] = useState<'all' | 'connues' | 'inconnues'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'batiment' | 'composant'>('all');
+  const [filterNom, setFilterNom] = useState('');
+
+  // Tous les hooks sont appelés inconditionnellement
+  const knownSet = useMemo(() => {
+    const set = new Set<string>();
+    (rapport?.technologiesConnues ?? []).forEach(c => set.add(c));
+    return set;
+  }, [rapport]);
+
+  const withDerived = useMemo(() => {
+    const list = global?.technologies ?? [];
+    return list.map(t => {
+      const connu = knownSet.has(t.code);
+      const caracStr = (t.caracteristiques || [])
+        .map(c => {
+          const label = t.type === 1 ? global?.caracteristiquesComposant[c.code] : global?.caracteristiquesBatiment[c.code];
+          return `${label ?? c.code}:${c.value}`;
+        }).join(', ');
+      const parentsStr = (t.parents || []).join(', ');
+      return { ...t, connu, caracStr, parentsStr };
+    });
+  }, [global, knownSet]);
+
+  const filtered = useMemo(() => {
+    const q = filterNom.trim().toLowerCase();
+    return withDerived.filter(t => {
+      if (filterConnu === 'connues' && !t.connu) return false;
+      if (filterConnu === 'inconnues' && t.connu) return false;
+      if (filterType === 'batiment' && t.type !== 0) return false;
+      if (filterType === 'composant' && t.type !== 1) return false;
+      if (q && !(t.nom?.toLowerCase().includes(q) || t.code.toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }, [withDerived, filterConnu, filterType, filterNom]);
+
+  const [parentFilters, setParentFilters] = useState<string[]>([]);
+
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    const cmp = (a: any, b: any) => {
+      let av: any, bv: any;
+      switch (sortKey) {
+        case 'connu': av = a.connu ? 1 : 0; bv = b.connu ? 1 : 0; break;
+        case 'type': av = a.type; bv = b.type; break;
+        case 'nom': av = (a.nom || '').toLowerCase(); bv = (b.nom || '').toLowerCase(); break;
+        case 'recherche': av = a.recherche ?? 0; bv = b.recherche ?? 0; break;
+        case 'description': av = (a.description || '').toLowerCase(); bv = (b.description || '').toLowerCase(); break;
+        case 'caracteristiques': av = a.caracStr.toLowerCase(); bv = b.caracStr.toLowerCase(); break;
+        case 'parents': av = a.parentsStr.toLowerCase(); bv = b.parentsStr.toLowerCase(); break;
+        default: av = 0; bv = 0;
+      }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    };
+    arr.sort(cmp);
+    return arr;
+  }, [filtered, sortKey, sortDir]);
+
+  const byParentsOrSorted = useMemo(() => {
+    if (!parentFilters.length) return sorted;
+    const set = new Set(parentFilters);
+    return sorted.filter(t => set.has(t.code));
+  }, [sorted, parentFilters]);
+
+  const total = sorted.length;
+  const maxPage = Math.max(1, Math.ceil(total / pageSize));
+  const curPage = Math.min(page, maxPage);
+  const start = (curPage - 1) * pageSize;
+  const pageItems = sorted.slice(start, start + pageSize);
+
+  function onSort(k: SortKey) {
+    if (sortKey === k) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(k);
+      setSortDir('asc');
+    }
+  }
+
+  function header(k: SortKey, label: string) {
+    const active = sortKey === k;
+    return (
+      <th onClick={() => onSort(k)} style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}>
+        {label} {active ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+      </th>
+    );
+  }
+
+  const rowStyle = (t: Technologie & { connu: boolean }) =>
+    t.connu ? { background: '#0f3d0f33' } : { background: '#ffa50022' };
+
   return (
-    <div style={{ padding: 12, overflow: 'auto', width: '100%' }}>
+    <div style={{ padding: 12, overflow: 'auto', width: '100%', height: 'calc(100%-20px)', display: 'flex', flexDirection: 'column' }}>
       <h3>Technologies</h3>
-      <ul>
-        {global.technologies.map((t, i) => (
-          <li key={i} title={t.description ?? ''}>
-            [{t.type === 0 ? 'Bâtiment' : 'Composant'}] {t.nom} (niv {t.niv}) — code {t.code} — recherche {t.recherche}
-            {t.caracteristiques?.length ? (
-              <ul>
-                {t.caracteristiques.map((c, j) => {
-                  const label = t.type === 1 ? global.caracteristiquesComposant[c.code] : global.caracteristiquesBatiment[c.code];
-                  return <li key={j}>{label ?? c.code}: {c.value}</li>;
-                })}
-              </ul>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+      {!global && (
+        <div style={{ marginBottom: 8, color: '#a66' }}>Chargement des données globales…</div>
+      )}
+
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+        {parentFilters.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span>Filtres parents:</span>
+            {parentFilters.map((code) => (
+              <span key={code} className="badge" style={{ background: '#235', color: '#ddd' }}>
+                {global?.technologies.find(t => t.code === code)?.nom || code}
+                <button
+                  onClick={() => setParentFilters(p => p.filter(c => c !== code))}
+                  style={{ marginLeft: 6 }}
+                  aria-label="retirer"
+                  title="Retirer"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            <button onClick={() => setParentFilters([])}>Effacer</button>
+          </div>
+        )}
+        <label>
+          Connu:
+          <select value={filterConnu} onChange={e => { setFilterConnu(e.target.value as any); setPage(1); }} style={{ marginLeft: 6 }}>
+            <option value="all">Tous</option>
+            <option value="connues">Connues</option>
+            <option value="inconnues">Inconnues</option>
+          </select>
+        </label>
+        <label>
+          Type:
+          <select value={filterType} onChange={e => { setFilterType(e.target.value as any); setPage(1); }} style={{ marginLeft: 6 }}>
+            <option value="all">Tous</option>
+            <option value="batiment">Bâtiment</option>
+            <option value="composant">Composant</option>
+          </select>
+        </label>
+        <label style={{ flex: 1, minWidth: 220 }}>
+          Nom:
+          <input
+            type="text"
+            value={filterNom}
+            onChange={e => { setFilterNom(e.target.value); setPage(1); }}
+            placeholder="Filtrer par nom ou code…"
+            style={{ marginLeft: 6, width: '100%' }}
+          />
+        </label>
+        <label>
+          Par page:
+          <select
+            value={pageSize}
+            onChange={e => { setPageSize(parseInt(e.target.value, 10)); setPage(1); }}
+            style={{ marginLeft: 6 }}
+          >
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </select>
+        </label>
+      </div>
+
+      <div style={{ overflow: 'auto' }}>
+        <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              {header('connu', 'Connu')}
+              {header('type', 'Type')}
+              {header('nom', 'Nom')}
+              {header('recherche', 'Recherche')}
+              {header('description', 'Description')}
+              {header('caracteristiques', 'Caractéristiques')}
+              {header('parents', 'Parents')}
+            </tr>
+          </thead>
+          <tbody>
+            {(() => {
+              const total = byParentsOrSorted.length;
+              const maxPage = Math.max(1, Math.ceil(total / pageSize));
+              const curPage = Math.min(page, maxPage);
+              const start = (curPage - 1) * pageSize;
+              const pageItems2 = byParentsOrSorted.slice(start, start + pageSize);
+
+              return pageItems2.map((t) => {
+                const carac = t.caracteristiques?.map((c, i) => {
+                  const label = t.type === 1 ? global?.caracteristiquesComposant[c.code] : global?.caracteristiquesBatiment[c.code];
+                  return (
+                    <span key={i} className="badge" style={{ background: '#333', color: '#ddd', marginRight: 4 }}>
+                      {(label ?? c.code) + ': ' + c.value}
+                    </span>
+                  );
+                });
+
+                const parentsContent = t.parents?.length
+                  ? t.parents.map((code, idx) => {
+                      const pTech = global?.technologies.find(tt => tt.code === code);
+                      const name = pTech?.nom || code;
+                      return (
+                        <span
+                          key={code}
+                          onClick={() => setParentFilters(arr => arr.includes(code) ? arr : [...arr, code])}
+                          title="Cliquer pour filtrer par cette technologie"
+                          style={{ cursor: 'pointer', textDecoration: 'underline', marginRight: 6 }}
+                        >
+                          {name}{idx < t.parents.length - 1 ? ',' : ''}
+                        </span>
+                      );
+                    })
+                  : '';
+
+                return (
+                  <tr key={t.code} style={rowStyle(t as any)}>
+                    <td>{(t as any).connu ? 'Oui' : 'Non'}</td>
+                    <td>{typeLabel(t.type)}</td>
+                    <td title={t.code} style={{ whiteSpace: 'nowrap' }}>{t.nom}</td>
+                    <td style={{ textAlign: 'right' }}>{t.recherche}</td>
+                    <td>{t.description}</td>
+                    <td>{carac}</td>
+                    <td>{parentsContent}</td>
+                  </tr>
+                );
+              });
+            })()}
+            {pageItems.length === 0 && (
+              <tr>
+                <td colSpan={7} style={{ textAlign: 'center', padding: 12, color: '#aaa' }}>
+                  {global ? 'Aucune technologie ne correspond aux filtres.' : 'Chargement…'}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+        <button disabled={curPage <= 1} onClick={() => setPage(1)}>{'<<'}</button>
+        <button disabled={curPage <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>{'<'}</button>
+        <span>Page {curPage} / {maxPage} — {total} éléments</span>
+        <button disabled={curPage >= maxPage} onClick={() => setPage(p => Math.min(maxPage, p + 1))}>{'>'}</button>
+        <button disabled={curPage >= maxPage} onClick={() => setPage(maxPage)}>{'>>'}</button>
+      </div>
     </div>
   );
 }

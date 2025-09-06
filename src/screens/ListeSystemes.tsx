@@ -1,28 +1,210 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { useReport } from '../context/ReportContext';
+
+type SortKey =
+  | 'etoile' | 'pos' | 'nom' | 'nbpla' | 'proprietaires'
+  | 'politique' | 'entretien' | 'revenu' | 'hscan' | 'bcont' | 'besp' | 'btech';
+type SortDir = 'asc' | 'desc';
 
 export default function ListeSystemes() {
   const { rapport } = useReport();
-  if (!rapport) return <div style={{ padding: 16 }}>Chargez les données pour voir la liste des systèmes.</div>;
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [sortKey, setSortKey] = useState<SortKey>('nom');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  const [filterOwned, setFilterOwned] = useState<'all' | 'owned' | 'notowned'>('all');
+  const [filterNom, setFilterNom] = useState('');
+  const [filterPolitique, setFilterPolitique] = useState<string>('all');
+
+  const currentId = rapport?.joueur.numero || 0;
+
+  const allSystems = useMemo(() => {
+    const list = [
+      ...(rapport?.systemesJoueur ?? []),
+      ...(rapport?.systemesDetectes ?? []),
+    ].map((s) => ({
+      ...s,
+      commandantsStr: s.proprietaires?.length ? s.proprietaires.join(', ') : '',
+      posStr: `${s.pos.x}-${s.pos.y}`,
+      owned: currentId ? (s.proprietaires || []).includes(currentId) || (s as any).type === 'joueur' : false,
+    }));
+    return list;
+  }, [rapport, currentId]);
+
+  const politiquesOptions = useMemo(() => {
+    const set = new Set<number>();
+    for (const s of allSystems) {
+      if (typeof (s as any).politique === 'number') set.add((s as any).politique);
+    }
+    return Array.from(set).sort((a, b) => a - b);
+  }, [allSystems]);
+
+  const filtered = useMemo(() => {
+    const q = filterNom.trim().toLowerCase();
+    return allSystems.filter(s => {
+      if (filterOwned === 'owned' && !s.owned) return false;
+      if (filterOwned === 'notowned' && s.owned) return false;
+      if (filterPolitique !== 'all') {
+        const p = (s as any).politique;
+        if (String(p) !== filterPolitique) return false;
+      }
+      if (q && !(s.nom.toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }, [allSystems, filterOwned, filterPolitique, filterNom]);
+
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    const cmp = (a: any, b: any) => {
+      let av: any, bv: any;
+      switch (sortKey) {
+        case 'etoile': av = a.typeEtoile; bv = b.typeEtoile; break;
+        case 'pos': av = a.pos.x * 1000 + a.pos.y; bv = b.pos.x * 1000 + b.pos.y; break;
+        case 'nom': av = a.nom.toLowerCase(); bv = b.nom.toLowerCase(); break;
+        case 'nbpla': av = a.nbPla ?? a.nombrePla ?? 0; bv = b.nbPla ?? b.nombrePla ?? 0; break;
+        case 'proprietaires': av = a.commandantsStr; bv = b.commandantsStr; break;
+        case 'politique': av = a.politique ?? -9999; bv = b.politique ?? -9999; break;
+        case 'entretien': av = a.entretien ?? 0; bv = b.entretien ?? 0; break;
+        case 'revenu': av = a.revenu ?? 0; bv = b.revenu ?? 0; break;
+        case 'hscan': av = a.hscan ?? 0; bv = b.hscan ?? 0; break;
+        case 'bcont': av = a.bcont ?? 0; bv = b.bcont ?? 0; break;
+        case 'besp': av = a.besp ?? 0; bv = b.besp ?? 0; break;
+        case 'btech': av = a.btech ?? 0; bv = b.btech ?? 0; break;
+        default: av = 0; bv = 0;
+      }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    };
+    arr.sort(cmp);
+    return arr;
+  }, [filtered, sortKey, sortDir]);
+
+  const total = sorted.length;
+  const maxPage = Math.max(1, Math.ceil(total / pageSize));
+  const curPage = Math.min(page, maxPage);
+  const start = (curPage - 1) * pageSize;
+  const pageItems = sorted.slice(start, start + pageSize);
+
+  function onSort(k: SortKey) {
+    if (sortKey === k) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(k); setSortDir('asc'); }
+  }
+  function header(k: SortKey, label: string) {
+    const active = sortKey === k;
+    return (
+      <th onClick={() => onSort(k)} style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}>
+        {label} {active ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+      </th>
+    );
+  }
+
   return (
-    <div style={{ padding: 12, overflow: 'auto', width: '100%' }}>
-      <h3>Systèmes du joueur</h3>
-      <ul>
-        {rapport.systemesJoueur.map((s, i) => (
-          <li key={`sj-${i}`}>
-            {s.nom} — {s.pos.x}-{s.pos.y} — {s.nombrePla} planètes — étoile {s.typeEtoile}
-            {s.proprietaires?.length ? ` — commandants: ${s.proprietaires.join(', ')}` : ''}
-          </li>
-        ))}
-      </ul>
-      <h3>Systèmes détectés</h3>
-      <ul>
-        {rapport.systemesDetectes.map((s, i) => (
-          <li key={`sd-${i}`}>
-            {s.nom} — {s.pos.x}-{s.pos.y} — {s.nbPla} planètes — étoile {s.typeEtoile} — proprio: {s.proprietaires.join(', ') || '—'}
-          </li>
-        ))}
-      </ul>
+    <div style={{ padding: 12, overflow: 'auto', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <h3>Systèmes</h3>
+
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+        <label>
+          Possédé:
+          <select value={filterOwned} onChange={e => { setFilterOwned(e.target.value as any); setPage(1); }} style={{ marginLeft: 6 }}>
+            <option value="all">Tous</option>
+            <option value="owned">Possédés</option>
+            <option value="notowned">Non possédés</option>
+          </select>
+        </label>
+        <label>
+          Politique:
+          <select value={filterPolitique} onChange={e => { setFilterPolitique(e.target.value); setPage(1); }} style={{ marginLeft: 6 }}>
+            <option value="all">Toutes</option>
+            {politiquesOptions.map(p => <option key={p} value={String(p)}>{p}</option>)}
+          </select>
+        </label>
+        <label style={{ flex: 1, minWidth: 240 }}>
+          Nom:
+          <input
+            type="text"
+            value={filterNom}
+            onChange={e => { setFilterNom(e.target.value); setPage(1); }}
+            placeholder="Filtrer par nom…"
+            style={{ marginLeft: 6, width: '100%' }}
+          />
+        </label>
+        <label>
+          Par page:
+          <select
+            value={pageSize}
+            onChange={e => { setPageSize(parseInt(e.target.value, 10)); setPage(1); }}
+            style={{ marginLeft: 6 }}
+          >
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </select>
+        </label>
+      </div>
+
+      <div style={{ overflow: 'auto' }}>
+        <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              {header('etoile', 'Étoile')}
+              {header('pos', 'Position')}
+              {header('nom', 'Nom')}
+              {header('nbpla', 'Planètes')}
+              {header('proprietaires', 'Commandants')}
+              {header('politique', 'Politique')}
+              {header('entretien', 'Entretien')}
+              {header('revenu', 'Revenu')}
+              {header('hscan', 'Portée détect.')}
+              {header('bcont', 'Contre-esp.')}
+              {header('besp', 'Espionnage')}
+              {header('btech', 'Technologique')}
+            </tr>
+          </thead>
+          <tbody>
+            {pageItems.map((s: any, idx) => (
+              <tr key={`${s.nom}-${idx}`}>
+                <td>
+                  <img
+                    src={`/img/etoile${s.typeEtoile}.jpg`}
+                    alt={`étoile ${s.typeEtoile}`}
+                    width={24}
+                    height={24}
+                    style={{ display: 'block' }}
+                  />
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>{s.pos.x}-{s.pos.y}</td>
+                <td>{s.nom}</td>
+                <td style={{ textAlign: 'right' }}>{s.nbPla ?? 0}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{s.commandantsStr || '—'}</td>
+                <td style={{ textAlign: 'right' }}>{s.politique ?? '—'}</td>
+                <td style={{ textAlign: 'right' }}>{typeof s.entretien === 'number' ? s.entretien.toFixed(1) : '—'}</td>
+                <td style={{ textAlign: 'right' }}>{typeof s.revenu === 'number' ? s.revenu.toFixed(1) : '—'}</td>
+                <td style={{ textAlign: 'right' }}>{s.hscan ?? '—'}</td>
+                <td style={{ textAlign: 'right' }}>{s.bcont ?? '—'}</td>
+                <td style={{ textAlign: 'right' }}>{s.besp ?? '—'}</td>
+                <td style={{ textAlign: 'right' }}>{s.btech ?? '—'}</td>
+              </tr>
+            ))}
+            {pageItems.length === 0 && (
+              <tr>
+                <td colSpan={12} style={{ textAlign: 'center', padding: 12, color: '#aaa' }}>
+                  {rapport ? 'Aucun système ne correspond aux filtres.' : 'Chargez le rapport pour voir les systèmes.'}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+        <button disabled={curPage <= 1} onClick={() => setPage(1)}>{'<<'}</button>
+        <button disabled={curPage <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>{'<'}</button>
+        <span>Page {curPage} / {maxPage} — {total} éléments</span>
+        <button disabled={curPage >= maxPage} onClick={() => setPage(p => Math.min(maxPage, p + 1))}>{'>'}</button>
+        <button disabled={curPage >= maxPage} onClick={() => setPage(maxPage)}>{'>>'}</button>
+      </div>
     </div>
   );
 }

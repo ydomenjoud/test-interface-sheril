@@ -46,13 +46,13 @@ describe('parseRapportXml - XML lowercase only', () => {
     expect(s1.nom).toBe('pavbzyb');
     expect(s1.pos).toEqual({ x: 1, y: 2 });
     expect(s1.typeEtoile).toBe(8);
-    expect(s1.nombrePla).toBe(17);
+    expect(s1.nbPla).toBe(17);
     expect(s1.planetes[0].batiments[0]).toEqual({ techCode: 'minei', count: 3 });
 
     const s2 = res.systemesJoueur[1];
     expect(s2.pos).toEqual({ x: 4, y: 5 });
     expect(s2.typeEtoile).toBe(0);
-    expect(s2.nombrePla).toBe(18); // lu via nbpla
+    expect(s2.nbPla).toBe(18); // lu via nbpla
   });
 
   it('extrait les systèmes détectés en lowercase et lit typeetoile correctement', () => {

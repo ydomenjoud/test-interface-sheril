@@ -1,16 +1,25 @@
 import React, { useRef } from 'react';
 import { useReport } from '../context/ReportContext';
+import Commandant from "./utils/Commandant";
 
 export default function Header() {
-  const { rapport, loadRapportFile, ready } = useReport();
+  const { rapport, loadRapportFile, ready, setCenter } = useReport();
   const rapportInput = useRef<HTMLInputElement>(null);
 
   return (
     <header className="app-header">
-      <div className="header-title">4X Interface</div>
-      <div className="badge">Joueur: {rapport?.joueur.nom ?? '—'}</div>
-      <div className="badge">Race: {rapport?.joueur.raceId ?? '—'}</div>
-      <div className="badge">Capitale: {rapport?.joueur.capitale ? `${rapport.joueur.capitale.x}-${rapport.joueur.capitale.y}` : '—'}</div>
+      <div className="header-title">Interface Sheril</div>
+      <div>
+          <Commandant num={rapport?.joueur.numero} />
+      </div>
+      <button
+        className="badge"
+        onClick={() => { if (rapport?.joueur.capitale) setCenter(rapport.joueur.capitale); }}
+        title="Centrer sur la capitale"
+        style={{ cursor: rapport?.joueur.capitale ? 'pointer' : 'not-allowed' }}
+      >
+        Capitale: {rapport?.joueur.capitale ? `${rapport.joueur.capitale.x}-${rapport.joueur.capitale.y}` : '—'}
+      </button>
       <div className="header-spacer" />
       <input
         ref={rapportInput}

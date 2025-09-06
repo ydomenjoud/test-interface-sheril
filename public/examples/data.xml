@@ -3617,13 +3617,13 @@
         <c code="14" nom="maîtrise de la finance"/>
     </leader_competences>
     <races>
-        <c code="0" grav_max="80" grav_min="0" nom="fremens" rad_max="200" rad_min="40" temp_max="200" temp_min="0"/>
-        <c code="1" grav_max="100" grav_min="40" nom="atalantes" rad_max="120" rad_min="0" temp_max="180" temp_min="-50"/>
-        <c code="2" grav_max="80" grav_min="20" nom="zwaias" rad_max="165" rad_min="10" temp_max="70" temp_min="-150"/>
-        <c code="3" grav_max="90" grav_min="30" nom="yoksor" rad_max="150" rad_min="50" temp_max="160" temp_min="-100"/>
-        <c code="4" grav_max="80" grav_min="0" nom="fergok" rad_max="200" rad_min="50" temp_max="190" temp_min="-140"/>
-        <c code="5" grav_max="20" grav_min="0" nom="cyborg" rad_max="200" rad_min="0" temp_max="200" temp_min="0"/>
-        <c code="6" grav_max="100" grav_min="0" nom="koros" rad_max="200" rad_min="0" temp_max="200" temp_min="-150"/>
+        <r code="0" color="#CC00FF" grav_max="80" grav_min="0" nom="fremens" rad_max="200" rad_min="40" temp_max="200" temp_min="0"/>
+        <r code="1" color="#0066CC" grav_max="100" grav_min="40" nom="atalantes" rad_max="120" rad_min="0" temp_max="180" temp_min="-50"/>
+        <r code="2" color="#FFCC00" grav_max="80" grav_min="20" nom="zwaias" rad_max="165" rad_min="10" temp_max="70" temp_min="-150"/>
+        <r code="3" color="#CC0033" grav_max="90" grav_min="30" nom="yoksor" rad_max="150" rad_min="50" temp_max="160" temp_min="-100"/>
+        <r code="4" color="#009933" grav_max="80" grav_min="0" nom="fergok" rad_max="200" rad_min="50" temp_max="190" temp_min="-140"/>
+        <r code="5" color="#777777" grav_max="20" grav_min="0" nom="cyborg" rad_max="200" rad_min="0" temp_max="200" temp_min="0"/>
+        <r code="6" color="#CC6600" grav_max="100" grav_min="0" nom="koros" rad_max="200" rad_min="0" temp_max="200" temp_min="-150"/>
     </races>
     <planpublic>
         <p ap="20" as="0" centaures="32.0" concepteur="neutre" marque="dune" minerai="21" nom="bombardier standard" pc="2" royalties="0" taille="1" tour="0" vitesse="14">
