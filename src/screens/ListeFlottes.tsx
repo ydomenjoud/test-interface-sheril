@@ -1,20 +1,30 @@
 import React, { useMemo, useState } from 'react';
 import { useReport } from '../context/ReportContext';
 import Commandant from "../components/utils/Commandant";
+import {commandantAsString} from "../utils/commandant";
 
 type SortKey = 'pos' | 'nom' | 'direction' | 'directive' | 'vitesse' | 'as' | 'ap' | 'nbv' | 'proprio';
 type SortDir = 'asc' | 'desc';
 
 export default function ListeFlottes() {
-  const { rapport } = useReport();
+  const { rapport, global} = useReport();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [sortKey, setSortKey] = useState<SortKey>('nom');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [filterNom, setFilterNom] = useState('');
-  const [filterProprio, setFilterProprio] = useState<string>('all');
+  const [filterProprios, setFilterProprios] = useState<string[]>([]);
 
   const currentId = rapport?.joueur.numero || 0;
+
+  const commandantOptions = useMemo(() => {
+    const set = new Set<number>();
+    if (currentId) set.add(currentId);
+    (rapport?.flottesDetectees ?? []).forEach(f => {
+      if (typeof f.proprio === 'number') set.add(f.proprio);
+    });
+    return Array.from(set).sort((a, b) => a - b);
+  }, [rapport, currentId]);
 
   const all = useMemo(() => {
     if (!rapport) return [];
@@ -34,12 +44,13 @@ export default function ListeFlottes() {
 
   const filtered = useMemo(() => {
     const q = filterNom.trim().toLowerCase();
+    const selected = new Set(filterProprios);
     return all.filter(f => {
-      if (filterProprio !== 'all' && String((f as any).proprio ?? '') !== filterProprio) return false;
+      if (selected.size > 0 && !selected.has(String((f as any).proprio ?? ''))) return false;
       if (q && !(f.nom?.toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [all, filterNom, filterProprio]);
+  }, [all, filterNom, filterProprios]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -101,11 +112,20 @@ export default function ListeFlottes() {
           />
         </label>
         <label>
-          Propriétaire:
-          <select value={filterProprio} onChange={e => { setFilterProprio(e.target.value); setPage(1); }} style={{ marginLeft: 6 }}>
-            <option value="all">Tous</option>
-            <option value={String(currentId)}>{`Joueur (${currentId || '—'})`}</option>
-            {/* valeurs fréquentes optionnelles; laisser “all” sinon */}
+          Commandants:
+          <select
+            multiple
+            value={filterProprios}
+            onChange={e => {
+              const vals = Array.from(e.currentTarget.selectedOptions).map(o => o.value);
+              setFilterProprios(vals);
+              setPage(1);
+            }}
+            style={{ marginLeft: 6, minWidth: 140 }}
+          >
+            {commandantOptions.map(id => (
+              <option key={id} value={String(id)}>{commandantAsString(global, id)}</option>
+            ))}
           </select>
         </label>
         <label>

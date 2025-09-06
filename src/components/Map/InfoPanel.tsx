@@ -24,28 +24,12 @@ export default function InfoPanel({ selected }: Props) {
   }, [selected, rapport]);
 
   // Hooks déclarés inconditionnellement
-  const [sysSort, setSysSort] = React.useState<{ key: 'nom' | 'nbPla' | 'politique' | 'revenu' | 'entretien', dir: 'asc' | 'desc' }>({ key: 'nom', dir: 'asc' });
   const [fltSort, setFltSort] = React.useState<{ key: 'nom' | 'vitesse' | 'as' | 'ap', dir: 'asc' | 'desc' }>({ key: 'nom', dir: 'asc' });
-  const [sysFilter, setSysFilter] = React.useState<string>('');
   const [fltFilter, setFltFilter] = React.useState<string>('');
 
-  const sysRows = useMemo(() => {
-    const rows = [...atPos.systems].filter((s: any) => s.nom.toLowerCase().includes(sysFilter.trim().toLowerCase()));
-    rows.sort((a: any, b: any) => {
-      let av: any, bv: any;
-      switch (sysSort.key) {
-        case 'nom': av = a.nom.toLowerCase(); bv = b.nom.toLowerCase(); break;
-        case 'nbPla': av = a.nbPla ?? 0; bv = b.nbPla ?? 0; break;
-        case 'politique': av = a.politique ?? -9999; bv = b.politique ?? -9999; break;
-        case 'revenu': av = a.revenu ?? 0; bv = b.revenu ?? 0; break;
-        case 'entretien': av = a.entretien ?? 0; bv = b.entretien ?? 0; break;
-      }
-      if (av < bv) return sysSort.dir === 'asc' ? -1 : 1;
-      if (av > bv) return sysSort.dir === 'asc' ? 1 : -1;
-      return 0;
-    });
-    return rows;
-  }, [atPos.systems, sysFilter, sysSort]);
+  const system = useMemo(() => {
+    return atPos.systems[0];
+  }, [atPos.systems]);
 
   const fltRows = useMemo(() => {
     const rows = [...atPos.fleets].filter((f: any) => f.nom.toLowerCase().includes(fltFilter.trim().toLowerCase()));
@@ -88,36 +72,27 @@ export default function InfoPanel({ selected }: Props) {
 
       <div className="info-block">
         <h4>Systèmes</h4>
-        <div style={{ marginBottom: 6 }}>
-          <input
-            type="text"
-            placeholder="Filtrer par nom…"
-            value={sysFilter}
-            onChange={e => setSysFilter(e.target.value)}
-          />
-        </div>
         <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
           <tr>
-            {sortHeader('Nom', sysSort, setSysSort, 'nom')}
-            {sortHeader('Planètes', sysSort, setSysSort, 'nbPla')}
-            {sortHeader('Commandant', sysSort, setSysSort, 'politique')}
-
+            <th>Nom</th>
+            <th>Planètes</th>
+            <th>Commandants</th>
           </tr>
           </thead>
           <tbody>
-          {sysRows.map((s: any, i: number) => (
-            <tr key={`sys-${i}`}>
-              <td>{s.nom}</td>
-              <td style={{ textAlign: 'right' }}>{s.nbPla ?? '—'}</td>
-                <td style={{ textAlign: 'right' }}>{s.politique ?? '—'}</td>
-                <td style={{ textAlign: 'right' }}>{s.proprietaires.map((p: number, key: number) =>
-                    <Commandant num={p} key={key} />
-                )}</td>
+          {system ? (
+            <tr>
+              <td>{system.nom}</td>
+              <td style={{ textAlign: 'right' }}>{system.nbPla ?? '—'}</td>
+              <td style={{ textAlign: 'right' }}>
+                {Array.isArray(system.proprietaires) && system.proprietaires.length
+                  ? system.proprietaires.map((p: number, key: number) => <Commandant num={p} key={key} />)
+                  : '—'}
+              </td>
             </tr>
-          ))}
-          {sysRows.length === 0 && (
-            <tr><td colSpan={5} style={{ textAlign: 'center', padding: 8, color: '#aaa' }}>Aucun système ici.</td></tr>
+          ) : (
+            <tr><td colSpan={3} style={{ textAlign: 'center', padding: 8, color: '#aaa' }}>Aucun système ici.</td></tr>
           )}
           </tbody>
         </table>

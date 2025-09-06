@@ -161,7 +161,8 @@ export function parseRapportXml(text: string): Rapport {
                 type: getAttr(v, ['type']) || getAttr(v, ['plan']) || 'Vaisseau', plan: getAttr(v, ['plan']) || '',
             });
         });
-        flottesJoueur.push({type: 'joueur', num, nom, pos, vaisseaux});
+        console.log('plop ', getAttr(f, ['direction']))
+        flottesJoueur.push({type: 'joueur', num, nom, pos, vaisseaux, direction: getAttr(f, ['direction']) || ''});
     });
 
     // Flottes détectées (lowercase only)

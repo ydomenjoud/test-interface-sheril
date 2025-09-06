@@ -185,6 +185,57 @@ export default function CanvasMap({onSelect}: Props) {
             ctx.strokeStyle = col;
             ctx.lineWidth = 1;
             ctx.strokeRect(px + cellSize - size, py, size, size);
+
+            // Flèche de direction (flottes du joueur uniquement, si "direction" est défini)
+            const dirStr = (f as any).direction as string | undefined;
+            if (dirStr) {
+                const parseGridPos = (s: string) => {
+                    // format attendu: "gal_y_x"
+                    const parts = s.split('_');
+                    if (parts.length < 3) return undefined;
+                    const y = Number(parts[1]);
+                    const x = Number(parts[2]);
+                    if (Number.isNaN(x) || Number.isNaN(y)) return undefined;
+                    return { x, y };
+                };
+                const t = parseGridPos(dirStr);
+                if (t) {
+                    const tdx = ((t.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+                    const tdy = ((t.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+                    const tx = tdx * cellSize + cellSize / 2;
+                    const ty = tdy * cellSize + cellSize / 2;
+
+                    // ne tracer que si la cible est dans le viewport
+                    if (tx >= 0 && ty >= 0 && tx <= cols * cellSize && ty <= rows * cellSize) {
+                        const sx = px + cellSize / 2;
+                        const sy = py + cellSize / 2;
+
+                        // dessiner une flèche orange
+                        const drawArrow = (c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) => {
+                            const headLen = Math.max(6, Math.floor(cellSize * 0.25));
+                            const angle = Math.atan2(y2 - y1, x2 - x1);
+                            c.save();
+                            c.strokeStyle = '#ff9800';
+                            c.fillStyle = '#ff9800';
+                            c.lineWidth = 2;
+                            c.beginPath();
+                            c.moveTo(x1, y1);
+                            c.lineTo(x2, y2);
+                            c.stroke();
+                            // pointe de flèche
+                            c.beginPath();
+                            c.moveTo(x2, y2);
+                            c.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+                            c.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+                            c.closePath();
+                            c.fill();
+                            c.restore();
+                        };
+
+                        drawArrow(ctx as CanvasRenderingContext2D, sx, sy, tx, ty);
+                    }
+                }
+            }
         });
 
     }, [rapport, systems, fleets, cellSize, center, currentPlayerId, assetsVersion, setViewportDims]);

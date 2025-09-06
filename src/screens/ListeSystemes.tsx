@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useReport } from '../context/ReportContext';
 import Commandant from "../components/utils/Commandant";
+import {commandantAsString} from "../utils/commandant";
 
 type SortKey =
   | 'etoile' | 'pos' | 'nom' | 'nbpla' | 'proprietaires'
@@ -8,7 +9,7 @@ type SortKey =
 type SortDir = 'asc' | 'desc';
 
 export default function ListeSystemes() {
-  const { rapport } = useReport();
+  const { rapport, global } = useReport();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [sortKey, setSortKey] = useState<SortKey>('nom');
@@ -17,6 +18,7 @@ export default function ListeSystemes() {
   const [filterOwned, setFilterOwned] = useState<'all' | 'owned' | 'notowned'>('all');
   const [filterNom, setFilterNom] = useState('');
   const [filterPolitique, setFilterPolitique] = useState<string>('all');
+  const [filterCommandants, setFilterCommandants] = useState<string[]>([]);
 
   const currentId = rapport?.joueur.numero || 0;
 
@@ -41,8 +43,17 @@ export default function ListeSystemes() {
     return Array.from(set).sort((a, b) => a - b);
   }, [allSystems]);
 
+  const commandantOptions = useMemo(() => {
+    const set = new Set<number>();
+    for (const s of allSystems) {
+      (s.proprietaires || []).forEach((id: number) => set.add(id));
+    }
+    return Array.from(set).sort((a, b) => a - b);
+  }, [allSystems]);
+
   const filtered = useMemo(() => {
     const q = filterNom.trim().toLowerCase();
+    const selected = new Set(filterCommandants);
     return allSystems.filter(s => {
       if (filterOwned === 'owned' && !s.owned) return false;
       if (filterOwned === 'notowned' && s.owned) return false;
@@ -50,10 +61,15 @@ export default function ListeSystemes() {
         const p = (s as any).politique;
         if (String(p) !== filterPolitique) return false;
       }
+      if (selected.size > 0) {
+        const owners: number[] = Array.isArray(s.proprietaires) ? s.proprietaires : [];
+        const hasAny = owners.some(id => selected.has(String(id)));
+        if (!hasAny) return false;
+      }
       if (q && !(s.nom.toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [allSystems, filterOwned, filterPolitique, filterNom]);
+  }, [allSystems, filterOwned, filterPolitique, filterCommandants, filterNom]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -130,6 +146,23 @@ export default function ListeSystemes() {
             placeholder="Filtrer par nom…"
             style={{ marginLeft: 6, width: '100%' }}
           />
+        </label>
+        <label>
+          Commandants:
+          <select
+            multiple
+            value={filterCommandants}
+            onChange={e => {
+              const vals = Array.from(e.currentTarget.selectedOptions).map(o => o.value);
+              setFilterCommandants(vals);
+              setPage(1);
+            }}
+            style={{ marginLeft: 6, minWidth: 140 }}
+          >
+            {commandantOptions.map(id => (
+              <option key={id} value={String(id)}>{commandantAsString(global, id)}</option>
+            ))}
+          </select>
         </label>
         <label>
           Par page:

@@ -1299,7 +1299,7 @@
             </s>
         </systemes>
         <flottes>
-            <f ap="519" as="936" direction="" directive="2" directive_precision="0" hscan="0" nom="flotte de départ" num="0" pos="0_4_6" vitesse="9">
+            <f ap="519" as="936" direction="0_8_8" directive="2" directive_precision="0" hscan="0" nom="flotte de départ" num="0" pos="0_4_6" vitesse="9">
                 <vaisseau exp="158" moral="4500" plan="intercepteur standard" race="1" type="intercepteur standard"/>
                 <vaisseau exp="1288" moral="4506" plan="intercepteur standard" race="1" type="intercepteur standard"/>
                 <vaisseau exp="568" moral="4505" plan="intercepteur standard" race="1" type="intercepteur standard"/>
