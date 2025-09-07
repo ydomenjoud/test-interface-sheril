@@ -17,9 +17,6 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#fb3a3a';
 }
 
-// Cache persistant des images d'étoiles (évite de recréer les Image à chaque rendu)
-const starImageCache: Record<number, HTMLImageElement> = {};
-
 export default function CanvasMap({onSelect}: Props) {
     const {rapport, cellSize, center, setCenter, setViewportDims} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -137,18 +134,6 @@ export default function CanvasMap({onSelect}: Props) {
             ctx.fillText(String(yCoord), xPos + 4, 12);
         }
 
-        // Utilise le cache persistant des images d'étoiles
-        function getStarImg(t: number): HTMLImageElement {
-            let img = starImageCache[t];
-            if (!img) {
-                img = new Image();
-                img.onload = () => setAssetsVersion(v => v + 1);
-                img.src = `${process.env.PUBLIC_URL}/img/etoile${t}.png`;
-                starImageCache[t] = img;
-            }
-            return img;
-        }
-
         const shipImg = shipImgRef.current;
 
         // systèmes
@@ -159,15 +144,25 @@ export default function CanvasMap({onSelect}: Props) {
             const py = dy * cellSize;
             if (px < 0 || py < 0 || px >= cols * cellSize || py >= rows * cellSize) return;
 
-            const img = getStarImg(s.typeEtoile);
-            if (img.complete && img.naturalWidth > 0) {
-                (ctx as CanvasRenderingContext2D).drawImage(img, px, py, cellSize, cellSize);
-            }
-
+            // Couleur en fonction de la possession (ex-logic de bordure)
             const col = colorForOwnership(currentPlayerId, s.owners, rapport?.joueur.alliances, rapport?.joueur.pna);
-            ctx.strokeStyle = col;
-            ctx.lineWidth = 1;
-            ctx.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
+
+            // Taille du disque en fonction du typeEtoile:
+            // type 1 => 50% de la case, type 9/10 => 100% de la case, interpolation linéaire entre 1..9
+            const t = Math.max(1, Math.min(10, Number(s.typeEtoile) || 1));
+            const factor = t >= 9 ? 1 : (0.5 + ((t - 1) * (0.5 / 8))); // t=1 -> 0.5, t=9 -> 1.0
+            const diameter = cellSize * factor;
+            const radius = diameter / 2;
+
+            const cx = px + cellSize / 2;
+            const cy = py + cellSize / 2;
+
+            const c2d = ctx as CanvasRenderingContext2D;
+            c2d.beginPath();
+            c2d.arc(cx, cy, radius, 0, Math.PI * 2);
+            c2d.fillStyle = col;
+            c2d.fill();
+            // plus de bordure
         });
 
         // flottes
