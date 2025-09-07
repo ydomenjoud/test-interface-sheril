@@ -119,7 +119,7 @@ export default function ListeSystemes() {
   }
 
   return (
-    <div style={{ padding: 12, overflow: 'auto', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ padding: 12, overflow: 'auto', width: 'calc(100% - 20px)', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <h3>Systèmes</h3>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>

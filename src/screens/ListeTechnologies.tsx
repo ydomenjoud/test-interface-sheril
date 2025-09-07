@@ -40,7 +40,7 @@ export default function ListeTechnologies() {
   // Tous les hooks sont appelés inconditionnellement
   const knownSet = useMemo(() => {
     const set = new Set<string>();
-    (rapport?.technologiesConnues ?? []).forEach(c => set.add(c));
+    (rapport?.technologiesConnues ?? []).forEach(c => set.add(c.toLowerCase()));
     return set;
   }, [rapport]);
 

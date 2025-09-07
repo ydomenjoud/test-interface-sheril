@@ -73,9 +73,9 @@ export function parseRapportXml(text: string): Rapport {
     sysNodes.forEach((s) => {
         const pos = parsePosString(getAttr(s, ['pos']) || '0_1_1');
         const nom = getAttr(s, ['nom']) || 'Système';
-        const rawStar = getAttrNum(s, ['typeetoile']) ?? getAttrNum(s, ['type']);
+        const rawStar = getAttrNum(s, ['typeEtoile']) ?? getAttrNum(s, ['type']);
         const typeEtoile = (rawStar ?? 0);
-        const nbPla = getAttrNum(s, ['nombrepla']) ?? getAttrNum(s, ['nbpla']) ?? 0;
+        const nbPla = getAttrNum(s, ['nbpla']) ?? getAttrNum(s, ['nbpla']) ?? 0;
 
         const proprietaires: number[] = [joueur.numero || 0];
 
@@ -123,11 +123,11 @@ export function parseRapportXml(text: string): Rapport {
             typeEtoile,
             nbPla,
             proprietaires,
+            scan: getAttrNum(s, ['hscan']),
             planetes, // attributs additionnels présents sur les systèmes du joueur
             politique: getAttrNum(s, ['politique']),
             entretien: getAttrNum(s, ['entretien']),
             revenu: getAttrNum(s, ['revenu']),
-            hscan: getAttrNum(s, ['hscan']),
             bcont: getAttrNum(s, ['bcont']),
             besp: getAttrNum(s, ['besp']),
             btech: getAttrNum(s, ['btech']),
@@ -140,9 +140,9 @@ export function parseRapportXml(text: string): Rapport {
     sysDetNodes.forEach((s) => {
         const pos = parsePosString(getAttr(s, ['pos']) || '0_1_1');
         const nom = getAttr(s, ['nom']) || 'Système';
-        const rawStar = getAttrNum(s, ['typeetoile']) ?? getAttrNum(s, ['type']);
+        const rawStar = getAttrNum(s, ['typeEtoile']) ?? getAttrNum(s, ['type']);
         const typeEtoile = rawStar ?? 0;
-        const nbPla = getAttrNum(s, ['nbpla']) ?? getAttrNum(s, ['nombrepla']) ?? 0;
+        const nbPla = getAttrNum(s, ['nbpla']) ?? getAttrNum(s, ['nbpla']) ?? 0;
         const proprietaires: number[] = [];
         qAll(s, ['proprio']).forEach((p) => {
             const v = Number((p.textContent || '').trim());
@@ -169,6 +169,7 @@ export function parseRapportXml(text: string): Rapport {
             type: 'joueur', proprio: joueur.numero,
             num, nom, pos, vaisseaux,
             nbVso: vaisseaux.length,
+            scan: getAttrNum(f, ['hscan']),
             as: getAttrNum(f, ['as']) ?? 0,
             ap: getAttrNum(f, ['ap']) ?? 0,
             directive: getAttrNum(f, ['directive'])|| 0,

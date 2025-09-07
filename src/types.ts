@@ -24,7 +24,6 @@ export interface SystemBase {
     politique?: number;
     entretien?: number;
     revenu?: number;
-    hscan?: number;
     bcont?: number;
     besp?: number;
     btech?: number;
@@ -33,6 +32,7 @@ export interface SystemBase {
 export interface SystemeJoueur extends SystemBase {
     type: 'joueur';
     planetes: Planete[];
+    scan: number;
 }
 
 export interface SystemeDetecte extends SystemBase {
@@ -55,6 +55,7 @@ export interface FlotteJoueur extends FlotteBase {
     vitesse: number;
     ap?: number;
     as?: number;
+    scan: number;
     nbVso: number;
     vaisseaux: { type: string; plan: string; nb?: number; puissance?: string }[];
 }
