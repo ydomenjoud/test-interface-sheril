@@ -2,7 +2,7 @@ export type XY = { x: number; y: number };
 
 export type Race = { id: number; nom: string; couleur?: string };
 export type Marchandise = { code: number; nom: string };
-export type Commandant = { numero?: number; nom?: string; raceId?: number;}
+export type Commandant = { numero?: number; nom?: string; raceId?: number; }
 
 export type TechCaracteristique = { code: number; value: number };
 export type Technologie = {
@@ -15,7 +15,7 @@ export type Planete = {
     minerai?: number; batiments: { techCode: string; count: number }[]; populations: { raceId: number; nb: number }[];
 };
 
-interface SystemBase {
+export interface SystemBase {
     nom: string;
     pos: XY;
     typeEtoile: number;
@@ -39,33 +39,30 @@ export interface SystemeDetecte extends SystemBase {
     type: 'detecte';
 }
 
-export type FlotteJoueur = {
-    type: 'joueur';
+export interface FlotteBase {
+    type: 'joueur' | 'detecte';
     num: number;
     nom: string;
     pos: XY;
-    direction?: string;
-    directive?: string | number;
-    vitesse?: number;
-    ap?: number;
-    as?: number;
-    vaisseaux: { type: string; plan: string; nb?: number; puissance?: string }[];
-};
-
-export type FlotteDetectee = {
-    type: 'detecte';
-    num: number;
-    nom: string;
-    pos: XY;
+    nbVso: number;
     proprio: number;
-    nbVso?: number;
-    direction?: string;
-    directive?: string | number;
-    vitesse?: number;
+}
+
+export interface FlotteJoueur extends FlotteBase {
+    type: 'joueur';
+    direction?: XY;
+    directive: string | number;
+    vitesse: number;
     ap?: number;
     as?: number;
+    nbVso: number;
+    vaisseaux: { type: string; plan: string; nb?: number; puissance?: string }[];
+}
+
+export interface FlotteDetectee extends FlotteBase {
+    type: 'detecte';
     puiss: 'faible' | 'moyenne' | 'grande' | string;
-};
+}
 
 export interface Alliance {
     createur: number;
@@ -77,16 +74,16 @@ export interface Alliance {
 
 export type Rapport = {
     joueur: {
-        numero?: number;
-        nom?: string;
-        raceId?: number;
-        reputation?: string;
-        statut?: string;
-        puissance?: number;
-        argent?: number;
-        capitale?: XY;
-        alliances?: Alliance[]; // aliances
-        pna?: number[]; // ids PNA
+        numero: number;
+        nom: string;
+        raceId: number;
+        reputation: string;
+        statut: string;
+        puissance: number;
+        argent: number;
+        capitale: XY;
+        alliances: Alliance[]; // aliances
+        pna: number[]; // ids PNA
     };
     technologiesConnues: string[];
     systemesJoueur: SystemeJoueur[];

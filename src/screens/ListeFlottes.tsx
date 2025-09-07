@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useReport } from '../context/ReportContext';
 import Commandant from "../components/utils/Commandant";
 import {commandantAsString} from "../utils/commandant";
+import Position from "../components/utils/Position";
 
 type SortKey = 'pos' | 'nom' | 'direction' | 'directive' | 'vitesse' | 'as' | 'ap' | 'nbv' | 'proprio';
 type SortDir = 'asc' | 'desc';
@@ -30,8 +31,7 @@ export default function ListeFlottes() {
     if (!rapport) return [];
     const own = rapport.flottesJoueur.map(f => ({
       ...f,
-      proprio: currentId,
-      nbv: f.vaisseaux?.length ?? 0,
+      nbv: f.nbVso ?? 0,
       posKey: f.pos.x * 1000 + f.pos.y,
     }));
     const det = rapport.flottesDetectees.map(f => ({
@@ -40,7 +40,7 @@ export default function ListeFlottes() {
       posKey: f.pos.x * 1000 + f.pos.y,
     }));
     return [...own, ...det];
-  }, [rapport, currentId]);
+  }, [rapport]);
 
   const filtered = useMemo(() => {
     const q = filterNom.trim().toLowerCase();
@@ -160,9 +160,9 @@ export default function ListeFlottes() {
           <tbody>
             {pageItems.map((f: any, i) => (
               <tr key={`${f.type}-${f.num}-${i}`}>
-                <td style={{ whiteSpace: 'nowrap' }}>{f.pos.x}-{f.pos.y}</td>
+                <td style={{ whiteSpace: 'nowrap' }}><Position pos={f.pos} /></td>
                 <td>{f.nom}</td>
-                <td>{f.direction ?? '—'}</td>
+                <td><Position pos={f.direction} /></td>
                 <td>{f.directive ?? '—'}</td>
                 <td style={{ textAlign: 'right' }}>{f.vitesse ?? '—'}</td>
                 <td style={{ textAlign: 'right' }}>{f.as ?? '—'}</td>

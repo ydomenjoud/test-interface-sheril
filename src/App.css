@@ -63,12 +63,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .app-nav {
-    width: 180px;
-    min-width: 180px;
-    border-right: 1px solid #ddd;
     padding: 12px;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 8px;
     overflow: auto;
 }
@@ -95,7 +92,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Carte layout */
 .carte-wrap {
     display: grid;
-    grid-template-columns: 1fr 300px;
+    grid-template-columns: 60vw 40vw;
     grid-template-rows: auto 1fr;
     grid-template-areas:
     "toolbar toolbar"
@@ -185,4 +182,9 @@ h1, h2, h3, h4, h5, h6 {
 
 .tech-table tbody tr:hover {
     outline: 1px solid #71deff55;
+}
+
+.position {
+    color: var(--accent);
+    font-weight: bold;
 }

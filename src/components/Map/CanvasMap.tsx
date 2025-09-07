@@ -31,7 +31,7 @@ export default function CanvasMap({onSelect}: Props) {
     }, [center]);
 
     // Gestion du drag
-    const dragRef = useRef({ dragging: false, lastX: 0, lastY: 0, accX: 0, accY: 0 });
+    const dragRef = useRef({dragging: false, lastX: 0, lastY: 0, accX: 0, accY: 0});
 
     // Préchargement et re-render des images
     const [assetsVersion, setAssetsVersion] = useState(0);
@@ -63,30 +63,20 @@ export default function CanvasMap({onSelect}: Props) {
 
     const systems = useMemo(() => {
         if (!rapport) return [];
-        return [
-            ...rapport.systemesJoueur.map(s => ({
-                ...s,
-                owners: s.proprietaires?.length ? s.proprietaires : [currentPlayerId],
-            })),
-            ...rapport.systemesDetectes.map(s => ({
-                ...s,
-                owners: s.proprietaires,
-            })),
-        ];
+        return [...rapport.systemesJoueur.map(s => ({
+            ...s, owners: s.proprietaires?.length ? s.proprietaires : [currentPlayerId],
+        })), ...rapport.systemesDetectes.map(s => ({
+            ...s, owners: s.proprietaires,
+        })),];
     }, [rapport, currentPlayerId]);
 
     const fleets = useMemo(() => {
         if (!rapport) return [];
-        return [
-            ...rapport.flottesJoueur.map(f => ({
-                ...f,
-                owner: currentPlayerId,
-            })),
-            ...rapport.flottesDetectees.map(f => ({
-                ...f,
-                owner: f.proprio,
-            })),
-        ];
+        return [...rapport.flottesJoueur.map(f => ({
+            ...f, owner: currentPlayerId,
+        })), ...rapport.flottesDetectees.map(f => ({
+            ...f, owner: f.proprio,
+        })),];
     }, [rapport, currentPlayerId]);
 
     useEffect(() => {
@@ -122,9 +112,7 @@ export default function CanvasMap({onSelect}: Props) {
         for (let r = 0; r <= rows; r++) {
             const xCoord = torusDelta(center.x, r - halfRows, BOUNDS.maxX);
             const yPos = r * cellSize;
-            if ((xCoord - 1) % 20 === 0) ctx.strokeStyle = '#123b66';
-            else if ((xCoord - 1) % 5 === 0) ctx.strokeStyle = '#661212';
-            else ctx.strokeStyle = '#444';
+            if ((xCoord - 1) % 20 === 0) ctx.strokeStyle = '#123b66'; else if ((xCoord - 1) % 5 === 0) ctx.strokeStyle = '#661212'; else ctx.strokeStyle = '#444';
             ctx.beginPath();
             ctx.moveTo(0, yPos);
             ctx.lineTo(cols * cellSize, yPos);
@@ -138,9 +126,7 @@ export default function CanvasMap({onSelect}: Props) {
         for (let c = 0; c <= cols; c++) {
             const yCoord = torusDelta(center.y, c - halfCols, BOUNDS.maxY);
             const xPos = c * cellSize;
-            if ((yCoord - 1) % 20 === 0) ctx.strokeStyle = '#123b66';
-            else if ((yCoord - 1) % 5 === 0) ctx.strokeStyle = '#661212';
-            else ctx.strokeStyle = '#444';
+            if ((yCoord - 1) % 20 === 0) ctx.strokeStyle = '#123b66'; else if ((yCoord - 1) % 5 === 0) ctx.strokeStyle = '#661212'; else ctx.strokeStyle = '#444';
             ctx.beginPath();
             ctx.moveTo(xPos, 0);
             ctx.lineTo(xPos, rows * cellSize);
@@ -202,53 +188,41 @@ export default function CanvasMap({onSelect}: Props) {
             ctx.strokeRect(px + cellSize - size, py, size, size);
 
             // Flèche de direction (flottes du joueur uniquement, si "direction" est défini)
-            const dirStr = (f as any).direction as string | undefined;
-            if (dirStr) {
-                const parseGridPos = (s: string) => {
-                    // format attendu: "gal_y_x"
-                    const parts = s.split('_');
-                    if (parts.length < 3) return undefined;
-                    const y = Number(parts[1]);
-                    const x = Number(parts[2]);
-                    if (Number.isNaN(x) || Number.isNaN(y)) return undefined;
-                    return { x, y };
-                };
-                const t = parseGridPos(dirStr);
-                if (t) {
-                    const tdx = ((t.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
-                    const tdy = ((t.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
-                    const tx = tdx * cellSize + cellSize / 2;
-                    const ty = tdy * cellSize + cellSize / 2;
+            const t = (f as any).direction;
+            if (t) {
+                const tdx = ((t.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+                const tdy = ((t.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+                const tx = tdx * cellSize + cellSize / 2;
+                const ty = tdy * cellSize + cellSize / 2;
 
-                    // ne tracer que si la cible est dans le viewport
-                    if (tx >= 0 && ty >= 0 && tx <= cols * cellSize && ty <= rows * cellSize) {
-                        const sx = px + cellSize / 2;
-                        const sy = py + cellSize / 2;
+                // ne tracer que si la cible est dans le viewport
+                if (tx >= 0 && ty >= 0 && tx <= cols * cellSize && ty <= rows * cellSize) {
+                    const sx = px + cellSize / 2;
+                    const sy = py + cellSize / 2;
 
-                        // dessiner une flèche orange
-                        const drawArrow = (c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) => {
-                            const headLen = Math.max(6, Math.floor(cellSize * 0.25));
-                            const angle = Math.atan2(y2 - y1, x2 - x1);
-                            c.save();
-                            c.strokeStyle = '#ff9800';
-                            c.fillStyle = '#ff9800';
-                            c.lineWidth = 2;
-                            c.beginPath();
-                            c.moveTo(x1, y1);
-                            c.lineTo(x2, y2);
-                            c.stroke();
-                            // pointe de flèche
-                            c.beginPath();
-                            c.moveTo(x2, y2);
-                            c.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
-                            c.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
-                            c.closePath();
-                            c.fill();
-                            c.restore();
-                        };
+                    // dessiner une flèche orange
+                    const drawArrow = (c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) => {
+                        const headLen = Math.max(6, Math.floor(cellSize * 0.25));
+                        const angle = Math.atan2(y2 - y1, x2 - x1);
+                        c.save();
+                        c.strokeStyle = '#ff9800';
+                        c.fillStyle = '#ff9800';
+                        c.lineWidth = 2;
+                        c.beginPath();
+                        c.moveTo(x1, y1);
+                        c.lineTo(x2, y2);
+                        c.stroke();
+                        // pointe de flèche
+                        c.beginPath();
+                        c.moveTo(x2, y2);
+                        c.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+                        c.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+                        c.closePath();
+                        c.fill();
+                        c.restore();
+                    };
 
-                        drawArrow(ctx as CanvasRenderingContext2D, sx, sy, tx, ty);
-                    }
+                    drawArrow(ctx as CanvasRenderingContext2D, sx, sy, tx, ty);
                 }
             }
         });
@@ -341,8 +315,7 @@ export default function CanvasMap({onSelect}: Props) {
 
             if ((stepX !== 0 || stepY !== 0) && centerRef.current) {
                 const next = {
-                    x: wrapX(centerRef.current.x + stepX),
-                    y: wrapY(centerRef.current.y + stepY),
+                    x: wrapX(centerRef.current.x + stepX), y: wrapY(centerRef.current.y + stepY),
                 };
                 centerRef.current = next;
                 setCenter(next);
@@ -359,14 +332,12 @@ export default function CanvasMap({onSelect}: Props) {
         window.addEventListener('mouseup', onUp);
     }, [cellSize, setCenter]);
 
-    return (
-        <div className="canvas-host">
+    return (<div className="canvas-host">
             <canvas
                 ref={canvasRef}
                 style={{width: '100%', height: '100vh'}}
                 onClick={handleClick}
                 onMouseDown={handleMouseDown}
             />
-        </div>
-    );
+        </div>);
 }

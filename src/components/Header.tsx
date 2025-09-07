@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { useReport } from '../context/ReportContext';
 import Commandant from "./utils/Commandant";
+import {NavLink} from "react-router-dom";
 
 export default function Header() {
   const { rapport, loadRapportFile, ready, setCenter } = useReport();
@@ -8,7 +9,6 @@ export default function Header() {
 
   return (
     <header className="app-header">
-      <div className="header-title">Interface Sheril</div>
       <div>
           <Commandant num={rapport?.joueur.numero} />
       </div>
@@ -20,6 +20,29 @@ export default function Header() {
       >
         Capitale: {rapport?.joueur.capitale ? `${rapport.joueur.capitale.x}-${rapport.joueur.capitale.y}` : '—'}
       </button>
+        <nav
+            className="app-nav"
+            style={{
+                display: 'flex',
+                gap: 12,
+                padding: '8px 12px',
+                borderBottom: '1px solid #222',
+                flexWrap: 'wrap',
+            }}
+        >
+            <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
+                Carte
+            </NavLink>
+            <NavLink to="/systemes" className={({ isActive }) => (isActive ? 'active' : '')}>
+                Systèmes
+            </NavLink>
+            <NavLink to="/flottes" className={({ isActive }) => (isActive ? 'active' : '')}>
+                Flottes
+            </NavLink>
+            <NavLink to="/technologies" className={({ isActive }) => (isActive ? 'active' : '')}>
+                Technologies
+            </NavLink>
+        </nav>
       <div className="header-spacer" />
       <input
         ref={rapportInput}
@@ -46,7 +69,6 @@ export default function Header() {
       >
         Charger exemple de rapport
       </button>
-      <span className="badge">{ready ? 'Données prêtes' : 'En attente des données'}</span>
     </header>
   );
 }

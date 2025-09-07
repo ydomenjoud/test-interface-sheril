@@ -1,20 +1,20 @@
 import {Alliance, FlotteDetectee, FlotteJoueur, Rapport, SystemeDetecte, SystemeJoueur} from '../types';
-import {parsePosString} from '../utils/position';
+import {isPos, parsePosString} from '../utils/position';
 
-function getAttr(el: Element | null | undefined, names: string[]): string | undefined {
-    if (!el) return undefined;
+function getAttr(el: Element | null | undefined, names: string[]): string  {
+    if (!el) return '';
     for (const n of names) {
         const v = el.getAttribute(n);
         if (v != null) return v;
     }
-    return undefined;
+    return '';
 }
 
-function getAttrNum(el: Element | null | undefined, names: string[]): number | undefined {
+function getAttrNum(el: Element | null | undefined, names: string[]): number {
     const v = getAttr(el, names);
-    if (v == null || v === '') return undefined;
+    if (v == null || v === '') return 0;
     const n = Number(v);
-    return Number.isNaN(n) ? undefined : n;
+    return Number.isNaN(n) ? 0 : n;
 }
 
 function qOne(root: ParentNode | null | undefined, selectors: string[]): Element | null {
@@ -53,20 +53,18 @@ export function parseRapportXml(text: string): Rapport {
         argent: getAttrNum(joueurNode, ['argent']),
         capitale: (() => {
             const cap = getAttr(joueurNode, ['capitale']);
-            return cap ? parsePosString(cap) : undefined;
+            return cap ? parsePosString(cap) : {x: 1, y: 1};
         })(),
         alliances: [],
         pna: [],
     };
 
 
-
-
     // Technologies connues (lowercase)
     const technologiesConnues: string[] = [];
     qAll(joueurNode, ['technologies > connue']).forEach((n) => {
-      const code = getAttr(n, ['code']);
-      if (code) technologiesConnues.push(code);
+        const code = getAttr(n, ['code']);
+        if (code) technologiesConnues.push(code);
     });
 
     // Systèmes du joueur (lowercase only)
@@ -119,8 +117,13 @@ export function parseRapportXml(text: string): Rapport {
         });
 
         systemesJoueur.push({
-            type: 'joueur', nom, pos, typeEtoile, nbPla, proprietaires, planetes,
-            // attributs additionnels présents sur les systèmes du joueur
+            type: 'joueur',
+            nom,
+            pos,
+            typeEtoile,
+            nbPla,
+            proprietaires,
+            planetes, // attributs additionnels présents sur les systèmes du joueur
             politique: getAttrNum(s, ['politique']),
             entretien: getAttrNum(s, ['entretien']),
             revenu: getAttrNum(s, ['revenu']),
@@ -161,7 +164,17 @@ export function parseRapportXml(text: string): Rapport {
                 type: getAttr(v, ['type']) || getAttr(v, ['plan']) || 'Vaisseau', plan: getAttr(v, ['plan']) || '',
             });
         });
-        flottesJoueur.push({type: 'joueur', num, nom, pos, vaisseaux, direction: getAttr(f, ['direction']) || ''});
+        const direction = getAttr(f, ['direction']);
+        flottesJoueur.push({
+            type: 'joueur', proprio: joueur.numero,
+            num, nom, pos, vaisseaux,
+            nbVso: vaisseaux.length,
+            as: getAttrNum(f, ['as']) ?? 0,
+            ap: getAttrNum(f, ['ap']) ?? 0,
+            directive: getAttrNum(f, ['directive'])|| 0,
+            vitesse: getAttrNum(f, ['vitesse'])|| 0,
+            direction: isPos(direction) ? parsePosString(direction) : undefined
+        });
     });
 
     // Flottes détectées (lowercase only)
@@ -174,6 +187,7 @@ export function parseRapportXml(text: string): Rapport {
             num: getAttrNum(f, ['num']) ?? 0,
             nom: getAttr(f, ['nom']) || 'Flotte',
             pos,
+            nbVso: getAttrNum(f, ['nbvso']) ?? 0,
             proprio: getAttrNum(f, ['proprio']) ?? 0,
             puiss: getAttr(f, ['puiss']) || 'inconnue',
         });
@@ -194,8 +208,7 @@ export function parseRapportXml(text: string): Rapport {
     joueur.alliances = alliances;
 
     const rapport: Rapport = {
-        technologiesConnues,
-        joueur, systemesJoueur, systemesDetectes, flottesJoueur, flottesDetectees,
+        technologiesConnues, joueur, systemesJoueur, systemesDetectes, flottesJoueur, flottesDetectees,
     };
 
     console.log('RAPPORT', rapport)

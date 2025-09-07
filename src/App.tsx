@@ -13,22 +13,12 @@ function App() {
     <ReportProvider>
       <div className="app-root">
         <Header />
-        <div className="app-body">
-          <nav className="app-nav">
-            <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
-              Carte
-            </NavLink>
-            <NavLink to="/systemes" className={({ isActive }) => (isActive ? 'active' : '')}>
-              Systèmes
-            </NavLink>
-            <NavLink to="/flottes" className={({ isActive }) => (isActive ? 'active' : '')}>
-              Flottes
-            </NavLink>
-            <NavLink to="/technologies" className={({ isActive }) => (isActive ? 'active' : '')}>
-              Technologies
-            </NavLink>
-          </nav>
-          <main className="app-main">
+        <div className="app-body" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+
+          <main
+            className="app-main"
+            style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+          >
             <Routes>
               <Route path="/" element={<Carte />} />
               <Route path="/systemes" element={<ListeSystemes />} />

@@ -1,10 +1,19 @@
 import { XY } from '../types';
 export const BOUNDS = { minX: 0, maxX: 40, minY: 0, maxY: 40 };
 
+export  function isPos(pos: string): boolean {
+    if(!pos || !pos.split) { return false; }
+    const parts = pos.split('_');
+    if (parts.length < 3) return false;
+    const x = parseInt(parts[1], 10);
+    const y = parseInt(parts[2], 10);
+    return !isNaN(x) && !isNaN(y);
+}
+
 export function parsePosString(pos: string): XY {
   // format GALAXIE_POSY_POSX ; "0_4_6" => x=4 (vertical), y=6 (horizontal)
   const parts = pos.split('_');
-  if (parts.length < 3) return { x: 1, y: 1 };
+  if (parts.length < 3) return { x: 0, y: 0 };
   const x = parseInt(parts[1], 10);
   const y = parseInt(parts[2], 10);
   return { x, y };
