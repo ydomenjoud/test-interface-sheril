@@ -136,6 +136,57 @@ export default function CanvasMap({onSelect}: Props) {
 
         const shipImg = shipImgRef.current;
 
+        // ZONES DE DÉTECTION (scan) – systèmes et flottes du joueur
+        // On calcule d’abord l’ensemble des cases détectées pour éviter tout empilement de couleurs.
+        const scanners: { pos: XY; scan: number }[] = [];
+        systems.forEach(s => {
+            const sc = Number((s as any).scan || 0);
+            if (sc > 0) scanners.push({ pos: s.pos, scan: sc });
+        });
+        fleets.forEach(f => {
+            const sc = Number((f as any).scan || 0);
+            if (sc > 0) scanners.push({ pos: f.pos, scan: sc });
+        });
+
+        // Déduplication des cases détectées (distance de Tchebyshev)
+        const detected = new Set<string>();
+        scanners.forEach(src => {
+            const r = Math.max(0, Math.floor(src.scan));
+            for (let dxCell = -r; dxCell <= r; dxCell++) {
+                for (let dyCell = -r; dyCell <= r; dyCell++) {
+                    if (Math.max(Math.abs(dxCell), Math.abs(dyCell)) > r) continue;
+
+                    // Mapping tore -> indices dans la fenêtre
+                    const tx = wrapX(src.pos.x + dyCell); // déplacement vertical
+                    const ty = wrapY(src.pos.y + dxCell); // déplacement horizontal
+
+                    const cxIdx = ((ty - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+                    const cyIdx = ((tx - topX + BOUNDS.maxX) % BOUNDS.maxX);
+                    const px = cxIdx * cellSize;
+                    const py = cyIdx * cellSize;
+
+                    if (px < 0 || py < 0 || px >= cols * cellSize || py >= rows * cellSize) continue;
+
+                    detected.add(`${cxIdx},${cyIdx}`);
+                }
+            }
+        });
+
+        // Dessin unique des cases détectées, en bleu transparent uniforme
+        const cScan = ctx as CanvasRenderingContext2D;
+        cScan.save();
+        cScan.globalAlpha = 1.0;
+        cScan.fillStyle = 'rgba(0, 128, 255, 0.22)'; // bleu transparent
+        detected.forEach(key => {
+            const [ixStr, iyStr] = key.split(',');
+            const ix = Number(ixStr);
+            const iy = Number(iyStr);
+            const px = ix * cellSize;
+            const py = iy * cellSize;
+            cScan.fillRect(px, py, cellSize, cellSize);
+        });
+        cScan.restore();
+
         // systèmes
         systems.forEach(s => {
             const dx = ((s.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
