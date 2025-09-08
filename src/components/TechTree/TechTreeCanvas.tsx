@@ -330,7 +330,7 @@ export default function TechTreeCanvas({
       const h = n.h * scale;
       // Fond
       drawRoundRect(screenX, screenY, w, h, 8 * scale);
-      const fillColor = n.known ? '#145a32' /* vert foncé */ : n.color;
+      const fillColor = n.known ? '#145a32' /* vert foncé */ : '#666666' /* gris pour inconnu */;
       ctx.fillStyle = fillColor;
       ctx.fill();
       // Bordure

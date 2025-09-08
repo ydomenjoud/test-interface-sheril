@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useReport } from '../context/ReportContext';
 import { Technologie } from '../types';
 
-type SortKey = 'connu' | 'type' | 'nom' | 'recherche' | 'description' | 'caracteristiques' | 'parents';
+type SortKey = 'connu' | 'type' | 'nom' | 'recherche' | 'description' | 'marchandises' | 'caracteristiques' | 'parents';
 type SortDir = 'asc' | 'desc';
 
 function typeLabel(t: 0 | 1) {
@@ -46,6 +46,8 @@ export default function ListeTechnologies() {
 
   const withDerived = useMemo(() => {
     const list = global?.technologies ?? [];
+    const marchMap = new Map<number, string>();
+    (global?.marchandises ?? []).forEach(m => marchMap.set(m.code, m.nom));
     return list.map(t => {
       const connu = knownSet.has(t.code);
       const caracStr = (t.caracteristiques || [])
@@ -54,7 +56,10 @@ export default function ListeTechnologies() {
           return `${label ?? c.code}:${c.value}`;
         }).join(', ');
       const parentsStr = (t.parents || []).join(', ');
-      return { ...t, connu, caracStr, parentsStr };
+      const marchStr = (t.marchandises || [])
+        .map(m => `${marchMap.get(m.code) ?? m.code}: ${m.nb}`)
+        .join(', ');
+      return { ...t, connu, caracStr, parentsStr, marchStr };
     });
   }, [global, knownSet]);
 
@@ -82,6 +87,7 @@ export default function ListeTechnologies() {
         case 'nom': av = (a.nom || '').toLowerCase(); bv = (b.nom || '').toLowerCase(); break;
         case 'recherche': av = a.recherche ?? 0; bv = b.recherche ?? 0; break;
         case 'description': av = (a.description || '').toLowerCase(); bv = (b.description || '').toLowerCase(); break;
+        case 'marchandises': av = (a.marchStr || '').toLowerCase(); bv = (b.marchStr || '').toLowerCase(); break;
         case 'caracteristiques': av = a.caracStr.toLowerCase(); bv = b.caracStr.toLowerCase(); break;
         case 'parents': av = a.parentsStr.toLowerCase(); bv = b.parentsStr.toLowerCase(); break;
         default: av = 0; bv = 0;
@@ -206,6 +212,7 @@ export default function ListeTechnologies() {
               {header('nom', 'Nom')}
               {header('recherche', 'Recherche')}
               {header('description', 'Description')}
+              {header('marchandises', 'Marchandises')}
               {header('caracteristiques', 'Caractéristiques')}
               {header('parents', 'Parents')}
             </tr>
@@ -232,6 +239,17 @@ export default function ListeTechnologies() {
                     </span>
                   );
                 });
+
+                const marchContent = (t.marchandises && t.marchandises.length)
+                  ? t.marchandises.map((m, i) => {
+                      const nom = global?.marchandises.find(mm => mm.code === m.code)?.nom ?? String(m.code);
+                      return (
+                        <div key={i} title={`code ${m.code}`} style={{ whiteSpace: 'nowrap' }}>
+                          {nom}: {m.nb}
+                        </div>
+                      );
+                    })
+                  : '';
 
                 const parentsContent = t.parents?.length
                   ? t.parents.map((code, idx) => {
@@ -262,6 +280,9 @@ export default function ListeTechnologies() {
                           style={{ fontSize: '0.8rem' }}
                         dangerouslySetInnerHTML={{ __html: t.description ?? '' }}
                       />
+                    </td>
+                    <td>
+                      {marchContent}
                     </td>
                     <td>{carac}</td>
                     <td>{parentsContent}</td>

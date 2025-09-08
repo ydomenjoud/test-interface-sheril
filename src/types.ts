@@ -5,9 +5,10 @@ export type Marchandise = { code: number; nom: string };
 export type Commandant = { numero?: number; nom?: string; raceId?: number; }
 
 export type TechCaracteristique = { code: number; value: number };
+export type TechMarchandise = { code: number; nb: number };
 export type Technologie = {
     base: string; code: string; niv: number; nom: string; type: 0 | 1; // 0 batiment, 1 composant
-    recherche: number; description?: string; parents: string[]; caracteristiques: TechCaracteristique[];
+    recherche: number; description?: string; parents: string[]; caracteristiques: TechCaracteristique[]; marchandises?: TechMarchandise[];
 };
 
 export type Planete = {

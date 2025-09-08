@@ -19,8 +19,12 @@ export function parseDataXml(text: string): GlobalData {
         const caracteristiques = Array.from(t.querySelectorAll('caracteristique')).map(c => ({
             code: Number(c.getAttribute('code') || 0), value: Number(c.getAttribute('value') || 0),
         }));
+        const marchandises = Array.from(t.querySelectorAll('marchandise')).map(m => ({
+            code: Number(m.getAttribute('code') || 0),
+            nb: Number(m.getAttribute('nb') || 0),
+        }));
         techs.push({
-            base, code, niv, nom, type, recherche, description, parents, caracteristiques,
+            base, code, niv, nom, type, recherche, description, parents, caracteristiques, marchandises,
         });
     });
 

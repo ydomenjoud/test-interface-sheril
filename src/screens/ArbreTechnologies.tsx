@@ -89,7 +89,14 @@ export default function ArbreTechnologies() {
             list="tech-search-list"
             placeholder="Nom ou code…"
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={e => {
+              const v = e.target.value;
+              setQuery(v);
+              const exact = techByCode.get(v);
+              if (exact) {
+                setSelectedCode(exact.code);
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 // le submit gère
@@ -125,7 +132,6 @@ export default function ArbreTechnologies() {
             style={{ width: 64, marginLeft: 6 }}
           />
         </label>
-        <button type="submit">Aller</button>
         {selectedCode && (
           <button type="button" onClick={() => setSelectedCode(undefined)}>Réinitialiser</button>
         )}
