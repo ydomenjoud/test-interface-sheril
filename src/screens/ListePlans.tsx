@@ -179,8 +179,8 @@ export default function ListePlans() {
                 <td>{p.nom}</td>
                 <td><Commandant num={p.concepteur} /></td>
                 <td>{p.marque ?? '—'}</td>
-                <td style={{ textAlign: 'right' }}>{p.tour ?? '—'}</td>
-                <td style={{ textAlign: 'right' }}>{p.taille ?? '—'}</td>
+                <td style={{ textAlign: 'right' }}>{p.tour ?? 0}</td>
+                <td style={{ textAlign: 'right' }}>{((p.taille || 0)+1) ?? '—'}</td>
                 <td style={{ textAlign: 'right' }}>{p.vitesse ?? '—'}</td>
                 <td style={{ textAlign: 'right' }}>{p.pc ?? '—'}</td>
                 <td style={{ textAlign: 'right' }}>{p.minerai ?? '—'}</td>
