@@ -234,8 +234,18 @@ export function parseRapportXml(text: string): Rapport {
         });
     });
 
+    // Budget technologique (valeur absolue)
+    let budgetTechnologique = 0;
+    const budgetsNode = qOne(joueurNode, ['budgets']);
+    qAll(budgetsNode, ['b']).forEach((b) => {
+        if ((getAttr(b, ['type']) || '').toLowerCase() === 'budget technologique') {
+            budgetTechnologique = Math.abs(getAttrNum(b, ['valeur']));
+        }
+    });
+
     const rapport: Rapport = {
         technologiesConnues, joueur, systemesJoueur, systemesDetectes, flottesJoueur, flottesDetectees, plansVaisseaux,
+        budgetTechnologique,
     };
 
     console.log('RAPPORT', rapport)
