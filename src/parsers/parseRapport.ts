@@ -1,4 +1,4 @@
-import {Alliance, FlotteDetectee, FlotteJoueur, Rapport, SystemeDetecte, SystemeJoueur} from '../types';
+import {Alliance, FlotteDetectee, FlotteJoueur, Rapport, SystemeDetecte, SystemeJoueur, PlanVaisseau} from '../types';
 import {isPos, parsePosString} from '../utils/position';
 
 function getAttr(el: Element | null | undefined, names: string[]): string  {
@@ -208,8 +208,34 @@ export function parseRapportXml(text: string): Rapport {
 
     joueur.alliances = alliances;
 
+    // Plans privés du commandant
+    const plansVaisseaux: PlanVaisseau[] = [];
+    qAll(joueurNode, ['plans > p']).forEach((p) => {
+        const nom = getAttr(p, ['nom']) || 'Plan';
+        const concepteur = getAttrNum(p, ['concepteur']) || 0;
+        const marque = getAttr(p, ['marque']) || undefined;
+        const tour = getAttrNum(p, ['tour']) || undefined;
+        const taille = getAttrNum(p, ['taille']) || undefined;
+        const vitesse = getAttrNum(p, ['vitesse']) || undefined;
+        const pc = getAttrNum(p, ['pc']) || undefined;
+        const minerai = getAttrNum(p, ['minerai']) || undefined;
+        const prix = getAttrNum(p, ['centaures', 'prix']) || undefined;
+        const ap = getAttrNum(p, ['ap']) || undefined;
+        const as = getAttrNum(p, ['as']) || undefined;
+        const royalties = getAttrNum(p, ['royalties']) || undefined;
+
+        const composants = qAll(p, ['comp']).map((c) => ({
+            code: getAttr(c, ['code']) || '',
+            nb: getAttrNum(c, ['nb']) || 0,
+        }));
+
+        plansVaisseaux.push({
+            nom, concepteur, marque, tour, taille, vitesse, pc, minerai, prix, ap, as, royalties, composants,
+        });
+    });
+
     const rapport: Rapport = {
-        technologiesConnues, joueur, systemesJoueur, systemesDetectes, flottesJoueur, flottesDetectees,
+        technologiesConnues, joueur, systemesJoueur, systemesDetectes, flottesJoueur, flottesDetectees, plansVaisseaux,
     };
 
     console.log('RAPPORT', rapport)

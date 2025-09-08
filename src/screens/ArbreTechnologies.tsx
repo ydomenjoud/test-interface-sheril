@@ -58,7 +58,7 @@ export default function ArbreTechnologies() {
   const options = useMemo(() => {
     return techs.map(t => ({
       code: t.code,
-      label: `${formatTechName(t)} — ${t.code}`,
+      label: `${formatTechName(t)}`,
     }));
   }, [techs]);
 

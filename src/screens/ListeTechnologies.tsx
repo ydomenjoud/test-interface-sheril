@@ -33,7 +33,7 @@ export default function ListeTechnologies() {
   const [sortKey, setSortKey] = useState<SortKey>('nom');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
-  const [filterConnu, setFilterConnu] = useState<'all' | 'connues' | 'inconnues'>('all');
+  const [filterConnu, setFilterConnu] = useState<'all' | 'connues' | 'inconnues' | 'atteignables'>('all');
   const [filterType, setFilterType] = useState<'all' | 'batiment' | 'composant'>('all');
   const [filterNom, setFilterNom] = useState('');
 
@@ -50,6 +50,8 @@ export default function ListeTechnologies() {
     (global?.marchandises ?? []).forEach(m => marchMap.set(m.code, m.nom));
     return list.map(t => {
       const connu = knownSet.has(t.code);
+      const parentsKnown = (t.parents || []).every(code => knownSet.has(code));
+      const atteignable = !connu && parentsKnown;
       const caracStr = (t.caracteristiques || [])
         .map(c => {
           const label = t.type === 1 ? global?.caracteristiquesComposant[c.code] : global?.caracteristiquesBatiment[c.code];
@@ -59,7 +61,7 @@ export default function ListeTechnologies() {
       const marchStr = (t.marchandises || [])
         .map(m => `${marchMap.get(m.code) ?? m.code}: ${m.nb}`)
         .join(', ');
-      return { ...t, connu, caracStr, parentsStr, marchStr };
+      return { ...t, connu, atteignable, caracStr, parentsStr, marchStr };
     });
   }, [global, knownSet]);
 
@@ -68,6 +70,7 @@ export default function ListeTechnologies() {
     return withDerived.filter(t => {
       if (filterConnu === 'connues' && !t.connu) return false;
       if (filterConnu === 'inconnues' && t.connu) return false;
+      if (filterConnu === 'atteignables' && !(t as any).atteignable) return false;
       if (filterType === 'batiment' && t.type !== 0) return false;
       if (filterType === 'composant' && t.type !== 1) return false;
       if (q && !(t.nom?.toLowerCase().includes(q) || t.code.toLowerCase().includes(q))) return false;
@@ -130,11 +133,13 @@ export default function ListeTechnologies() {
     );
   }
 
-  const rowStyle = (t: Technologie & { connu: boolean }) =>
-    t.connu ? { background: '#0f3d0f33' } : { background: '#ffa50022' };
+  const rowStyle = (t: Technologie & { connu: boolean; atteignable?: boolean }) =>
+    t.connu
+      ? { background: '#0f3d0f33' }
+      : (t.atteignable ? { background: '#1e90ff33' } : { background: '#ffa50022' });
 
   return (
-    <div style={{ padding: 12, overflow: 'auto', width: '100%', height: 'calc(100%-20px)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ padding: 12, overflow: 'auto', width: 'calc(100%-20px)', height: 'calc(100%-20px)', display: 'flex', flexDirection: 'column' }}>
       <h3>Technologies</h3>
       {!global && (
         <div style={{ marginBottom: 8, color: '#a66' }}>Chargement des données globales…</div>
@@ -169,6 +174,7 @@ export default function ListeTechnologies() {
             <option value="all">Tous</option>
             <option value="connues">Connues</option>
             <option value="inconnues">Inconnues</option>
+            <option value="atteignables">Atteignables</option>
           </select>
         </label>
         <label>
@@ -203,7 +209,7 @@ export default function ListeTechnologies() {
         </label>
       </div>
 
-      <div style={{ overflow: 'auto' }}>
+      <div style={{ overflow: 'auto'}}>
         <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
@@ -229,13 +235,16 @@ export default function ListeTechnologies() {
                 const carac = t.caracteristiques?.map((c, i) => {
                   const label = t.type === 1 ? global?.caracteristiquesComposant[c.code] : global?.caracteristiquesBatiment[c.code];
                   let value = c.value+'';
-                  switch(c.code) {
-                      case 7:
-                          value = global?.marchandises.find(m => m.code === c.code)?.nom || c.value+'';
+                  if(t.type === 0) {
+                      switch (c.code) {
+                          case 7:
+                              value = global?.marchandises.find(m => m.code === c.code)?.nom || c.value + '';
+                              break;
+                      }
                   }
                   return (
                     <span key={i} className="badge" >
-                      {(label ?? c.code)} : <span className={'information'}>{value}</span>
+                      {(label ?? c.code)}: <span className={'information'}>{value}</span>
                     </span>
                   );
                 });

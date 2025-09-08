@@ -171,6 +171,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Tableau technologies */
 .tech-table th, .tech-table td {
     border-bottom: 1px solid #333;
+    border-right: 1px solid #333;
     padding: 6px 8px;
     vertical-align: top;
 }

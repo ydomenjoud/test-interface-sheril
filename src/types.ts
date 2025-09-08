@@ -6,9 +6,46 @@ export type Commandant = { numero?: number; nom?: string; raceId?: number; }
 
 export type TechCaracteristique = { code: number; value: number };
 export type TechMarchandise = { code: number; nb: number };
+
+// Spécification d'une technologie (utile pour les composants de vaisseaux)
+export type TechSpecification = {
+    case?: number;   // emprise en cases dans le plan
+    min?: number;    // coût minerai unitaire
+    prix?: number;   // coût argent unitaire
+    type?: string;   // ex: 'arme'
+};
+
 export type Technologie = {
     base: string; code: string; niv: number; nom: string; type: 0 | 1; // 0 batiment, 1 composant
     recherche: number; description?: string; parents: string[]; caracteristiques: TechCaracteristique[]; marchandises?: TechMarchandise[];
+    specification?: TechSpecification;
+};
+
+// Composants d'un plan de vaisseau
+export type PlanComposant = { code: string; nb: number };
+// Plan de vaisseau (public ou privé)
+export type PlanVaisseau = {
+    nom: string;
+    concepteur?: number;
+    marque?: string;
+    tour?: number;
+    taille?: number;
+    vitesse?: number;
+    pc?: number;
+    minerai?: number;
+    prix?: number; // centaures/prix
+    ap?: number;
+    as?: number;
+    royalties?: number;
+    composants: PlanComposant[];
+};
+
+// Règle de taille des vaisseaux (détermination taille/vitesse via total des cases)
+export type VaisseauTailleRule = {
+    minCase: number;
+    maxCase: number;
+    taille: number;
+    vitesse: number;
 };
 
 export type Planete = {
@@ -92,6 +129,7 @@ export type Rapport = {
     systemesDetectes: SystemeDetecte[];
     flottesJoueur: FlotteJoueur[];
     flottesDetectees: FlotteDetectee[];
+    plansVaisseaux: PlanVaisseau[];
 };
 export type GlobalData = {
     commandants: Commandant[];
@@ -101,4 +139,6 @@ export type GlobalData = {
     politiques: Record<number, string>;
     caracteristiquesBatiment: Record<number, string>;
     caracteristiquesComposant: Record<number, string>;
+    plansPublic: PlanVaisseau[];
+    tailleVaisseaux: VaisseauTailleRule[];
 };

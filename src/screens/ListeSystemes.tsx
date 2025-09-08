@@ -24,10 +24,20 @@ export default function ListeSystemes() {
   const currentId = rapport?.joueur.numero || 0;
 
   const allSystems = useMemo(() => {
-    const list = [
-      ...(rapport?.systemesJoueur ?? []),
-      ...(rapport?.systemesDetectes ?? []),
-    ].map((s) => ({
+    // Construire une map par position pour éviter les doublons.
+    // On insère d'abord les systèmes détectés, puis on écrase avec ceux du joueur (prioritaires).
+    const byPos = new Map<string, any>();
+
+    for (const s of (rapport?.systemesDetectes ?? [])) {
+      const key = `${s.pos.x}-${s.pos.y}`;
+      byPos.set(key, s);
+    }
+    for (const s of (rapport?.systemesJoueur ?? [])) {
+      const key = `${s.pos.x}-${s.pos.y}`;
+      byPos.set(key, s);
+    }
+
+    const list = Array.from(byPos.values()).map((s) => ({
       ...s,
       proprietaires: s.proprietaires || [],
       posStr: `${s.pos.x}-${s.pos.y}`,
