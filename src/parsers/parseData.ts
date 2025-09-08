@@ -23,6 +23,7 @@ export function parseDataXml(text: string): GlobalData {
             code: Number(m.getAttribute('code') || 0),
             nb: Number(m.getAttribute('nb') || 0),
         }));
+        console.log(marchandises)
         techs.push({
             base, code, niv, nom, type, recherche, description, parents, caracteristiques, marchandises,
         });

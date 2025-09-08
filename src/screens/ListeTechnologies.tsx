@@ -234,7 +234,7 @@ export default function ListeTechnologies() {
                           value = global?.marchandises.find(m => m.code === c.code)?.nom || c.value+'';
                   }
                   return (
-                    <span key={i} className="badge" style={{ background: '#333', color: '#ddd', marginRight: 4 }}>
+                    <span key={i} className="badge" >
                       {(label ?? c.code)} : <span className={'information'}>{value}</span>
                     </span>
                   );
@@ -244,9 +244,9 @@ export default function ListeTechnologies() {
                   ? t.marchandises.map((m, i) => {
                       const nom = global?.marchandises.find(mm => mm.code === m.code)?.nom ?? String(m.code);
                       return (
-                        <div key={i} title={`code ${m.code}`} style={{ whiteSpace: 'nowrap' }}>
-                          {nom}: {m.nb}
-                        </div>
+                        <span key={i} className="badge" title={`code ${m.code}`}>
+                            {nom}: <span className={'information'}>{m.nb}</span>
+                        </span>
                       );
                     })
                   : '';

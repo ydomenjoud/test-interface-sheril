@@ -58,7 +58,6 @@ export default function TechTreeCanvas({
   const lastPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
 
-  console.log(knownCodes)
   const techByCode = useMemo(() => {
     const m = new Map<string, Technologie>();
     techs.forEach(t => m.set(t.code, t));
