@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import Commandant from '../components/utils/Commandant';
 import { useReport } from '../context/ReportContext';
 import { PlanVaisseau, Technologie } from '../types';
@@ -35,7 +35,7 @@ export default function ListePlans() {
     return map;
   }, [global]);
 
-  const withCompStr = (p: PlanVaisseau): string => {
+  const withCompStr = useCallback((p: PlanVaisseau): string => {
     const comps = p.composants || [];
     return comps
       .map(c => {
@@ -43,13 +43,13 @@ export default function ListePlans() {
         return `${label}: ${c.nb}`;
       })
       .join(', ');
-  };
+  }, [techLabelByCode]);
 
   const rows: Row[] = useMemo(() => {
     const pub = (global?.plansPublic ?? []).map< Row >(p => ({ ...p, typeSrc: 'public', compStr: withCompStr(p) }));
     const pri = (rapport?.plansVaisseaux ?? []).map< Row >(p => ({ ...p, typeSrc: 'prive', compStr: withCompStr(p) }));
     return [...pub, ...pri];
-  }, [global, rapport]);
+  }, [global, rapport, withCompStr]);
 
   const filtered = useMemo(() => {
     const q = filterQ.trim().toLowerCase();
