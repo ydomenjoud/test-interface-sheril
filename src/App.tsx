@@ -7,6 +7,7 @@ import ListeSystemes from './screens/ListeSystemes';
 import ListeFlottes from './screens/ListeFlottes';
 import ListeTechnologies from './screens/ListeTechnologies';
 import {ReportProvider} from './context/ReportContext';
+import ArbreTechnologies from './screens/ArbreTechnologies';
 
 function App() {
     return (<ReportProvider>
@@ -23,6 +24,7 @@ function App() {
                             <Route path="/systemes" element={<ListeSystemes/>}/>
                             <Route path="/flottes" element={<ListeFlottes/>}/>
                             <Route path="/technologies" element={<ListeTechnologies/>}/>
+                            <Route path="/arbre-technologies" element={<ArbreTechnologies/>}/>
                         </Routes>
                     </main>
                 </div>
