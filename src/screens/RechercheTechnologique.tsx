@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { useReport } from '../context/ReportContext';
-import { Technologie } from '../types';
 
 type Assign = { code: string; amount: number };
 
