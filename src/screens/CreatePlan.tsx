@@ -1,8 +1,143 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useReport } from '../context/ReportContext';
 import { Technologie } from '../types';
 
 type Entry = { code: string; qty: number };
+
+// Sélecteur avec recherche intégrée (sans dépendance externe)
+function SearchableSelect(props: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+  style?: React.CSSProperties;
+}) {
+  const { options, value, onChange, placeholder, style } = props;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [highlight, setHighlight] = useState(0);
+
+  const selected = useMemo(() => options.find(o => o.value === value) || null, [options, value]);
+
+  useEffect(() => {
+    // suivi du label sélectionné dans l’input quand on ferme/ouvre
+    if (!open && selected) setQuery(selected.label);
+    if (!open && !selected) setQuery('');
+  }, [open, selected]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(o => o.label.toLowerCase().includes(q));
+  }, [options, query]);
+
+  useEffect(() => {
+    setHighlight(0);
+  }, [query, open]);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!containerRef.current) return;
+      if (!containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  function commit(val: string) {
+    onChange(val);
+    setOpen(false);
+    const sel = options.find(o => o.value === val);
+    setQuery(sel?.label ?? '');
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!open && (e.key === 'ArrowDown' || e.key === 'Enter')) {
+      setOpen(true);
+      e.preventDefault();
+      return;
+    }
+    if (!open) return;
+    if (e.key === 'ArrowDown') {
+      setHighlight(h => Math.min(filtered.length - 1, h + 1));
+      e.preventDefault();
+    } else if (e.key === 'ArrowUp') {
+      setHighlight(h => Math.max(0, h - 1));
+      e.preventDefault();
+    } else if (e.key === 'Enter') {
+      const opt = filtered[highlight];
+      if (opt) commit(opt.value);
+      e.preventDefault();
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+      e.preventDefault();
+    }
+  }
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', minWidth: 320, ...style }}>
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', border: '1px solid #555', borderRadius: 4, padding: '4px 8px',
+          background: '#111', color: '#ddd', gap: 6
+        }}
+        onClick={() => {
+          setOpen(true);
+          setTimeout(() => inputRef.current?.focus(), 0);
+        }}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder={placeholder || 'Choisir…'}
+          value={open ? query : (selected?.label ?? '')}
+          onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
+          onKeyDown={onKeyDown}
+          style={{
+            flex: 1, background: 'transparent', color: 'inherit', border: 'none', outline: 'none', minWidth: 0
+          }}
+        />
+        <span style={{ opacity: 0.7 }}>▾</span>
+      </div>
+      {open && (
+        <div
+          style={{
+            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, maxHeight: 260, overflow: 'auto',
+            background: '#0f0f10', border: '1px solid #444', borderRadius: 4, zIndex: 20, boxShadow: '0 4px 16px rgba(0,0,0,0.35)'
+          }}
+          role="listbox"
+        >
+          {filtered.length === 0 ? (
+            <div style={{ padding: 8, color: '#aaa' }}>Aucun résultat</div>
+          ) : filtered.map((o, i) => (
+            <div
+              key={o.value}
+              role="option"
+              aria-selected={value === o.value}
+              onMouseEnter={() => setHighlight(i)}
+              onMouseDown={(e) => { e.preventDefault(); commit(o.value); }}
+              style={{
+                padding: '6px 8px',
+                background: i === highlight ? '#1e2a44' : 'transparent',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+                overflow: 'hidden'
+              }}
+              title={o.label}
+            >
+              {o.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function CreatePlan() {
   const { global } = useReport();
@@ -19,22 +154,25 @@ export default function CreatePlan() {
     return map;
   }, [compTechs]);
 
-  // Recherche dans la liste des composants
-  const [compFilter, setCompFilter] = useState<string>('');
-  const filteredCompTechs = useMemo(() => {
-    const q = compFilter.trim().toLowerCase();
-    if (!q) return compTechs;
-    return compTechs.filter(t =>
-      (t.nom || '').toLowerCase().includes(q) || t.code.toLowerCase().includes(q)
-    );
-  }, [compTechs, compFilter]);
+  // Code de caractéristique pour "propulsion"
+  const propulsionCode = useMemo(() => {
+    const dict = global?.caracteristiquesComposant || {};
+    let code = 0;
+    for (const [k, v] of Object.entries(dict)) {
+      if ((v || '').toLowerCase() === 'propulsion') {
+        code = Number(k);
+        break;
+      }
+    }
+    return code; // par défaut 0 si non trouvé
+  }, [global]);
 
   const [selectedCode, setSelectedCode] = useState<string>('');
   const [selectedQty, setSelectedQty] = useState<number>(1);
   const [entries, setEntries] = useState<Entry[]>([]);
 
   function addEntry() {
-    const code = selectedCode || filteredCompTechs[0]?.code;
+    const code = selectedCode || compTechs[0]?.code;
     if (!code) return;
     const qty = Math.max(1, Math.floor(selectedQty || 1));
     setEntries(prev => {
@@ -60,10 +198,11 @@ export default function CreatePlan() {
     let totalMinerai = 0;
     let totalPrix = 0;
     const marchTotals = new Map<number, number>();
+    let propulsionMax = 0;
 
     for (const e of entries) {
       const t = techByCode.get(e.code);
-      if (!t) continue;
+      if (!t || e.qty <= 0) continue;
       const s = t.specification || {};
       const unitCase = s.case ?? 0;
       const unitMin = s.min ?? 0;
@@ -73,6 +212,10 @@ export default function CreatePlan() {
       totalMinerai += unitMin * e.qty;
       totalPrix += unitPrix * e.qty;
 
+      // propulsion: on prend la plus grande valeur présente
+      const propVal = (t.caracteristiques || []).find(c => c.code === propulsionCode)?.value ?? 0;
+      if (propVal > propulsionMax) propulsionMax = propVal;
+
       // marchandises par composant
       for (const m of (t.marchandises ?? [])) {
         marchTotals.set(m.code, (marchTotals.get(m.code) || 0) + m.nb * e.qty);
@@ -81,18 +224,21 @@ export default function CreatePlan() {
 
     // Taille / vitesse selon règles
     let taille = undefined as number | undefined;
-    let vitesse = undefined as number | undefined;
+    let baseSpeed = 0;
     if (global?.tailleVaisseaux?.length) {
       const found = global.tailleVaisseaux.find(r => totalCase >= r.minCase && (r.maxCase === 0 || totalCase <= r.maxCase));
       const rule = found ?? global.tailleVaisseaux[global.tailleVaisseaux.length - 1];
       if (rule) {
         taille = rule.taille;
-        vitesse = rule.vitesse;
+        baseSpeed = rule.vitesse ?? 0;
       }
     }
 
-    return { totalCase, totalMinerai, totalPrix, marchTotals, taille, vitesse };
-  }, [entries, techByCode, global]);
+    // Vitesse finale: si aucune propulsion, 0 ; sinon base + max propulsion
+    const vitesse = propulsionMax > 0 ? baseSpeed + propulsionMax : 0;
+
+    return { totalCase, totalMinerai, totalPrix, marchTotals, taille, baseSpeed, propulsionMax, vitesse };
+  }, [entries, techByCode, global, propulsionCode]);
 
   const marchList = useMemo(() => {
     const out: { code: number; nom: string; nb: number }[] = [];
@@ -109,35 +255,19 @@ export default function CreatePlan() {
       <h3>Créer un plan de vaisseau</h3>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-        <label>
-          Rechercher:
-          <input
-            type="text"
-            value={compFilter}
-            onChange={e => setCompFilter(e.target.value)}
-            placeholder="Nom ou code…"
-            style={{ marginLeft: 6, width: 220 }}
-          />
-        </label>
-        <label>
-          Composant:
-          <select
+        <div>
+          <div style={{ marginBottom: 4 }}>Composant:</div>
+          <SearchableSelect
+            options={compTechs.map(t => ({
+              value: t.code,
+              label: `${t.nom} (${t.code}) — ${t.specification?.case ?? 0} case, min ${t.specification?.min ?? 0}, prix ${t.specification?.prix ?? 0}`
+            }))}
             value={selectedCode}
-            onChange={e => setSelectedCode(e.target.value)}
-            style={{ marginLeft: 6, minWidth: 320, maxWidth: 520 }}
-            disabled={filteredCompTechs.length === 0}
-          >
-            {filteredCompTechs.length === 0 ? (
-              <option value="">Aucun composant</option>
-            ) : (
-              filteredCompTechs.map(t => (
-                <option key={t.code} value={t.code}>
-                  {t.nom} {t.niv >= 0 ? `(${(t.specification?.case ?? 0)} case, min ${(t.specification?.min ?? 0)}, prix ${(t.specification?.prix ?? 0)})` : ''}
-                </option>
-              ))
-            )}
-          </select>
-        </label>
+            onChange={setSelectedCode}
+            placeholder="Rechercher un composant…"
+            style={{ minWidth: 380 }}
+          />
+        </div>
         <label>
           Quantité:
           <input
@@ -148,7 +278,7 @@ export default function CreatePlan() {
             style={{ width: 80, marginLeft: 6 }}
           />
         </label>
-        <button onClick={addEntry} disabled={filteredCompTechs.length === 0 && !selectedCode}>Ajouter</button>
+        <button onClick={addEntry} disabled={compTechs.length === 0 && !selectedCode}>Ajouter</button>
       </div>
 
       <div style={{ overflow: 'auto' }}>
@@ -195,13 +325,12 @@ export default function CreatePlan() {
                       onChange={ev => setQty(e.code, parseInt(ev.target.value || '0', 10))}
                       style={{ width: 80 }}
                     />
+
                   </td>
                   <td style={{ textAlign: 'right' }}>{unitCase * e.qty}</td>
                   <td style={{ textAlign: 'right' }}>{unitMin * e.qty}</td>
                   <td style={{ textAlign: 'right' }}>{(unitPrix * e.qty).toFixed(1)}</td>
                   <td>
-                    <button onClick={() => setQty(e.code, Math.max(0, e.qty - 1))} title="Retirer 1">−</button>
-                    <button onClick={() => setQty(e.code, e.qty + 1)} title="Ajouter 1" style={{ marginLeft: 6 }}>+</button>
                     <button onClick={() => remove(e.code)} title="Retirer ce composant" style={{ marginLeft: 6 }}>Suppr.</button>
                   </td>
                 </tr>
@@ -218,12 +347,17 @@ export default function CreatePlan() {
         </table>
       </div>
 
-      <div style={{ marginTop: 12, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ marginTop: 12, display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <div className="badge" style={{ background: '#123', color: '#ddd' }}>
           Taille: <b>{totals.taille ?? '—'}</b>
         </div>
-        <div className="badge" style={{ background: '#123', color: '#ddd' }}>
-          Vitesse: <b>{totals.vitesse ?? '—'}</b>
+        <div className="badge" style={{ background: '#123', color: '#ddd', display: 'flex', alignItems: 'center', gap: 8 }}>
+          Vitesse: <b>{Number.isFinite(totals.vitesse) ? totals.vitesse : '—'}</b>
+          {entries.length > 0 && totals.propulsionMax === 0 && (
+            <span style={{ color: '#f0c040' }} title="Aucun composant de propulsion sélectionné — vitesse fixée à 0">
+              ⚠ aucun moteur (vitesse 0)
+            </span>
+          )}
         </div>
         <div className="badge" style={{ background: '#123', color: '#ddd' }}>
           Cases: <b>{totals.totalCase}</b>
