@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { useReport } from '../context/ReportContext';
+import React, {useMemo, useState} from 'react';
+import {useReport} from '../context/ReportContext';
+import SearchableSelect from "../components/utils/SearchableSelect";
+import {formatTechName} from "../utils/global";
 
 type Assign = { code: string; amount: number };
 
@@ -19,13 +21,12 @@ export default function RechercheTechnologique() {
       if (!t.code) return false;
       if (knownSet.has(t.code)) return false;
       const parents = t.parents || [];
-      const okParents = parents.every(p => knownSet.has(p.toLowerCase()));
-      return okParents;
+        return parents.every(p => knownSet.has(p.toLowerCase()));
     }).sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
   }, [global, knownSet]);
 
   // Assignations
-  const [assigns, setAssigns] = useState<Assign[]>([]);
+  const [assigns, setAssigns] = useState<Assign[]>([    ]);
   const [selectedCode, setSelectedCode] = useState<string>('');
 
   function addAssign() {
@@ -35,6 +36,7 @@ export default function RechercheTechnologique() {
     const t = (global?.technologies ?? []).find(tt => tt.code === code);
     const def = t?.recherche ?? 0;
     setAssigns(prev => [...prev, { code, amount: def }]);
+    setSelectedCode('');
   }
   function setAmount(code: string, val: number) {
     setAssigns(prev => prev.map(a => a.code === code ? { ...a, amount: Math.max(0, Number.isFinite(val) ? val : 0) } : a));
@@ -74,25 +76,19 @@ export default function RechercheTechnologique() {
       </div>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
-        <label>
-          Technologie atteignable:
-          <select
-            value={selectedCode}
-            onChange={e => setSelectedCode(e.target.value)}
-            style={{ marginLeft: 6, minWidth: 320 }}
-            disabled={atteignables.length === 0}
-          >
-            {atteignables.length === 0 ? (
-              <option value="">Aucune technologie atteignable</option>
-            ) : (
-              atteignables.map(t => (
-                <option key={t.code} value={t.code}>
-                  {t.nom} ({t.code}) — coût recherche: {t.recherche}
-                </option>
-              ))
-            )}
-          </select>
-        </label>
+          <div>
+            <div style={{ marginBottom: 4 }}>Technologie atteignable:</div>
+            <SearchableSelect
+              options={atteignables.map(t => ({
+                value: t.code,
+                label: `${formatTechName(t)} — coût recherche: ${t.recherche}`
+              }))}
+              value={selectedCode}
+              onChange={setSelectedCode}
+              placeholder="Rechercher une technologie…"
+              style={{ minWidth: 380 }}
+            />
+          </div>
         <button onClick={addAssign} disabled={atteignables.length === 0 || (selectedCode && assigns.some(a => a.code === selectedCode)) || false}>
           Ajouter
         </button>

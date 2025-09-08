@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useReport } from '../context/ReportContext';
 import { Technologie } from '../types';
+import {formatTechName} from "../utils/global";
 
 type SortKey = 'connu' | 'type' | 'nom' | 'recherche' | 'description' | 'marchandises' | 'caracteristiques' | 'parents';
 type SortDir = 'asc' | 'desc';
@@ -9,22 +10,6 @@ function typeLabel(t: 0 | 1) {
   return t === 0 ? 'Bâtiment' : 'Composant';
 }
 
-// Helpers affichage niveau en chiffres romains (niv est 0-based)
-function toRoman(n: number): string {
-  const romans = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
-  if (n <= 0) return romans[0];
-  if (n >= romans.length) return romans[romans.length - 1];
-  return romans[n];
-}
-function romanFromNiv(niv?: number): string {
-  // niv 0 => 1 => I, niv 4 => 5 => V ; cap à X
-  const lvl = Math.max(1, Math.min(10, ((niv ?? 0) + 1)));
-  return toRoman(lvl);
-}
-function formatTechName(t?: Technologie): string {
-  if (!t) return '';
-  return `${t.nom} ${romanFromNiv(t.niv)}`;
-}
 
 export default function ListeTechnologies() {
   const { global, rapport } = useReport();
