@@ -19,6 +19,8 @@ type NodeRect = {
   h: number;
   color: string;
   label: string;
+  known: boolean;
+  stroke?: string; // couleur de bordure (orange pour parents, bleu pour enfants)
 };
 
 function toRoman(n: number): string {
@@ -55,6 +57,8 @@ export default function TechTreeCanvas({
   const dragMovedRef = useRef(false);
   const lastPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
+
+  console.log(knownCodes)
   const techByCode = useMemo(() => {
     const m = new Map<string, Technologie>();
     techs.forEach(t => m.set(t.code, t));
@@ -174,6 +178,7 @@ export default function TechTreeCanvas({
         h: nodeHeight,
         color: '#2c3e50',
         label: selLabel,
+        known: knownCodes.has(selected.code.toLowerCase()),
       };
       nodes.push(selNode);
       nodeByCode.set(selNode.code, selNode);
@@ -188,7 +193,13 @@ export default function TechTreeCanvas({
           const label = formatTechName(t);
           const w = measureNodeWidth(label);
           const y = startY + i * (nodeHeight + vGap);
-          const node: NodeRect = { code, x, y, w, h: nodeHeight, color: '#f39c12', label };
+          const node: NodeRect = {
+            code, x, y, w, h: nodeHeight,
+            color: '#f39c12',
+            label,
+            known: knownCodes.has(code.toLowerCase()),
+            stroke: '#f39c12' // bordure orange pour parents
+          };
           nodes.push(node);
           nodeByCode.set(code, node);
         });
@@ -204,7 +215,13 @@ export default function TechTreeCanvas({
           const label = formatTechName(t);
           const w = measureNodeWidth(label);
           const y = startY + i * (nodeHeight + vGap);
-          const node: NodeRect = { code, x, y, w, h: nodeHeight, color: '#3498db', label };
+          const node: NodeRect = {
+            code, x, y, w, h: nodeHeight,
+            color: '#3498db',
+            label,
+            known: knownCodes.has(code.toLowerCase()),
+            stroke: '#3498db' // bordure bleue pour enfants
+          };
           nodes.push(node);
           nodeByCode.set(code, node);
         });
@@ -296,8 +313,10 @@ export default function TechTreeCanvas({
         const w = measureNodeWidth(label);
         const x = -w / 2;
         const y = startY + idx * (nodeHeight + vGap);
-        const color = knownCodes.has(t.code) ? '#2c3e50' : '#777';
-        const node: NodeRect = { code: t.code, x, y, w, h: nodeHeight, color, label };
+        const isKnown = knownCodes.has(t.code.toLowerCase());
+        // La couleur de base (non connue) reste grise, si connu le fill sera forcé à vert foncé au dessin
+        const color = isKnown ? '#2c3e50' : '#777';
+        const node: NodeRect = { code: t.code, x, y, w, h: nodeHeight, color, label, known: isKnown };
         nodes.push(node);
       });
     }
@@ -311,11 +330,14 @@ export default function TechTreeCanvas({
       const h = n.h * scale;
       // Fond
       drawRoundRect(screenX, screenY, w, h, 8 * scale);
-      ctx.fillStyle = n.color;
+      const fillColor = n.known ? '#145a32' /* vert foncé */ : n.color;
+      ctx.fillStyle = fillColor;
       ctx.fill();
       // Bordure
       ctx.lineWidth = Math.max(1, 2 * scale);
-      ctx.strokeStyle = (selectedCode && n.code === selectedCode) ? '#ecf0f1' : '#222';
+      const isSelected = (selectedCode && n.code === selectedCode);
+      const strokeColor = isSelected ? '#ecf0f1' : (n.stroke ?? '#222');
+      ctx.strokeStyle = strokeColor;
       ctx.stroke();
       // Texte
       ctx.fillStyle = '#ecf0f1';

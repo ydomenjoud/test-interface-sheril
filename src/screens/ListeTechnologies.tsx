@@ -221,9 +221,14 @@ export default function ListeTechnologies() {
               return pageItems2.map((t) => {
                 const carac = t.caracteristiques?.map((c, i) => {
                   const label = t.type === 1 ? global?.caracteristiquesComposant[c.code] : global?.caracteristiquesBatiment[c.code];
+                  let value = c.value+'';
+                  switch(c.code) {
+                      case 7:
+                          value = global?.marchandises.find(m => m.code === c.code)?.nom || c.value+'';
+                  }
                   return (
                     <span key={i} className="badge" style={{ background: '#333', color: '#ddd', marginRight: 4 }}>
-                      {(label ?? c.code) + ': ' + c.value}
+                      {(label ?? c.code)} : <span className={'information'}>{value}</span>
                     </span>
                   );
                 });

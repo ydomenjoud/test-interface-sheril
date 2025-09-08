@@ -27,7 +27,7 @@ export default function ArbreTechnologies() {
 
   const knownSet = useMemo(() => {
     const s = new Set<string>();
-    (rapport?.technologiesConnues ?? []).forEach(c => s.add(c));
+    (rapport?.technologiesConnues ?? []).forEach(c => s.add(c.toLowerCase()));
     return s;
   }, [rapport]);
 
