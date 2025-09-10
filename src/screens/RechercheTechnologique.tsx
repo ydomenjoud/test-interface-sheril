@@ -29,13 +29,25 @@ export default function RechercheTechnologique() {
   const [assigns, setAssigns] = useState<Assign[]>([    ]);
   const [selectedCode, setSelectedCode] = useState<string>('');
 
+  const assignedCodes = useMemo(() => {
+    const set = new Set<string>();
+    assigns.forEach(a => set.add(a.code));
+    return set;
+  }, [assigns]);
+
+  const availableTechs = useMemo(() => {
+    return atteignables.filter(t => !assignedCodes.has(t.code));
+  }, [atteignables, assignedCodes]);
+
   function addAssign() {
-    const code = selectedCode || atteignables[0]?.code;
+    const code = selectedCode || availableTechs[0]?.code;
     if (!code) return;
     if (assigns.some(a => a.code === code)) return;
     const t = (global?.technologies ?? []).find(tt => tt.code === code);
     const def = t?.recherche ?? 0;
-    setAssigns(prev => [...prev, { code, amount: def }]);
+    const remainingBudget = Math.max(0, budget - totalAllocated);
+    const amount = Math.min(def, remainingBudget);
+    setAssigns(prev => [...prev, { code, amount }]);
     setSelectedCode('');
   }
   function setAmount(code: string, val: number) {
@@ -79,7 +91,7 @@ export default function RechercheTechnologique() {
           <div>
             <div style={{ marginBottom: 4 }}>Technologie atteignable:</div>
             <SearchableSelect
-              options={atteignables.map(t => ({
+              options={availableTechs.map(t => ({
                 value: t.code,
                 label: `${formatTechName(t)} — coût recherche: ${t.recherche}`
               }))}
@@ -89,7 +101,7 @@ export default function RechercheTechnologique() {
               style={{ minWidth: 380 }}
             />
           </div>
-        <button onClick={addAssign} disabled={atteignables.length === 0 || (selectedCode && assigns.some(a => a.code === selectedCode)) || false}>
+        <button onClick={addAssign} disabled={availableTechs.length === 0}>
           Ajouter
         </button>
       </div>
