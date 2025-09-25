@@ -80,11 +80,23 @@ export function parseRapportXml(text: string): Rapport {
         const proprietaires: number[] = [joueur.numero || 0];
 
         const planetes: any[] = [];
+        let revenuEstime = 0;
         const pNodes = qAll(s, ['planetes > p',]);
         pNodes.forEach((p) => {
+            const proprietaire = getAttrNum(p, ['prop']);
+            if (proprietaire === joueur.numero) {
+                const tax = getAttrNum(p, ['tax']);
+                const popNode = qOne(p, ['population']);
+                if (popNode) {
+                    const popAct = getAttrNum(popNode, ['popAct']);
+                    const popMax = getAttrNum(popNode, ['popMax']);
+                    const popAug = getAttrNum(popNode, ['popAug']);
+                    revenuEstime += Math.min(popAct + popAct * popAug / 100, popMax) * tax / 10;
+                }
+            }
+
             const num = getAttrNum(p, ['num']) ?? 0;
             const pdc = getAttrNum(p, ['pdc']) ?? 0;
-            const proprietaire = getAttrNum(p, ['prop']);
             const minerai = getAttrNum(p, ['stockmin']) ?? getAttrNum(p, ['minerai']);
 
             const batiments: { techCode: string; count: number }[] = [];
@@ -128,6 +140,7 @@ export function parseRapportXml(text: string): Rapport {
             politique: getAttrNum(s, ['politique']),
             entretien: getAttrNum(s, ['entretien']),
             revenu: getAttrNum(s, ['revenu']),
+            revenuEstime,
             bcont: getAttrNum(s, ['bcont']),
             besp: getAttrNum(s, ['besp']),
             btech: getAttrNum(s, ['btech']),

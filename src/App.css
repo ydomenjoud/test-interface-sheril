@@ -11,6 +11,13 @@ html, body, #root {
     color: #ffffff;
 }
 
+.race0{ color: #CC00FF !important; }
+.race1{ color: #0066CC !important; }
+.race2{ color: #FFCC00 !important; }
+.race3{ color: #CC0033 !important; }
+.race4{ color: #009933 !important; }
+.race5{ color: #777777 !important; }
+
 .information {
     color: var(--information);
 }

@@ -6,7 +6,7 @@ import Position from "../components/utils/Position";
 
 type SortKey =
   | 'etoile' | 'pos' | 'nom' | 'nbpla' | 'proprietaires'
-  | 'politique' | 'entretien' | 'revenu' | 'hscan' | 'bcont' | 'besp' | 'btech';
+  | 'politique' | 'entretien' | 'revenu' | 'revenuEstime' | 'hscan' | 'bcont' | 'besp' | 'btech';
 type SortDir = 'asc' | 'desc';
 
 export default function ListeSystemes() {
@@ -95,6 +95,7 @@ export default function ListeSystemes() {
         case 'politique': av = a.politique ?? -9999; bv = b.politique ?? -9999; break;
         case 'entretien': av = a.entretien ?? 0; bv = b.entretien ?? 0; break;
         case 'revenu': av = a.revenu ?? 0; bv = b.revenu ?? 0; break;
+        case 'revenuEstime': av = a.revenuEstime ?? 0; bv = b.revenuEstime ?? 0; break;
         case 'hscan': av = a.hscan ?? 0; bv = b.hscan ?? 0; break;
         case 'bcont': av = a.bcont ?? 0; bv = b.bcont ?? 0; break;
         case 'besp': av = a.besp ?? 0; bv = b.besp ?? 0; break;
@@ -108,6 +109,18 @@ export default function ListeSystemes() {
     arr.sort(cmp);
     return arr;
   }, [filtered, sortKey, sortDir]);
+
+  const totals = useMemo(() => {
+    return filtered.reduce((acc, s) => {
+      acc.entretien += s.entretien ?? 0;
+      acc.revenu += s.revenu ?? 0;
+      acc.revenuEstime += s.revenuEstime ?? 0;
+      acc.technologique += (s.revenuEstime ?? 0) * (s.btech ?? 0) / 100;
+      acc.contreEspionnage += (s.revenuEstime ?? 0) * (s.bcont ?? 0) / 100;
+      acc.espionnage += (s.revenuEstime ?? 0) * (s.besp ?? 0) / 100;
+      return acc;
+    }, { entretien: 0, revenu: 0, revenuEstime: 0, technologique: 0, contreEspionnage: 0, espionnage: 0 });
+  }, [filtered]);
 
   const total = sorted.length;
   const maxPage = Math.max(1, Math.ceil(total / pageSize));
@@ -201,6 +214,7 @@ export default function ListeSystemes() {
               {header('politique', 'Politique')}
               {header('entretien', 'Entretien')}
               {header('revenu', 'Revenu')}
+              {header('revenuEstime', 'Revenu estimé')}
               {header('hscan', 'Portée détect.')}
               {header('bcont', 'Contre-esp.')}
               {header('besp', 'Espionnage')}
@@ -228,6 +242,7 @@ export default function ListeSystemes() {
                 <td style={{ textAlign: 'right' }}>{s.politique ?? '—'}</td>
                 <td style={{ textAlign: 'right' }}>{typeof s.entretien === 'number' ? s.entretien.toFixed(1) : '—'}</td>
                 <td style={{ textAlign: 'right' }}>{typeof s.revenu === 'number' ? s.revenu.toFixed(1) : '—'}</td>
+                <td style={{ textAlign: 'right' }}>{typeof s.revenuEstime === 'number' ? s.revenuEstime.toFixed(1) : '—'}</td>
                 <td style={{ textAlign: 'right' }}>{s.hscan ?? '—'}</td>
                 <td style={{ textAlign: 'right' }}>{s.bcont ?? '—'}</td>
                 <td style={{ textAlign: 'right' }}>{s.besp ?? '—'}</td>
@@ -236,12 +251,24 @@ export default function ListeSystemes() {
             ))}
             {pageItems.length === 0 && (
               <tr>
-                <td colSpan={12} style={{ textAlign: 'center', padding: 12, color: '#aaa' }}>
+                <td colSpan={13} style={{ textAlign: 'center', padding: 12, color: '#aaa' }}>
                   {rapport ? 'Aucun système ne correspond aux filtres.' : 'Chargez le rapport pour voir les systèmes.'}
                 </td>
               </tr>
             )}
           </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={6} style={{ textAlign: 'right', fontWeight: 'bold' }}>Totaux:</td>
+              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.entretien.toFixed(1)}</td>
+              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.revenu.toFixed(1)}</td>
+              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.revenuEstime.toFixed(1)}</td>
+              <td></td>
+              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.contreEspionnage.toFixed(1)}</td>
+              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.espionnage.toFixed(1)}</td>
+              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.technologique.toFixed(1)}</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
 

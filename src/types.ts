@@ -70,6 +70,7 @@ export interface SystemBase {
 export interface SystemeJoueur extends SystemBase {
     type: 'joueur';
     planetes: Planete[];
+    revenuEstime: number;
     scan: number;
 }
 
