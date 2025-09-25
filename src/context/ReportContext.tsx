@@ -43,7 +43,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         let alive = true;
         (async () => {
             try {
-                const txt = await fetch(`${process.env.PUBLIC_URL}/examples/data.xml`).then(r => r.text());
+                const txt = await fetch(`https://sheril.pbem-france.net/stats/data.xml`).then(r => r.text());
                 if (!alive) return;
                 const data = parseDataXml(txt);
                 setGlobal(data);

@@ -223,7 +223,7 @@ export default function ListeTechnologies() {
                   if(t.type === 0) {
                       switch (c.code) {
                           case 7:
-                              value = global?.marchandises.find(m => m.code === c.code)?.nom || c.value + '';
+                              value = global?.marchandises.find(m => m.code === (c.value - 1))?.nom || c.value + '';
                               break;
                       }
                   }

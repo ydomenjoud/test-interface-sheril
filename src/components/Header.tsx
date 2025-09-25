@@ -65,15 +65,5 @@ export default function Header() {
             }}
             title="Charger rapport.xml"
         />
-        <button
-            onClick={async () => {
-                const txt = await fetch(`${process.env.PUBLIC_URL}/examples/rapport.xml`).then(r => r.text());
-                const file = new File([txt], 'rapport.xml', {type: 'text/xml'});
-                await loadRapportFile(file);
-                if (rapportInput.current) rapportInput.current.value = '';
-            }}
-        >
-            Charger exemple de rapport
-        </button>
     </header>);
 }
