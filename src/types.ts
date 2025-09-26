@@ -125,6 +125,7 @@ export type Rapport = {
         alliances: Alliance[]; // aliances
         pna: number[]; // ids PNA
     };
+    technologiesAtteignables: string[];
     technologiesConnues: string[];
     systemesJoueur: SystemeJoueur[];
     systemesDetectes: SystemeDetecte[];

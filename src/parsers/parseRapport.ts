@@ -67,6 +67,14 @@ export function parseRapportXml(text: string): Rapport {
         if (code) technologiesConnues.push(code);
     });
 
+    // Technologies connues (lowercase)
+    const technologiesAtteignables: string[] = [];
+    qAll(joueurNode, ['technologies > atteignable']).forEach((n) => {
+        const code = getAttr(n, ['code']);
+        if (code) technologiesAtteignables.push(code);
+    });
+
+
     // Systèmes du joueur (lowercase only)
     const systemesJoueur: SystemeJoueur[] = [];
     const sysNodes = qAll(joueurNode, ['systemes > s',]);
@@ -257,6 +265,7 @@ export function parseRapportXml(text: string): Rapport {
     });
 
     const rapport: Rapport = {
+        technologiesAtteignables,
         technologiesConnues, joueur, systemesJoueur, systemesDetectes, flottesJoueur, flottesDetectees, plansVaisseaux,
         budgetTechnologique,
     };
