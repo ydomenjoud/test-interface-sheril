@@ -19,11 +19,13 @@ export default function RechercheTechnologique() {
         const list = (global?.technologies ?? []);
         return list.filter(t => {
             if (!t.code) return false;
-            if (knownSet.has(t.code)) return false;
+            if (knownSet.has(t.code.toLowerCase())) return false;
             const parents = t.parents || [];
             return parents.every(p => knownSet.has(p.toLowerCase()));
         }).sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
     }, [global, knownSet]);
+    // console.log(knownSet, atteignables);
+
 
     // Assignations
     const [assigns, setAssigns] = useState<Assign[]>([]);
