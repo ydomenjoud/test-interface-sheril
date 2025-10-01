@@ -42,6 +42,7 @@ export function parseRapportXml(text: string): Rapport {
     // Nœuds racines strictement en lowercase
     const rapportNode = qOne(doc, ['rapport']);
     const joueurNode = qOne(rapportNode, ['commandant']);
+    const tour = getAttrNum(rapportNode, ['numTour']);
 
     const joueur: Rapport['joueur'] = {
         numero: getAttrNum(joueurNode, ['numero']),
@@ -265,6 +266,7 @@ export function parseRapportXml(text: string): Rapport {
     });
 
     const rapport: Rapport = {
+        tour,
         technologiesAtteignables,
         technologiesConnues, joueur, systemesJoueur, systemesDetectes, flottesJoueur, flottesDetectees, plansVaisseaux,
         budgetTechnologique,

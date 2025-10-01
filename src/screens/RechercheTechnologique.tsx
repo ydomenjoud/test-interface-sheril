@@ -1,19 +1,37 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {useReport} from '../context/ReportContext';
 import SearchableSelect from "../components/utils/SearchableSelect";
 import {formatTechName, toRoman} from "../utils/global";
 
 type Assign = { code: string; amount: number };
 
+
+
 export default function RechercheTechnologique() {
     const {global, rapport} = useReport();
+    const tour = rapport?.tour;
+    const researchKey = 'research-' + tour;
 
     // Techs atteignables = non connues dont tous les parents sont connus
     const atteignables = rapport?.technologiesAtteignables;
 
     // Assignations
-    const [assigns, setAssigns] = useState<Assign[]>([]);
+    const [assigns, setAssigns] = useState<Assign[]>(() => {
+        if (!tour) return [];
+        try {
+            const saved = localStorage.getItem(researchKey);
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            console.error("Failed to parse assigns from localStorage", e);
+            return [];
+        }
+    });
     const [selectedCode, setSelectedCode] = useState<string>('');
+
+    useEffect(() => {
+        if (!tour) return;
+        localStorage.setItem(researchKey, JSON.stringify(assigns));
+    }, [assigns, tour, researchKey]);
 
     const availableTechs = (global?.technologies.filter(t => {
         return atteignables?.includes(t.code) && assigns.findIndex(a => a.code === t.code) === -1;
@@ -76,7 +94,7 @@ export default function RechercheTechnologique() {
     }, [rows]);
 
     return (<div style={{padding: 12, overflow: 'auto', height: '100%', display: 'flex', flexDirection: 'column'}}>
-        <h3>Recherche technologique</h3>
+        <h3>Recherche technologique - tour {tour}</h3>
 
         <div style={{marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap'}}>
             <div className="badge" style={{background: '#123', color: '#ddd'}}>
@@ -105,7 +123,7 @@ export default function RechercheTechnologique() {
                     }))}
                     value={selectedCode}
                     onChange={setSelectedCode}
-                    placeholder="Rechercher une technologie…"
+                    placeholder="Rechercher une technologie..."
                     style={{minWidth: 380}}
                 />
             </div>
@@ -147,7 +165,7 @@ export default function RechercheTechnologique() {
                     </td>
                 </tr>))}
                 {rows.length === 0 && (<tr>
-                    <td colSpan={5} style={{textAlign: 'center', padding: 12, color: '#aaa'}}>
+                    <td colSpan={6} style={{textAlign: 'center', padding: 12, color: '#aaa'}}>
                         Ajoutez une technologie atteignable pour répartir le budget.
                     </td>
                 </tr>)}

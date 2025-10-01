@@ -113,6 +113,7 @@ export interface Alliance {
 }
 
 export type Rapport = {
+    tour: number;
     joueur: {
         numero: number;
         nom: string;
