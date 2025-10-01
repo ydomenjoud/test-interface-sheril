@@ -90,7 +90,7 @@ export default function InfoPanel({ selected }: Props) {
                 puissanceDesc = `AS: ${local.as}/ AP: ${local.ap} (${p})`;
             } else if (f.type === 'detecte') {
                 const local = f as FlotteDetectee;
-                puissanceDesc = `${local.puiss} (${getPuissanceFromString(local.puiss)})`;
+                puissanceDesc = `${getPuissanceFromString(local.puiss)} - ${local.puiss}`;
 
             }
             return (
