@@ -1,42 +1,69 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useReport} from '../context/ReportContext';
 import SearchableSelect from "../components/utils/SearchableSelect";
 import {formatTechName, toRoman} from "../utils/global";
 
 type Assign = { code: string; amount: number };
 
-
-
 export default function RechercheTechnologique() {
     const {global, rapport} = useReport();
     const tour = rapport?.tour;
-    const researchKey = 'research-' + tour;
 
-    // Techs atteignables = non connues dont tous les parents sont connus
-    const atteignables = rapport?.technologiesAtteignables;
-
-    // Assignations
-    const [assigns, setAssigns] = useState<Assign[]>(() => {
-        if (!tour) return [];
-        try {
-            const saved = localStorage.getItem(researchKey);
-            return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-            console.error("Failed to parse assigns from localStorage", e);
-            return [];
-        }
-    });
+    const [assigns, setAssigns] = useState<Assign[]>([]);
     const [selectedCode, setSelectedCode] = useState<string>('');
 
+    // Effect to LOAD data from localStorage when the tour changes
     useEffect(() => {
-        if (!tour) return;
-        localStorage.setItem(researchKey, JSON.stringify(assigns));
-    }, [assigns, tour, researchKey]);
+        if (!tour) {
+            setAssigns([]);
+            return;
+        }
+
+        const researchKey = `recherche-technologique-tour-${tour}`;
+        try {
+            const saved = localStorage.getItem(researchKey);
+            setAssigns(saved ? JSON.parse(saved) : []);
+        } catch (e) {
+            console.error("Failed to parse assigns from localStorage", e);
+            setAssigns([]);
+        }
+    }, [tour]); // This effect runs only when `tour` changes.
+
+    // A ref to skip saving on the initial renders before the first user interaction.
+    const isInitialLoadOrTourChange = useRef(true);
+
+    // Set the ref to true whenever the tour changes, to prevent auto-saving right after a load.
+    useEffect(() => {
+        isInitialLoadOrTourChange.current = true;
+    }, [tour]);
+
+    // Effect to SAVE data to localStorage when `assigns` changes due to user interaction
+    useEffect(() => {
+        // Don't save on the first render cycle or right after a tour change.
+        if (isInitialLoadOrTourChange.current) {
+            isInitialLoadOrTourChange.current = false;
+            return;
+        }
+
+        if (!tour) {
+            return; // Don't save if we don't have a tour number
+        }
+
+        const researchKey = `recherche-technologique-tour-${tour}`;
+        try {
+            localStorage.setItem(researchKey, JSON.stringify(assigns));
+        } catch (e) {
+            console.error("Failed to save assigns to localStorage", e);
+        }
+    }, [assigns, tour]); // This effect runs only when `assigns` changes.
+
+
+    const atteignables = rapport?.technologiesAtteignables;
 
     const availableTechs = (global?.technologies.filter(t => {
         return atteignables?.includes(t.code) && assigns.findIndex(a => a.code === t.code) === -1;
     }) || []).sort((a, b) => {
-        if(a.type === b.type){
+        if (a.type === b.type) {
             return a.nom.localeCompare(b.nom);
         }
         return a.type > b.type ? 1 : -1;
@@ -76,6 +103,40 @@ export default function RechercheTechnologique() {
 
     function remove(code: string) {
         setAssigns(prev => prev.filter(a => a.code !== code));
+    }
+
+    const onePercentAmount = budget > 0 ? Math.floor(budget / 100) : 0;
+
+    function increasePercent(code: string) {
+        if (totalAllocated >= budget && onePercentAmount > 0) return;
+
+        const assign = assigns.find(a => a.code === code);
+        if (!assign) return;
+
+        const t = (global?.technologies ?? []).find(tt => tt.code === code);
+        const maxAmount = t?.recherche;
+
+        const currentAmount = assign.amount || 0;
+        let newAmount = currentAmount + onePercentAmount;
+
+        // Ensure new amount does not make total allocation exceed budget
+        // const remainingBudget = budget - totalAllocated;
+        // if (newAmount - currentAmount > remainingBudget) {
+        //     newAmount = currentAmount + remainingBudget;
+        // }
+
+        if (maxAmount !== undefined) {
+            newAmount = Math.min(Math.floor(newAmount), maxAmount);
+        }
+
+        setAmount(code, newAmount);
+    }
+
+    function decreasePercent(code: string) {
+        const assign = assigns.find(a => a.code === code);
+        if (!assign) return;
+        const newAmount = Math.floor((assign.amount || 0) - onePercentAmount);
+        setAmount(code, newAmount); // setAmount handles Math.max(0, ...)
     }
 
     const rows = assigns.map(a => {
@@ -119,7 +180,7 @@ export default function RechercheTechnologique() {
                 <div style={{marginBottom: 4}}>Technologie atteignable:</div>
                 <SearchableSelect
                     options={availableTechs.map(t => ({
-                        value: t.code, label: `(${t.recherche}) - ${t.type===0 ? 'B' : 'C'} - ${formatTechName(t)} `
+                        value: t.code, label: `(${t.recherche}) - ${t.type === 0 ? 'B' : 'C'} - ${formatTechName(t)} `
                     }))}
                     value={selectedCode}
                     onChange={setSelectedCode}
@@ -159,7 +220,11 @@ export default function RechercheTechnologique() {
                             style={{width: 120, textAlign: 'right'}}
                         />
                     </td>
-                    <td style={{textAlign: 'right'}}>{rowPct}%</td>
+                    <td style={{textAlign: 'right', whiteSpace: 'nowrap'}}>
+                        <button onClick={() => decreasePercent(a.code)} style={{padding: '2px 5px', marginRight: 5}} disabled={a.amount <= 0}>-</button>
+                        {rowPct}%
+                        <button onClick={() => increasePercent(a.code)} style={{padding: '2px 5px', marginLeft: 5}} disabled={totalAllocated >= budget || a.amount >= (t?.recherche ?? Infinity)}>+</button>
+                    </td>
                     <td>
                         <button onClick={() => remove(a.code)}>Supprimer</button>
                     </td>

@@ -1,8 +1,9 @@
 import React, {useMemo} from 'react';
 import {useReport} from '../../context/ReportContext';
-import {XY} from '../../types';
+import {FlotteBase, FlotteDetectee, FlotteJoueur, XY} from '../../types';
 import Commandant from "../utils/Commandant";
 import Position from "../utils/Position";
+import {getDescriptionPuissance, getPuissance, getPuissanceFromString} from "../../utils/puissance";
 
 type Props = {
   selected?: XY;
@@ -77,16 +78,28 @@ export default function InfoPanel({ selected }: Props) {
           </tr>
           </thead>
           <tbody>
-          {atPos.fleets.map((f: any, i: number) => {
+          {atPos.fleets.map((f: FlotteBase, i: number) => {
             const owner = (f as any).proprio ?? (rapport?.joueur?.numero ?? undefined);
-            const puissance = (f as any).puiss ?? ((typeof f.as === 'number') ? f.as : '—');
+            // const puissance = (f as any).puiss ?? ((typeof f.as === 'number') ? f.as : '—');
+            let puissanceDesc = "";
+
+            if(f.type === 'joueur') {
+                const local = f as FlotteJoueur;
+                const puissance = getPuissance(local);
+                const p = getDescriptionPuissance(puissance);
+                puissanceDesc = `AS: ${local.as}/ AP: ${local.ap} (${p})`;
+            } else if (f.type === 'detecte') {
+                const local = f as FlotteDetectee;
+                puissanceDesc = `${local.puiss} (${getPuissanceFromString(local.puiss)})`;
+
+            }
             return (
               <tr key={`flt-${i}`}>
-                <td>{f.nom}</td>
+                <td>{f.nom} ({f.num})</td>
                 <td style={{ textAlign: 'right' }}>
                   {typeof owner === 'number' ? <Commandant num={owner} /> : '—'}
                 </td>
-                <td style={{ textAlign: 'right' }}>{puissance}</td>
+                <td style={{ textAlign: 'right' }}>{puissanceDesc}</td>
               </tr>
             );
           })}
