@@ -99,7 +99,7 @@ export function parseRapportXml(text: string): Rapport {
                     const popAct = getAttrNum(popNode, ['popAct']);
                     const popMax = getAttrNum(popNode, ['popMax']);
                     const popAug = getAttrNum(popNode, ['popAug']);
-                    revenuEstime += Math.min(popAct + popAct * popAug / 100, popMax) * tax / 10;
+                    revenuEstime += Math.min(popAct + Math.floor(popAct * popAug / 100), popMax) * tax / 10;
                 }
             }
 
