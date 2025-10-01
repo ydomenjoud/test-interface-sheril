@@ -95,7 +95,7 @@ export default function InfoPanel({ selected }: Props) {
             }
             return (
               <tr key={`flt-${i}`}>
-                <td>{f.nom} ({f.num})</td>
+                <td>{f.nom} ({f.num+1})</td>
                 <td style={{ textAlign: 'right' }}>
                   {typeof owner === 'number' ? <Commandant num={owner} /> : '—'}
                 </td>
