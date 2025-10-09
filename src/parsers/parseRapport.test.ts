@@ -92,3 +92,48 @@ describe('parseRapportXml - XML lowercase only', () => {
     });
   });
 });
+
+describe('parseRapportXml - conservation des systèmes détectés entre tours', () => {
+  it("conserve les systèmes détectés d'un tour précédent et remplace par position", () => {
+    const xmlTour3 = `
+      <rapport numtour="3" version="1.152">
+        <commandant capitale="0_1_1" grade="comte" nom="mab" numero="1" planetes="0" puissance="0" race="1" reputation="0" statut="neutre">
+          <detection>
+            <systeme nbpla="10" nom="Ancien" pos="0_6_2" typeetoile="1">
+              <proprio>9</proprio>
+            </systeme>
+          </detection>
+        </commandant>
+      </rapport>
+    `;
+    const res3 = parseRapportXml(xmlTour3);
+    expect(res3.systemesDetectes).toHaveLength(1);
+    expect(res3.systemesDetectes[0]).toMatchObject({ nom: 'Ancien', pos: { x: 6, y: 2 }, typeEtoile: 1, nbPla: 10, proprietaires: [9] });
+
+    const xmlTour4 = `
+      <rapport numtour="4" version="1.152">
+        <commandant capitale="0_1_1" grade="comte" nom="mab" numero="1" planetes="0" puissance="0" race="1" reputation="0" statut="neutre">
+          <detection>
+            <systeme nbpla="12" nom="Mis à jour" pos="0_6_2" typeetoile="5">
+              <proprio>14</proprio>
+            </systeme>
+            <systeme nbpla="7" nom="Nouveau" pos="0_8_8" typeetoile="3">
+              <proprio>2</proprio>
+            </systeme>
+          </detection>
+        </commandant>
+      </rapport>
+    `;
+    const res4 = parseRapportXml(xmlTour4);
+    // Nous devons avoir 2 systèmes: l'ancien (remplacé) et le nouveau
+    expect(res4.systemesDetectes).toHaveLength(2);
+
+    // Trouver par position
+    const byKey = (x: number, y: number) => res4.systemesDetectes.find(s => s.pos.x === x && s.pos.y === y)!;
+    const maj = byKey(6, 2);
+    expect(maj).toMatchObject({ nom: 'Mis à jour', typeEtoile: 5, nbPla: 12, proprietaires: [14] });
+
+    const nouveau = byKey(8, 8);
+    expect(nouveau).toMatchObject({ nom: 'Nouveau', typeEtoile: 3, nbPla: 7, proprietaires: [2] });
+  });
+});

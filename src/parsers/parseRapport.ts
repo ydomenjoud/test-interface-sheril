@@ -36,13 +36,87 @@ function qAll(root: ParentNode | null | undefined, selectors: string[]): Element
     return out;
 }
 
+// Cache module-level pour conserver les systèmes détectés entre les chargements de rapports
+let __detectedSystemsCache: Map<string, SystemeDetecte> = new Map();
+
+// Persistance LocalStorage (désactivée durant les tests pour éviter la pollution du runner)
+const LS_KEY_DETECTEDS = 'sheril_detected_systems_v1';
+function canUseLocalStorage(): boolean {
+    // jsdom expose window/localStorage en test, mais on désactive explicitement en test
+    // pour éviter des interactions entre tests
+    try {
+        // @ts-ignore
+        if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') return false;
+        if (typeof window === 'undefined' || !('localStorage' in window)) return false;
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function loadDetectedFromLS(): Map<string, SystemeDetecte> {
+    if (!canUseLocalStorage()) return new Map();
+    try {
+        const raw = window.localStorage.getItem(LS_KEY_DETECTEDS);
+        if (!raw) return new Map();
+        const arr = JSON.parse(raw) as any[];
+        if (!Array.isArray(arr)) return new Map();
+        const m = new Map<string, SystemeDetecte>();
+        for (const it of arr) {
+            if (!it || !it.pos || typeof it.pos.x !== 'number' || typeof it.pos.y !== 'number') continue;
+            const key = `${it.pos.x}_${it.pos.y}`;
+            // Reconstituer l'objet en s'assurant des champs attendus
+            const sd: SystemeDetecte = {
+                type: 'detecte',
+                nom: String(it.nom || 'Système'),
+                pos: { x: Number(it.pos.x), y: Number(it.pos.y) },
+                typeEtoile: Number(it.typeEtoile || 0),
+                nbPla: Number(it.nbPla || 0),
+                proprietaires: Array.isArray(it.proprietaires) ? it.proprietaires.map((n: any) => Number(n)).filter((n: any) => !Number.isNaN(n)) : [],
+                politique: typeof it.politique === 'number' ? it.politique : undefined,
+                entretien: typeof it.entretien === 'number' ? it.entretien : undefined,
+                revenu: typeof it.revenu === 'number' ? it.revenu : undefined,
+                bcont: typeof it.bcont === 'number' ? it.bcont : undefined,
+                besp: typeof it.besp === 'number' ? it.besp : undefined,
+                btech: typeof it.btech === 'number' ? it.btech : undefined,
+            };
+            m.set(key, sd);
+        }
+        return m;
+    } catch {
+        return new Map();
+    }
+}
+
+function saveDetectedToLS(map: Map<string, SystemeDetecte>): void {
+    if (!canUseLocalStorage()) return;
+    try {
+        const arr = Array.from(map.values());
+        window.localStorage.setItem(LS_KEY_DETECTEDS, JSON.stringify(arr));
+    } catch {
+        // ignore
+    }
+}
+
+// Charger l'état depuis le localStorage au chargement du module
+(() => {
+    try {
+        const fromLS = loadDetectedFromLS();
+        if (fromLS.size) {
+            __detectedSystemsCache = fromLS;
+        }
+    } catch {
+        // ignore
+    }
+})();
+
 export function parseRapportXml(text: string): Rapport {
     const doc = new DOMParser().parseFromString(text, 'text/xml');
 
     // Nœuds racines strictement en lowercase
     const rapportNode = qOne(doc, ['rapport']);
     const joueurNode = qOne(rapportNode, ['commandant']);
-    const tour = getAttrNum(rapportNode, ['numTour']);
+    const tour = getAttrNum(rapportNode, ['numTour', 'numtour']);
 
     const joueur: Rapport['joueur'] = {
         numero: getAttrNum(joueurNode, ['numero']),
@@ -82,9 +156,9 @@ export function parseRapportXml(text: string): Rapport {
     sysNodes.forEach((s) => {
         const pos = parsePosString(getAttr(s, ['pos']) || '0_1_1');
         const nom = getAttr(s, ['nom']) || 'Système';
-        const rawStar = getAttrNum(s, ['typeEtoile']) ?? getAttrNum(s, ['type']);
+        const rawStar = getAttrNum(s, ['typeEtoile', 'typeetoile', 'type']);
         const typeEtoile = (rawStar ?? 0);
-        const nbPla = getAttrNum(s, ['nbpla']) ?? getAttrNum(s, ['nbpla']) ?? 0;
+        const nbPla = getAttrNum(s, ['nbpla', 'nombrepla']) ?? 0;
 
         const proprietaires: number[] = [joueur.numero || 0];
 
@@ -158,13 +232,13 @@ export function parseRapportXml(text: string): Rapport {
 
     // Systèmes détectés (lowercase only)
     const systemesDetectes: SystemeDetecte[] = [];
-    let sysDetNodes = qAll(joueurNode, ['detections > systeme']);
+    let sysDetNodes = qAll(joueurNode, ['detections > systeme', 'detection > systeme']);
     sysDetNodes.forEach((s) => {
         const pos = parsePosString(getAttr(s, ['pos']) || '0_1_1');
         const nom = getAttr(s, ['nom']) || 'Système';
-        const rawStar = getAttrNum(s, ['typeEtoile']) ?? getAttrNum(s, ['type']);
+        const rawStar = getAttrNum(s, ['typeEtoile', 'typeetoile', 'type']);
         const typeEtoile = rawStar ?? 0;
-        const nbPla = getAttrNum(s, ['nbpla']) ?? getAttrNum(s, ['nbpla']) ?? 0;
+        const nbPla = getAttrNum(s, ['nbpla', 'nombrepla']) ?? 0;
         const proprietaires: number[] = [];
         qAll(s, ['proprio']).forEach((p) => {
             const v = Number((p.textContent || '').trim());
@@ -172,6 +246,17 @@ export function parseRapportXml(text: string): Rapport {
         });
         systemesDetectes.push({type: 'detecte', nom, pos, typeEtoile, nbPla, proprietaires});
     });
+
+    // Fusionner avec le cache précédent (clé = position)
+    const keyOf = (sd: SystemeDetecte) => `${sd.pos.x}_${sd.pos.y}`;
+    const mergedMap: Map<string, SystemeDetecte> = new Map(__detectedSystemsCache);
+    systemesDetectes.forEach(sd => {
+        mergedMap.set(keyOf(sd), sd);
+    });
+    const mergedSystemesDetectes: SystemeDetecte[] = Array.from(mergedMap.values());
+    __detectedSystemsCache = mergedMap;
+    // Sauvegarder dans le localStorage (si disponible)
+    try { saveDetectedToLS(mergedMap); } catch { /* ignore */ }
 
     // Flottes du joueur (lowercase only)
     const flottesJoueur: FlotteJoueur[] = [];
@@ -202,7 +287,7 @@ export function parseRapportXml(text: string): Rapport {
 
     // Flottes détectées (lowercase only)
     const flottesDetectees: FlotteDetectee[] = [];
-    let fltDetNodes = qAll(joueurNode, ['detections > flotte']);
+    let fltDetNodes = qAll(joueurNode, ['detections > flotte', 'detection > flotte']);
     fltDetNodes.forEach((f) => {
         const pos = parsePosString(getAttr(f, ['pos']) || '0_1_1');
         flottesDetectees.push({
@@ -268,11 +353,9 @@ export function parseRapportXml(text: string): Rapport {
     const rapport: Rapport = {
         tour,
         technologiesAtteignables,
-        technologiesConnues, joueur, systemesJoueur, systemesDetectes, flottesJoueur, flottesDetectees, plansVaisseaux,
+        technologiesConnues, joueur, systemesJoueur, systemesDetectes: mergedSystemesDetectes, flottesJoueur, flottesDetectees, plansVaisseaux,
         budgetTechnologique,
     };
-
-    console.log('RAPPORT', rapport)
 
     return rapport;
 }
