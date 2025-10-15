@@ -110,6 +110,8 @@ function saveDetectedToLS(map: Map<string, SystemeDetecte>): void {
     }
 })();
 
+const keyOf = (sd: Pick<SystemeDetecte, 'pos'>) => `${sd.pos.x}_${sd.pos.y}`;
+
 export function parseRapportXml(text: string): Rapport {
     const doc = new DOMParser().parseFromString(text, 'text/xml');
 
@@ -211,6 +213,12 @@ export function parseRapportXml(text: string): Rapport {
             });
         });
 
+        // si il était présent avant dans les détections, et qu'il possédé maintenant, on le supprime
+        const key = keyOf({pos});
+        if(__detectedSystemsCache.has(key)) {
+            __detectedSystemsCache.delete(key)
+        }
+
         systemesJoueur.push({
             type: 'joueur',
             nom,
@@ -248,7 +256,6 @@ export function parseRapportXml(text: string): Rapport {
     });
 
     // Fusionner avec le cache précédent (clé = position)
-    const keyOf = (sd: SystemeDetecte) => `${sd.pos.x}_${sd.pos.y}`;
     const mergedMap: Map<string, SystemeDetecte> = new Map(__detectedSystemsCache);
     systemesDetectes.forEach(sd => {
         mergedMap.set(keyOf(sd), sd);
