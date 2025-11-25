@@ -322,19 +322,23 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
             const py = dy * cellSize;
             if (px < 0 || py < 0 || px >= cols * cellSize || py >= rows * cellSize) return;
 
-            const size = Math.max(16, Math.floor(cellSize * 0.5));
+            // Taille et placement de l'icône de vaisseau
+            // Exigence: l'image du vaisseau doit faire un tiers de la largeur d'une case et être centrée
+            const size = Math.floor(cellSize / 3);
+            const drawX = px + (cellSize - size) / 2;
+            const drawY = py + (cellSize - size) / 2;
             const c2d = ctx as CanvasRenderingContext2D;
             c2d.save();
             if (!isFleetSelected((f as any).owner)) {
                 c2d.filter = 'grayscale(1)';
             }
             if (shipImg && shipImg.complete && shipImg.naturalWidth > 0) {
-                c2d.drawImage(shipImg, px + cellSize - size, py, size, size);
+                c2d.drawImage(shipImg, drawX, drawY, size, size);
             }
             const col = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna);
             c2d.strokeStyle = col;
             c2d.lineWidth = 1;
-            c2d.strokeRect(px + cellSize - size, py, size, size);
+            c2d.strokeRect(drawX, drawY, size, size);
 
             // Flèche de direction (flottes du joueur uniquement, si "direction" est défini)
             const t = (f as any).direction;
