@@ -220,13 +220,14 @@ export function parseRapportXml(text: string): Rapport {
             __detectedSystemsCache.delete(key)
         }
 
+        const sortedProprietaires = Array.from(proprietaires).sort((a, b) => a - b);
         systemesJoueur.push({
             type: 'joueur',
             nom,
             pos,
             typeEtoile,
             nbPla,
-            proprietaires: Array.from(proprietaires.values()),
+            proprietaires: sortedProprietaires,
             scan: getAttrNum(s, ['hscan']),
             planetes, // attributs additionnels présents sur les systèmes du joueur
             politique: getAttrNum(s, ['politique']),
@@ -253,7 +254,8 @@ export function parseRapportXml(text: string): Rapport {
             const v = Number((p.textContent || '').trim());
             if (!Number.isNaN(v)) proprietaires.push(v);
         });
-        systemesDetectes.push({type: 'detecte', nom, pos, typeEtoile, nbPla, proprietaires});
+        const sortedProprietaires = Array.from(proprietaires).sort((a, b) => a - b);
+        systemesDetectes.push({type: 'detecte', nom, pos, typeEtoile, nbPla, proprietaires: sortedProprietaires});
     });
 
     // Fusionner avec le cache précédent (clé = position)

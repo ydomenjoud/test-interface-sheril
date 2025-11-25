@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
 import {BOUNDS, torusDelta, wrapX, wrapY} from '../../utils/position';
 import {Alliance, XY} from '../../types';
+import {lightenHexColor} from "../../utils/global";
 
 type Props = {
     onSelect: (xy: XY) => void;
@@ -20,7 +21,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
         if(colors.size === 1) {
             return colors.values().next().value;
         } else {
-            return '#ffa638';
+            return '#ff9540';
         }
         // sinon on renvoi jaune
     }
@@ -328,7 +329,7 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
 
             // HALO de sélection pour les systèmes (couleur via colorForOwnership)
             if (isSystemSelected(owners)) {
-                const haloColor = col;
+                const haloColor = lightenHexColor(col, 100);
                 const lineW = 2;
                 const blur = Math.max(10, Math.floor(lineW * 1.5));
                 const rHalo = radius + lineW / 2; // halo juste à l'extérieur du disque
@@ -414,10 +415,11 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
 
             // HALO de sélection pour les flottes (autour de l'icône centrée)
             if (isFleetSelected((f as any).owner)) {
-                const haloColor = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna);
+                const col = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna);
+                const haloColor = col
                 const lineW = 2
                 const blur = Math.max(10, Math.floor(lineW * 1.5));
-                const pad = Math.max(1, Math.floor(cellSize * 0.04));
+                const pad = 0;
                 const x = drawX - pad;
                 const y = drawY - pad;
                 const w = size + pad * 2;

@@ -16,3 +16,49 @@ export function formatTechName(t?: Technologie): string {
     if (!t) return '';
     return `${t.nom} ${romanFromNiv(t.niv)}`;
 }
+
+/**
+ * Éclaircit une couleur hexadécimale d'un pourcentage donné.
+ * @param {string} hex - Le code couleur hexadécimal (ex: '#99fa78').
+ * @param {number} percent - Le pourcentage d'éclaircissement (ex: 20 pour 20%).
+ * @returns {string} Le nouveau code couleur hexadécimal éclairci.
+ */
+export function lightenHexColor(hex: string, percent: number) {
+    // 1. Nettoyer et valider le format hex
+    let color = hex.startsWith('#') ? hex.slice(1) : hex;
+
+    // Assurer que l'entrée est au format RRGGBB ou RRRRGGGGBBBB (inhabituel)
+    if (color.length !== 6) {
+        // Gérer les formats courts (3 caractères) ou invalides
+        if (color.length === 3) {
+            color = color.split('').map(c => c + c).join('');
+        } else {
+            // Fallback ou erreur pour les cas non standard
+            console.error("Format hex invalide.");
+            return hex;
+        }
+    }
+
+    const factor = 1 + percent / 100;
+    let newColor = '#';
+
+    // 2. Traiter chaque composante RVB
+    for (let i = 0; i < 3; i++) {
+        // Extraire la composante (ex: '99' pour le Rouge)
+        let compHex = color.substring(i * 2, i * 2 + 2);
+
+        // Convertir en décimal (0-255)
+        let compDec = parseInt(compHex, 16);
+
+        // Appliquer l'éclaircissement et s'assurer de ne pas dépasser 255
+        let compLightened = Math.min(255, Math.floor(compDec * factor));
+
+        // Reconvertir en hexadécimal (doit avoir deux chiffres)
+        let compNewHex = compLightened.toString(16);
+
+        // Ajouter un '0' devant si nécessaire (ex: 10 en hex est 'a', on veut '0a')
+        newColor += compNewHex.length === 1 ? '0' + compNewHex : compNewHex;
+    }
+
+    return newColor;
+}

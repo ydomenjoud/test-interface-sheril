@@ -34,9 +34,16 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
 
     const loadRapportFile = useCallback(async (file: File) => {
         const text = await file.text();
+        // Parse and apply the report
         const r = parseRapportXml(text);
         setRapport(r);
         if (!center && r.joueur.capitale) setCenter(r.joueur.capitale);
+        // Persist the raw XML so it can be reloaded automatically later
+        try {
+            localStorage.setItem('rapportXml', text);
+        } catch {
+            // Storage might be unavailable (private mode/quota). Ignore silently.
+        }
     }, [center]);
 
     useEffect(() => {
@@ -62,6 +69,22 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         return () => {
             alive = false;
         };
+    }, []);
+
+    // Au chargement, si un rapport a déjà été chargé auparavant, le recharger automatiquement
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem('rapportXml');
+            if (stored) {
+                const r = parseRapportXml(stored);
+                setRapport(r);
+                if (!center && r.joueur.capitale) setCenter(r.joueur.capitale);
+            }
+        } catch {
+            // Si localStorage n'est pas accessible ou contenu invalide, ignorer
+        }
+        // we only want this to run once on mount
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const value = useMemo<ReportContextType>(() => ({
