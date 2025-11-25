@@ -11,11 +11,25 @@ type Props = {
 export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[]) {
     if (owners && owners?.length === 1 && owners[0] === 0) return 'grey';
     if (!owners || owners.length === 0) return '#999';
+
+    // si y'en a plusieurs en enlevant le neutre
+    if (owners.length > 1 ){
+        const withoutNeutral = owners.filter(o => o !== 0);
+        // si tous pareil, on renvoit la couleur,
+        const colors: Set<string> = new Set(withoutNeutral.map(o => colorForOwnership(currentPlayerId, [o], alliances, pna)));
+        if(colors.size === 1) {
+            return colors.values().next().value;
+        } else {
+            return '#ffa638';
+        }
+        // sinon on renvoi jaune
+    }
+
     const owner = owners[0];
     if (currentPlayerId && owners.includes(currentPlayerId)) return '#09ca31';
-    if (alliances && alliances.some(a => a.commandants.includes(owner))) return '#4945e4';
+    if (alliances && alliances.some(a => a.commandants.includes(owner))) return '#224eff';
     if (pna && pna.includes(owner)) return 'yellow';
-    return '#fb3a3a';
+    return '#f80c0c';
 }
 
 export default function CanvasMap({onSelect, selectedOwners}: Props) {
@@ -311,6 +325,24 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
                 c2d.fill();
             }
             c2d.restore();
+
+            // HALO de sélection pour les systèmes (couleur via colorForOwnership)
+            if (isSystemSelected(owners)) {
+                const haloColor = col;
+                const lineW = 2;
+                const blur = Math.max(10, Math.floor(lineW * 1.5));
+                const rHalo = radius + lineW / 2; // halo juste à l'extérieur du disque
+                const cHalo = ctx as CanvasRenderingContext2D;
+                cHalo.save();
+                cHalo.strokeStyle = haloColor;
+                cHalo.lineWidth = lineW;
+                cHalo.shadowColor = haloColor;
+                cHalo.shadowBlur = blur;
+                cHalo.beginPath();
+                cHalo.arc(cx, cy, rHalo, 0, Math.PI * 2);
+                cHalo.stroke();
+                cHalo.restore();
+            }
             // plus de bordure
         });
 
@@ -379,6 +411,26 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
                 }
             }
             c2d.restore();
+
+            // HALO de sélection pour les flottes (autour de l'icône centrée)
+            if (isFleetSelected((f as any).owner)) {
+                const haloColor = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna);
+                const lineW = 2
+                const blur = Math.max(10, Math.floor(lineW * 1.5));
+                const pad = Math.max(1, Math.floor(cellSize * 0.04));
+                const x = drawX - pad;
+                const y = drawY - pad;
+                const w = size + pad * 2;
+                const h = size + pad * 2;
+                const cHalo = ctx as CanvasRenderingContext2D;
+                cHalo.save();
+                cHalo.strokeStyle = haloColor;
+                cHalo.lineWidth = lineW;
+                cHalo.shadowColor = haloColor;
+                cHalo.shadowBlur = blur;
+                cHalo.strokeRect(x, y, w, h);
+                cHalo.restore();
+            }
         });
 
     }, [rapport, systems, fleets, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion, selectedOwners]);

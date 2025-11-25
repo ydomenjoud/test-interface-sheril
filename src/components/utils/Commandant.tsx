@@ -9,7 +9,7 @@ export default function Commandant({num}: Props) {
     const {global} = useReport();
 
     if (num === 0) return <span className={'commandant neutre'}>
-           Neutre
+           Neutre &nbsp;
         </span>
 
     if (!global || !global.commandants || !num) return <></>;
