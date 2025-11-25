@@ -33,6 +33,9 @@ export default function InfoPanel({ selected }: Props) {
     return <div className="carte-info">Cliquez sur une case de la carte pour voir le détail.</div>;
   }
 
+  console.log({system})
+
+
   return (
     <div className="carte-info">
       <div className="info-block">

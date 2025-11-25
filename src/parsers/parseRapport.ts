@@ -162,13 +162,14 @@ export function parseRapportXml(text: string): Rapport {
         const typeEtoile = (rawStar ?? 0);
         const nbPla = getAttrNum(s, ['nbpla', 'nombrepla']) ?? 0;
 
-        const proprietaires: number[] = [joueur.numero || 0];
+        const proprietaires: Set<number> = new Set();
 
         const planetes: any[] = [];
         let revenuEstime = 0;
         const pNodes = qAll(s, ['planetes > p',]);
         pNodes.forEach((p) => {
             const proprietaire = getAttrNum(p, ['prop']);
+            proprietaires.add(proprietaire);
             if (proprietaire === joueur.numero) {
                 const tax = getAttrNum(p, ['tax']);
                 const popNode = qOne(p, ['population']);
@@ -225,7 +226,7 @@ export function parseRapportXml(text: string): Rapport {
             pos,
             typeEtoile,
             nbPla,
-            proprietaires,
+            proprietaires: Array.from(proprietaires.values()),
             scan: getAttrNum(s, ['hscan']),
             planetes, // attributs additionnels présents sur les systèmes du joueur
             politique: getAttrNum(s, ['politique']),

@@ -8,6 +8,7 @@ import { XY } from '../types';
 export default function Carte() {
   const { rapport, global, cellSize, setCellSize, center, setCenter } = useReport();
   const [selected, setSelected] = useState<XY | undefined>(undefined);
+  const [selectedOwners, setSelectedOwners] = useState<number[]>([]);
 
   const content = useMemo(() => {
     if (!rapport) {
@@ -47,12 +48,34 @@ export default function Carte() {
         <div style={{ marginLeft: 20 }}>
           Astuce: utilisez les flèches pour naviguer, maintenez Ctrl pour se déplacer par 5.
         </div>
+        {/* Filtre multi-sélection des commandants */}
+        <div style={{ marginLeft: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label htmlFor="owner-filter">Filtrer par commandant(s):</label>
+          <select
+            id="owner-filter"
+            multiple
+            size={4}
+            value={selectedOwners.map(String)}
+            onChange={(e) => {
+              const values = Array.from(e.target.selectedOptions).map(o => parseInt(o.value, 10)).filter(n => !Number.isNaN(n));
+              setSelectedOwners(values);
+            }}
+          >
+            {(global?.commandants || [])
+              .filter(c => typeof c.numero === 'number')
+              .map(c => (
+                <option key={c.numero} value={String(c.numero)}>
+                  {c.nom || `#${c.numero}`}
+                </option>
+              ))}
+          </select>
+        </div>
       </div>
 
       <div className="carte-canvas-area">
         {!rapport ? content : (
           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-            <CanvasMap onSelect={(xy) => setSelected(xy)} />
+            <CanvasMap onSelect={(xy) => setSelected(xy)} selectedOwners={selectedOwners} />
             <MiniMap onCenter={(x, y) => setCenter({ x, y })} />
           </div>
         )}

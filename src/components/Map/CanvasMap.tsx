@@ -5,6 +5,7 @@ import {Alliance, XY} from '../../types';
 
 type Props = {
     onSelect: (xy: XY) => void;
+    selectedOwners?: number[]; // liste des commandants sélectionnés pour filtrage visuel
 };
 
 export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[]) {
@@ -17,7 +18,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#fb3a3a';
 }
 
-export default function CanvasMap({onSelect}: Props) {
+export default function CanvasMap({onSelect, selectedOwners}: Props) {
     const {rapport, cellSize, center, setCenter, setViewportDims} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -75,6 +76,43 @@ export default function CanvasMap({onSelect}: Props) {
             ...f, owner: f.proprio,
         })),];
     }, [rapport, currentPlayerId]);
+
+    // Cache pour les patterns de hachures afin d'éviter de recréer à chaque frame
+    const hatchCacheRef = useRef<Map<string, CanvasPattern>>(new Map());
+
+    // Crée un pattern hachuré alternant plusieurs couleurs
+    const getHatchPattern = useCallback((ctx: CanvasRenderingContext2D, colors: string[], size: number) => {
+        const key = `${colors.join('-')}|${Math.round(size)}`;
+        const cache = hatchCacheRef.current;
+        const cached = cache.get(key);
+        if (cached) return cached;
+        // Taille de base du motif en fonction de la taille de cellule
+        const stripe = Math.max(3, Math.floor(size * 0.12)); // épaisseur de bande
+        const tile = Math.max(12, Math.min(64, stripe * colors.length * 2)); // dimension tuile
+        const off = document.createElement('canvas');
+        off.width = tile;
+        off.height = tile;
+        const c = off.getContext('2d');
+        if (!c) return null;
+        // fond transparent
+        c.clearRect(0, 0, tile, tile);
+        // Dessiner des bandes diagonales en alternant les couleurs
+        // Stratégie: dessiner un grand nombre de parallèles dans un repère pivoté
+        c.save();
+        c.translate(tile / 2, tile / 2);
+        c.rotate(-Math.PI / 4); // diagonales 45°
+        c.translate(-tile / 2, -tile / 2);
+        const totalBands = Math.ceil(tile / stripe) + 2;
+        for (let i = -1; i < totalBands; i++) {
+            const color = colors[(i + colors.length) % colors.length];
+            c.fillStyle = color;
+            c.fillRect(i * stripe, -tile, stripe, tile * 3);
+        }
+        c.restore();
+        const pattern = ctx.createPattern(off, 'repeat');
+        if (pattern) cache.set(key, pattern);
+        return pattern;
+    }, []);
 
     useEffect(() => {
         const cvs = canvasRef.current;
@@ -187,6 +225,18 @@ export default function CanvasMap({onSelect}: Props) {
         });
         cScan.restore();
 
+        // Fonction utilitaire: déterminer si un élément correspond à la sélection
+        const isSystemSelected = (owners?: number[]) => {
+            if (!selectedOwners || selectedOwners.length === 0) return true;
+            if (!owners || owners.length === 0) return false;
+            return owners.some(o => selectedOwners.includes(o));
+        };
+        const isFleetSelected = (owner?: number) => {
+            if (!selectedOwners || selectedOwners.length === 0) return true;
+            if (owner == null) return false;
+            return selectedOwners.includes(owner);
+        };
+
         // systèmes
         systems.forEach(s => {
             const dx = ((s.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
@@ -195,8 +245,9 @@ export default function CanvasMap({onSelect}: Props) {
             const py = dy * cellSize;
             if (px < 0 || py < 0 || px >= cols * cellSize || py >= rows * cellSize) return;
 
-            // Couleur en fonction de la possession (ex-logic de bordure)
-            const col = colorForOwnership(currentPlayerId, s.owners, rapport?.joueur.alliances, rapport?.joueur.pna);
+            // Couleur(s) en fonction de la possession
+            const owners = (s as any).owners as number[] | undefined;
+            const col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna);
 
             // Taille du disque en fonction du typeEtoile:
             // type 1 => 50% de la case, type 9/10 => 100% de la case, interpolation linéaire entre 1..9
@@ -209,10 +260,57 @@ export default function CanvasMap({onSelect}: Props) {
             const cy = py + cellSize / 2;
 
             const c2d = ctx as CanvasRenderingContext2D;
+            c2d.save();
+            if (!isSystemSelected(owners)) {
+                // éléments non sélectionnés en niveaux de gris
+                c2d.filter = 'opacity(0.15)';
+            }
             c2d.beginPath();
             c2d.arc(cx, cy, radius, 0, Math.PI * 2);
-            c2d.fillStyle = col;
-            c2d.fill();
+            // Si plusieurs propriétaires, afficher des parts angulaires (camembert)
+            const multiOwners = (owners && owners.length >= 2) ? owners : undefined;
+            if (multiOwners) {
+                // Déterminer les poids par propriétaire à partir des planètes du système (si dispo)
+                let weights: number[] = [];
+                const sysAny = s as any;
+                const planets: { proprietaire?: number }[] | undefined = sysAny.planetes;
+                if (Array.isArray(planets) && planets.length > 0) {
+                    const counts = new Map<number, number>();
+                    planets.forEach(p => {
+                        if (p && typeof p.proprietaire === 'number') {
+                            counts.set(p.proprietaire, (counts.get(p.proprietaire) || 0) + 1);
+                        }
+                    });
+                    weights = multiOwners.map(o => counts.get(o) || 0);
+                }
+                // Si aucune info exploitable, répartir équitablement
+                if (!weights.length || weights.every(w => w === 0)) {
+                    weights = multiOwners.map(() => 1);
+                }
+                const total = weights.reduce((a, b) => a + b, 0);
+                // Préparer les couleurs par propriétaire
+                const colors = multiOwners.map(o => colorForOwnership(currentPlayerId, [o], rapport?.joueur.alliances, rapport?.joueur.pna));
+
+                // Dessiner les parts: une par owner, angle proportionnel au poids
+                let angle = -Math.PI / 2; // démarrage en haut, pour stabilité visuelle
+                for (let i = 0; i < multiOwners.length; i++) {
+                    const frac = total > 0 ? (weights[i] / total) : (1 / multiOwners.length);
+                    const delta = Math.PI * 2 * frac;
+                    const start = angle;
+                    const end = angle + delta;
+                    c2d.beginPath();
+                    c2d.moveTo(cx, cy);
+                    c2d.arc(cx, cy, radius, start, end);
+                    c2d.closePath();
+                    c2d.fillStyle = colors[i];
+                    c2d.fill();
+                    angle = end;
+                }
+            } else {
+                c2d.fillStyle = col;
+                c2d.fill();
+            }
+            c2d.restore();
             // plus de bordure
         });
 
@@ -225,13 +323,18 @@ export default function CanvasMap({onSelect}: Props) {
             if (px < 0 || py < 0 || px >= cols * cellSize || py >= rows * cellSize) return;
 
             const size = Math.max(16, Math.floor(cellSize * 0.5));
+            const c2d = ctx as CanvasRenderingContext2D;
+            c2d.save();
+            if (!isFleetSelected((f as any).owner)) {
+                c2d.filter = 'grayscale(1)';
+            }
             if (shipImg && shipImg.complete && shipImg.naturalWidth > 0) {
-                (ctx as CanvasRenderingContext2D).drawImage(shipImg, px + cellSize - size, py, size, size);
+                c2d.drawImage(shipImg, px + cellSize - size, py, size, size);
             }
             const col = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna);
-            ctx.strokeStyle = col;
-            ctx.lineWidth = 1;
-            ctx.strokeRect(px + cellSize - size, py, size, size);
+            c2d.strokeStyle = col;
+            c2d.lineWidth = 1;
+            c2d.strokeRect(px + cellSize - size, py, size, size);
 
             // Flèche de direction (flottes du joueur uniquement, si "direction" est défini)
             const t = (f as any).direction;
@@ -268,12 +371,13 @@ export default function CanvasMap({onSelect}: Props) {
                         c.restore();
                     };
 
-                    drawArrow(ctx as CanvasRenderingContext2D, sx, sy, tx, ty);
+                    drawArrow(c2d as CanvasRenderingContext2D, sx, sy, tx, ty);
                 }
             }
+            c2d.restore();
         });
 
-    }, [rapport, systems, fleets, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion]);
+    }, [rapport, systems, fleets, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion, selectedOwners]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
