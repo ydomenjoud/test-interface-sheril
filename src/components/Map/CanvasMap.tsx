@@ -92,42 +92,6 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
         })),];
     }, [rapport, currentPlayerId]);
 
-    // Cache pour les patterns de hachures afin d'éviter de recréer à chaque frame
-    const hatchCacheRef = useRef<Map<string, CanvasPattern>>(new Map());
-
-    // Crée un pattern hachuré alternant plusieurs couleurs
-    const getHatchPattern = useCallback((ctx: CanvasRenderingContext2D, colors: string[], size: number) => {
-        const key = `${colors.join('-')}|${Math.round(size)}`;
-        const cache = hatchCacheRef.current;
-        const cached = cache.get(key);
-        if (cached) return cached;
-        // Taille de base du motif en fonction de la taille de cellule
-        const stripe = Math.max(3, Math.floor(size * 0.12)); // épaisseur de bande
-        const tile = Math.max(12, Math.min(64, stripe * colors.length * 2)); // dimension tuile
-        const off = document.createElement('canvas');
-        off.width = tile;
-        off.height = tile;
-        const c = off.getContext('2d');
-        if (!c) return null;
-        // fond transparent
-        c.clearRect(0, 0, tile, tile);
-        // Dessiner des bandes diagonales en alternant les couleurs
-        // Stratégie: dessiner un grand nombre de parallèles dans un repère pivoté
-        c.save();
-        c.translate(tile / 2, tile / 2);
-        c.rotate(-Math.PI / 4); // diagonales 45°
-        c.translate(-tile / 2, -tile / 2);
-        const totalBands = Math.ceil(tile / stripe) + 2;
-        for (let i = -1; i < totalBands; i++) {
-            const color = colors[(i + colors.length) % colors.length];
-            c.fillStyle = color;
-            c.fillRect(i * stripe, -tile, stripe, tile * 3);
-        }
-        c.restore();
-        const pattern = ctx.createPattern(off, 'repeat');
-        if (pattern) cache.set(key, pattern);
-        return pattern;
-    }, []);
 
     useEffect(() => {
         const cvs = canvasRef.current;
