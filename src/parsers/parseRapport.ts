@@ -196,21 +196,45 @@ export function parseRapportXml(text: string): Rapport {
                 }
             });
 
-            const populations: { raceId: number; nb: number }[] = [];
+            const populations: { raceId: number; nb: number, growth: number, max: number }[] = [];
             const popNodes = [...qAll(p, ['pop']), ...qAll(p, ['population']),];
             popNodes.forEach((pop) => {
                 const raceStr = getAttr(pop, ['race']) || getAttr(pop, ['code']) || (pop.textContent || '').trim();
                 // nb peut être dans nb, count, ou popact (cas fréquent)
-                const nbStr = getAttr(pop, ['nb']) || getAttr(pop, ['count']) || getAttr(pop, ['popact']) || '0';
+                const nbStr = getAttr(pop, ['nb']) || getAttr(pop, ['count']) || getAttr(pop, ['popAct']) || '0';
                 const raceId = Number(raceStr);
                 const nb = Number(nbStr);
+                const growth = Number(getAttr(pop, ['popAug']) || '0');
+                const max = Number(getAttr(pop, ['popMax']) || '0');
+
                 if (!Number.isNaN(raceId) && !Number.isNaN(nb) && nb > 0) {
-                    populations.push({raceId, nb});
+                    populations.push({ raceId, nb, max, growth });
                 }
             });
+            const tax = getAttrNum(p, ['tax']) ?? 0;
+
+            const atmosphere = getAttrNum(p, ['atm']) ?? 0;
+            const gravity = getAttrNum(p, ['grav']) ?? 0;
+            const radiation = getAttrNum(p, ['rad']) ?? 0;
+            const temperature = getAttrNum(p, ['temp']) ?? 0;
+            const terraformation = getAttrNum(p, ['terra']) ?? 0;
+            const size = getAttrNum(p, ['tai']) ?? 0;
+
 
             planetes.push({
-                num, pdc, proprietaire, minerai, batiments, populations,
+                num,
+                pdc,
+                proprietaire,
+                minerai,
+                batiments,
+                populations,
+                tax,
+                atmosphere,
+                gravity,
+                radiation,
+                temperature,
+                terraformation,
+                size
             });
         });
 

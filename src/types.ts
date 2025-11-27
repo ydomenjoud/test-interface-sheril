@@ -49,8 +49,24 @@ export type VaisseauTailleRule = {
 };
 
 export type Planete = {
-    num: number; proprietaire?: number; pdc: number; // points de construction
-    minerai?: number; batiments: { techCode: string; count: number }[]; populations: { raceId: number; nb: number }[];
+    num: number;
+    proprietaire?: number;
+    pdc: number; // points de construction
+    minerai?: number;
+    batiments: { techCode: string; count: number }[]; 
+    populations: {
+        raceId: number;
+        nb: number,
+        growth: number,
+        max: number
+    }[];
+    tax: number,
+    atmosphere: number,
+    gravity: number,
+    radiation: number,
+    temperature: number,
+    terraformation: number,
+    size: number,
 };
 
 export interface SystemBase {
