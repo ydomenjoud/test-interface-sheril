@@ -31,20 +31,12 @@ export default function PlayerSystemDetail() {
 
   const [terraformationOffset, setTerraformationInput] = useState<number>(0);
 
-  useEffect(() => {
-    setTerraformationInput(selectedPlanet?.terraformation || 0)
-  }, [selectedPlanet])
-
   const terraformationCost = useMemo(() => {
     if (!selectedPlanet) {
       return 0;
     }
     return planetTerraformationCost(selectedPlanet.terraformation, terraformationOffset)
   }, [selectedPlanet, terraformationOffset])
-
-  useEffect(() => {
-    setTerraformationInput(selectedPlanet?.terraformation || 0)
-  }, [selectedPlanet])
 
   const systemTerraformationCost = useMemo<number>(() => {
     if (terraformationOffset === 0) {
