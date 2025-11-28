@@ -236,7 +236,7 @@ export default function ListeSystemes() {
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   {s.owned
-                  ? <NavLink to={'/player-system-detail/' + s.key}><Position pos={s.pos} /></NavLink>
+                  ? <NavLink to={'/player-system-detail/' + s.posStr}><Position pos={s.pos} /></NavLink>
                   : <Position pos={s.pos} />}
                 </td>
                 <td>{s.nom}</td>
