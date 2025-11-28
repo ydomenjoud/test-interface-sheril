@@ -1,6 +1,16 @@
 export type XY = { x: number; y: number };
 
-export type Race = { id: number; nom: string; couleur?: string };
+export type Range = {min: number, max: number};
+
+export type Race = {
+    id: number;
+    nom: string;
+    couleur?: string
+    graviteSupporte: Range;
+    temperatureSupporte: Range;
+    radiationSupporte: Range;
+};
+
 export type Marchandise = { code: number; nom: string };
 export type Commandant = { numero?: number; nom?: string; raceId?: number; }
 

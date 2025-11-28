@@ -48,9 +48,6 @@ export default function Header() {
             <NavLink to="/recherche" className={({isActive}) => (isActive ? 'active' : '')}>
                 Recherche
             </NavLink>
-            <NavLink to="/terraformation" className={({isActive}) => (isActive ? 'active' : '')}>
-                Terraformation
-            </NavLink>
         </nav>
         <div className="header-spacer"/>
         <input
