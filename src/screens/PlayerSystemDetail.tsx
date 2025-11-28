@@ -88,7 +88,10 @@ export default function PlayerSystemDetail() {
                 if (planet.populations[0]?.raceId === race.id) {
                   return <>
                     <td className={raceClass}>{planet.populations[0].nb + 1}</td>
-                    <td className={raceClass}>{planet.populations[0].max}</td>
+                    <td className={raceClass}>
+                      {planet.populations[0].max}
+                      {terraformationOffset > 0 && <>&nbsp;({maxPopulationByRace(race, planet, terraformationOffset)})</>}
+                    </td>
                   </>
                 }
                 return <>
