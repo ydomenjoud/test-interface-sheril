@@ -1,9 +1,7 @@
 // import React, { useMemo, useState } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useReport } from '../context/ReportContext';
-import SearchableSelect from '../components/utils/SearchableSelect';
-import { Planete, SystemeJoueur, XY } from '../types';
-import { raceIndexToNameMap, racesEnumList } from "../utils/races";
+import { Planete } from '../types';
 import { atmospheresNameList, maxPopulationByRace, planetTerraformationCost } from '../utils/planet';
 import { useParams } from 'react-router-dom';
 import Position from '../components/utils/Position';
@@ -44,7 +42,7 @@ export default function PlayerSystemDetail() {
     }
     return planetsList.filter(planet => planet.proprietaire === currentId)
       .reduce((systemSum, planet) => systemSum + planetTerraformationCost(planet.terraformation, terraformationOffset), 0);
-  }, [terraformationOffset, planetsList])
+  }, [terraformationOffset, planetsList, currentId])
 
   return (
     <div style={{ padding: 12, overflow: 'auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -52,7 +50,7 @@ export default function PlayerSystemDetail() {
       <h3>Système {selectedSystem && <span> {selectedSystem.nom} <Position pos={selectedSystem.pos}></Position></span>}</h3>
 
       <label htmlFor="ownedOnly">
-        Afficher Seulement les planètes possédées
+        Afficher seulement les planètes possédées
         <input name='ownedOnly' type='checkbox' value={'hey'} checked={isShowOwnedOnly} onChange={e => { setIsShowOwnedOnly(e.target.checked) }} />
       </label>
 

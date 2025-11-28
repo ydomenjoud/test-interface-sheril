@@ -30,7 +30,7 @@ export function planetTerraformationCost(currentLevel: number, offset: number = 
 }
 
 
-export function maxPopulationByRace({id, graviteSupporte, radiationSupporte, temperatureSupporte}: Race, {terraformation, radiation: radiation, temperature, gravity, size, atmosphere}: Planete, offset: number = 0): number {
+export function maxPopulationByRace({id, graviteSupporte, radiationSupporte, temperatureSupporte}: Race, {terraformation, radiation, temperature, gravity, size, atmosphere}: Planete, offset: number = 0): number {
     terraformation = Math.max(terraformation + offset, 0);
     
     if ([
