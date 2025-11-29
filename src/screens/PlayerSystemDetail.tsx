@@ -71,7 +71,7 @@ export default function PlayerSystemDetail() {
         <tbody>
           {planetsList.length > 0 && planetsList.map((planet) => <>
             <tr>
-              <td>{planet.num}</td>
+              <td>{planet.num + 1}</td>
               <td><Commandant num={planet.proprietaire} /></td>
               {races.map(race => {
                 const raceClass = 'race' + race.id
