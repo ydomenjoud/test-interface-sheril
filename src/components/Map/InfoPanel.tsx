@@ -4,6 +4,7 @@ import {FlotteBase, FlotteDetectee, FlotteJoueur, XY} from '../../types';
 import Commandant from "../utils/Commandant";
 import Position from "../utils/Position";
 import {getDescriptionPuissance, getPuissance, getPuissanceFromString} from "../../utils/puissance";
+import { NavLink } from 'react-router-dom';
 
 type Props = {
   selected?: XY;
@@ -29,6 +30,8 @@ export default function InfoPanel({ selected }: Props) {
     return atPos.systems[0];
   }, [atPos.systems]);
 
+  const isOwner = useMemo(() => system?.proprietaires?.some(p => p === rapport?.joueur?.numero), [system, rapport])
+
   if (!selected) {
     return <div className="carte-info">Cliquez sur une case de la carte pour voir le détail.</div>;
   }
@@ -48,6 +51,7 @@ export default function InfoPanel({ selected }: Props) {
             <th>Nom</th>
             <th>Planètes</th>
             <th>Commandants</th>
+            { isOwner &&<th></th>}
           </tr>
           </thead>
           <tbody>
@@ -60,6 +64,7 @@ export default function InfoPanel({ selected }: Props) {
                   ? system.proprietaires.map((p: number, key: number) => <Commandant num={p} key={key} />)
                   : '—'}
               </td>
+              { isOwner && <td className='app-nav'><NavLink  to={`/player-system-detail/${selected.x}-${selected.y}`}>détails {isOwner}</NavLink></td> }
             </tr>
           ) : (
             <tr><td colSpan={3} style={{ textAlign: 'center', padding: 8, color: '#aaa' }}>Aucun système ici.</td></tr>

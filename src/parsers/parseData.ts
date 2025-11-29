@@ -39,10 +39,24 @@ export function parseDataXml(text: string): GlobalData {
 
     const races: Race[] = [];
     doc.querySelectorAll('data > races > r')?.forEach((r, idx) => {
+        
+
         races.push({
             id: Number(r.getAttribute('code') || r.getAttribute('id') || idx + 1),
             nom: r.getAttribute('nom') || `Race ${idx + 1}`,
             couleur: r.getAttribute('color') || 'white',
+            graviteSupporte: {
+                min: +(r.getAttribute('grav_min') || 0),
+                max: +(r.getAttribute('grav_max') || 0),
+            },
+            temperatureSupporte: {
+                min: +(r.getAttribute('temp_min') || 0),
+                max: +(r.getAttribute('temp_max') || 0),
+            },
+            radiationSupporte: {
+                min: +(r.getAttribute('rad_min') || 0),
+                max: +(r.getAttribute('rad_max') || 0),
+            },
         });
     });
 
