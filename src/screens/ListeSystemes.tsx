@@ -3,6 +3,7 @@ import { useReport } from '../context/ReportContext';
 import Commandant from "../components/utils/Commandant";
 import {commandantAsString} from "../utils/commandant";
 import Position from "../components/utils/Position";
+import { NavLink } from 'react-router-dom';
 
 type SortKey =
   | 'etoile' | 'pos' | 'nom' | 'nbpla' | 'proprietaires'
@@ -233,7 +234,11 @@ export default function ListeSystemes() {
                     style={{ display: 'block' }}
                   />
                 </td>
-                <td style={{ whiteSpace: 'nowrap' }}><Position pos={s.pos} /></td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {s.owned
+                  ? <NavLink to={'/player-system-detail/' + s.posStr}><Position pos={s.pos} /></NavLink>
+                  : <Position pos={s.pos} />}
+                </td>
                 <td>{s.nom}</td>
                 <td style={{ textAlign: 'right' }}>{s.nbPla ?? 0}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{s.proprietaires.map((p: number, key: number) =>

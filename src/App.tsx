@@ -11,6 +11,7 @@ import ArbreTechnologies from './screens/ArbreTechnologies';
 import ListePlans from './screens/ListePlans';
 import CreatePlan from './screens/CreatePlan';
 import RechercheTechnologique from './screens/RechercheTechnologique';
+import PlayerSystemDetail from './screens/PlayerSystemDetail';
 
 function App() {
     return (<ReportProvider>
@@ -31,6 +32,7 @@ function App() {
                             <Route path="/plans" element={<ListePlans/>}/>
                             <Route path="/plans/creer" element={<CreatePlan/>}/>
                             <Route path="/recherche" element={<RechercheTechnologique/>}/>
+                            <Route path="/player-system-detail/:key" element={<PlayerSystemDetail/>}/>
                         </Routes>
                     </main>
                 </div>
