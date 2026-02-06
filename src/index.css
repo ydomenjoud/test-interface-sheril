@@ -18,3 +18,7 @@ code {
 .race3{ color: #CC0033}
 .race4{ color: #009933}
 .race5{ color: #777777}
+
+.zero-value {
+  color: #555;
+}

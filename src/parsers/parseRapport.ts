@@ -1,7 +1,7 @@
-import {Alliance, FlotteDetectee, FlotteJoueur, Rapport, SystemeDetecte, SystemeJoueur, PlanVaisseau} from '../types';
+import {Alliance, FlotteDetectee, FlotteJoueur, Lieutenant, Rapport, SystemeDetecte, SystemeJoueur, PlanVaisseau} from '../types';
 import {isPos, parsePosString} from '../utils/position';
 
-function getAttr(el: Element | null | undefined, names: string[]): string  {
+export function getAttr(el: Element | null | undefined, names: string[]): string  {
     if (!el) return '';
     for (const n of names) {
         const v = el.getAttribute(n);
@@ -10,14 +10,14 @@ function getAttr(el: Element | null | undefined, names: string[]): string  {
     return '';
 }
 
-function getAttrNum(el: Element | null | undefined, names: string[]): number {
+export function getAttrNum(el: Element | null | undefined, names: string[]): number {
     const v = getAttr(el, names);
     if (v == null || v === '') return 0;
     const n = Number(v);
     return Number.isNaN(n) ? 0 : n;
 }
 
-function qOne(root: ParentNode | null | undefined, selectors: string[]): Element | null {
+export function qOne(root: ParentNode | null | undefined, selectors: string[]): Element | null {
     if (!root) return null;
     for (const s of selectors) {
         const el = (root as ParentNode).querySelector(s);
@@ -26,7 +26,7 @@ function qOne(root: ParentNode | null | undefined, selectors: string[]): Element
     return null;
 }
 
-function qAll(root: ParentNode | null | undefined, selectors: string[]): Element[] {
+export function qAll(root: ParentNode | null | undefined, selectors: string[]): Element[] {
     if (!root) return [];
     const out: Element[] = [];
     for (const s of selectors) {
@@ -112,23 +112,18 @@ function saveDetectedToLS(map: Map<string, SystemeDetecte>): void {
 
 const keyOf = (sd: Pick<SystemeDetecte, 'pos'>) => `${sd.pos.x}_${sd.pos.y}`;
 
-// Ajout manuel de systèmes détectés (persistance + cache)
-export function addManualDetectedSystems(systems: SystemeDetecte[]) {
-    if (!systems || systems.length === 0) return;
-    const merged = new Map(__detectedSystemsCache);
-    systems.forEach(sd => {
-        merged.set(keyOf(sd), sd);
-    });
-    __detectedSystemsCache = merged;
-    try { saveDetectedToLS(merged); } catch { /* ignore */ }
-}
-
-export function getCachedDetectedSystems(): SystemeDetecte[] {
-    return Array.from(__detectedSystemsCache.values());
-}
-
 export function parseRapportXml(text: string): Rapport {
     const doc = new DOMParser().parseFromString(text, 'text/xml');
+
+    const raceNames: { [key: number]: { nom: string, couleur: string } } = {
+        0: { nom: "Fremens", couleur: "#CC00FF" },
+        1: { nom: "Atalantes", couleur: "#0066CC" },
+        2: { nom: "Zwaias", couleur: "#FFCC00" },
+        3: { nom: "Yoksor", couleur: "#CC0033" },
+        4: { nom: "Fergok", couleur: "#009933" },
+        5: { nom: "Cyborg", couleur: "#777777" },
+        6: { nom: "Koros", couleur: "#CC6600" },
+    };
 
     // Nœuds racines strictement en lowercase
     const rapportNode = qOne(doc, ['rapport']);
@@ -167,6 +162,39 @@ export function parseRapportXml(text: string): Rapport {
     });
 
 
+    // Marchandises by system position
+    const marchandisesBySystem = new Map<string, { code: number; num: number; prod: number }[]>();
+    qAll(rapportNode, ['postes_commerciaux > p']).forEach(pc => {
+        const posStr = getAttr(pc, ['pos']);
+        if (posStr) {
+            const marchandises: { code: number; num: number; prod: number }[] = [];
+            qAll(pc, ['m']).forEach(m => {
+                marchandises.push({
+                    code: getAttrNum(m, ['code']),
+                    num: getAttrNum(m, ['nb']),
+                    prod: getAttrNum(m, ['prod']),
+                });
+            });
+            marchandisesBySystem.set(posStr, marchandises);
+        }
+    });
+
+    const lieutenants: Lieutenant[] = [];
+    qAll(joueurNode, ['lieutenants > l']).forEach((l) => {
+        const competences = qAll(l, ['c']).map(c => ({
+            comp: getAttrNum(c, ['comp']),
+            val: getAttrNum(c, ['val']),
+        }));
+
+        lieutenants.push({
+            nom: getAttr(l, ['nom']),
+            pos: getAttr(l, ['pos']),
+            att: getAttrNum(l, ['att']),
+            race: getAttrNum(l, ['race']),
+            competences,
+        });
+    });
+
     // Systèmes du joueur (lowercase only)
     const systemesJoueur: SystemeJoueur[] = [];
     const sysNodes = qAll(joueurNode, ['systemes > s',]);
@@ -181,6 +209,15 @@ export function parseRapportXml(text: string): Rapport {
 
         const planetes: any[] = [];
         let revenuEstime = 0;
+        let pdc = 0;
+        let revenumin = 0;
+        let stockmin = 0;
+        let popAct = 0;
+        let popMax = 0;
+        let popAug = 0;
+        const racePop: { [key: number]: number } = {};
+        const racePopAug: { [key: number]: number } = {};
+        const marchandises = marchandisesBySystem.get(getAttr(s, ['pos'])) || [];
         const pNodes = qAll(s, ['planetes > p',]);
         pNodes.forEach((p) => {
             const proprietaire = getAttrNum(p, ['prop']);
@@ -197,7 +234,12 @@ export function parseRapportXml(text: string): Rapport {
             }
 
             const num = getAttrNum(p, ['num']) ?? 0;
-            const pdc = getAttrNum(p, ['pdc']) ?? 0;
+            const planetPdc = getAttrNum(p, ['pdc']) ?? 0;
+            pdc += planetPdc;
+            const planetRevenumin = getAttrNum(p, ['revenumin']) ?? 0;
+            revenumin += planetRevenumin;
+            const planetStockmin = getAttrNum(p, ['stockmin']) ?? 0;
+            stockmin += planetStockmin;
             const minerai = getAttrNum(p, ['stockmin']) ?? getAttrNum(p, ['minerai']);
 
             const batiments: { techCode: string; count: number }[] = [];
@@ -219,11 +261,22 @@ export function parseRapportXml(text: string): Rapport {
                 const nbStr = getAttr(pop, ['nb']) || getAttr(pop, ['count']) || getAttr(pop, ['popAct']) || '0';
                 const raceId = Number(raceStr);
                 const nb = Number(nbStr);
+                popAct += nb;
                 const growth = Number(getAttr(pop, ['popAug']) || '0');
+                popAug += growth;
                 const max = Number(getAttr(pop, ['popMax']) || '0');
+                popMax += max;
 
                 if (!Number.isNaN(raceId) && !Number.isNaN(nb) && nb > 0) {
                     populations.push({ raceId, nb, max, growth });
+                    if (!racePop[raceId]) {
+                        racePop[raceId] = 0;
+                    }
+                    racePop[raceId] += nb;
+                    if (!racePopAug[raceId]) {
+                        racePopAug[raceId] = 0;
+                    }
+                    racePopAug[raceId] += growth;
                 }
             });
             const tax = getAttrNum(p, ['tax']) ?? 0;
@@ -238,9 +291,11 @@ export function parseRapportXml(text: string): Rapport {
 
             planetes.push({
                 num,
-                pdc,
+                pdc: planetPdc,
                 proprietaire,
                 minerai,
+                revenumin: planetRevenumin,
+                stockmin: planetStockmin,
                 batiments,
                 populations,
                 tax,
@@ -260,16 +315,36 @@ export function parseRapportXml(text: string): Rapport {
         }
 
         const sortedProprietaires = Array.from(proprietaires).sort((a, b) => a - b);
+        const politique = getAttrNum(s, ['politique']);
+        if (politique === 3) {
+            pdc *= 1.5;
+        } else if (politique === 7) {
+            pdc *= 2;
+        }
+
+        const mostRepresentedRace = Object.keys(racePop).length > 0
+            ? raceNames[parseInt(Object.keys(racePop).reduce((a, b) => racePop[parseInt(a)] > racePop[parseInt(b)] ? a : b))].nom
+            : "";
         systemesJoueur.push({
             type: 'joueur',
             nom,
             pos,
+            pdc,
+            revenumin,
+            stockmin,
+            popAct,
+            popMax,
+            popAug: popAug / nbPla,
+            race: mostRepresentedRace,
+            racePop,
+            racePopAug,
+            marchandises,
             typeEtoile,
             nbPla,
             proprietaires: sortedProprietaires,
             scan: getAttrNum(s, ['hscan']),
             planetes, // attributs additionnels présents sur les systèmes du joueur
-            politique: getAttrNum(s, ['politique']),
+            politique,
             entretien: getAttrNum(s, ['entretien']),
             revenu: getAttrNum(s, ['revenu']),
             revenuEstime,
@@ -314,16 +389,31 @@ export function parseRapportXml(text: string): Rapport {
         const pos = parsePosString(getAttr(f, ['pos']) || '0_1_1');
         const nom = getAttr(f, ['nom']) || 'Flotte';
         const num = getAttrNum(f, ['num']) ?? 0;
-        const vaisseaux: { type: string; plan: string; nb?: number; puissance?: string }[] = [];
+        const vaisseaux: FlotteJoueur['vaisseaux'] = [];
         qAll(f, ['vaisseau']).forEach((v) => {
             vaisseaux.push({
-                type: getAttr(v, ['type']) || getAttr(v, ['plan']) || 'Vaisseau', plan: getAttr(v, ['plan']) || '',
+                type: getAttr(v, ['type']) || getAttr(v, ['plan']) || 'Vaisseau',
+                plan: getAttr(v, ['plan']) || '',
+                exp: getAttrNum(v, ['exp']),
+                moral: getAttrNum(v, ['moral']),
+                race: getAttrNum(v, ['race']),
             });
         });
+
+        const raceIds = new Set(vaisseaux.map(v => v.race).filter(r => r !== undefined));
+        const equipage = Array.from(raceIds).sort((a, b) => a! - b!).map(raceId => {
+            const race = raceNames[raceId!] || { nom: String(raceId), couleur: '#FFFFFF' };
+            return { nom: race.nom, couleur: race.couleur };
+        });
+
         const direction = getAttr(f, ['direction']);
+        const lieutenant = lieutenants.find(l => /^\d+$/.test(l.pos) && parseInt(l.pos, 10) === num);
+
         flottesJoueur.push({
             type: 'joueur', proprio: joueur.numero,
             num, nom, pos, vaisseaux,
+            equipage,
+            heros: lieutenant?.nom,
             nbVso: vaisseaux.length,
             scan: getAttrNum(f, ['hscan']),
             as: getAttrNum(f, ['as']) ?? 0,
@@ -399,11 +489,30 @@ export function parseRapportXml(text: string): Rapport {
         }
     });
 
+    const combats: { x: number; y: number }[] = [];
+    qAll(joueurNode, ['messages > m']).forEach((m) => {
+        if (getAttr(m, ['type']) === 'EVT') {
+            const content = m.innerHTML || '';
+            if (content.includes('résultat de combat')) {
+                const match = /<FONT color='#AC0DFE'>(\d+)-(\d+)/.exec(content);
+                if (match) {
+                    const x = parseInt(match[1], 10);
+                    const y = parseInt(match[2], 10);
+                    if (!isNaN(x) && !isNaN(y)) {
+                        combats.push({ x, y });
+                    }
+                }
+            }
+        }
+    });
+
     const rapport: Rapport = {
         tour,
+        lieutenants,
         technologiesAtteignables,
         technologiesConnues, joueur, systemesJoueur, systemesDetectes: mergedSystemesDetectes, flottesJoueur, flottesDetectees, plansVaisseaux,
         budgetTechnologique,
+        combats,
     };
 
     return rapport;

@@ -63,7 +63,9 @@ export type Planete = {
     proprietaire?: number;
     pdc: number; // points de construction
     minerai?: number;
-    batiments: { techCode: string; count: number }[]; 
+    revenumin: number;
+    stockmin: number;
+    batiments: { techCode: string; count: number }[];
     populations: {
         raceId: number;
         nb: number,
@@ -93,11 +95,27 @@ export interface SystemBase {
     btech?: number;
 }
 
+export type MarchandiseData = {
+    code: number;
+    num: number;
+    prod: number;
+};
+
 export interface SystemeJoueur extends SystemBase {
     type: 'joueur';
+    pdc: number;
+    revenumin: number;
+    stockmin: number;
+    popAct: number;
+    popMax: number;
+    popAug: number;
+    race: string;
+    racePop: { [key: number]: number };
+    racePopAug: { [key: number]: number };
     planetes: Planete[];
     revenuEstime: number;
     scan: number;
+    marchandises: MarchandiseData[];
 }
 
 export interface SystemeDetecte extends SystemBase {
@@ -122,7 +140,9 @@ export interface FlotteJoueur extends FlotteBase {
     as?: number;
     scan: number;
     nbVso: number;
-    vaisseaux: { type: string; plan: string; nb?: number; puissance?: string }[];
+    vaisseaux: { type: string; plan: string; nb?: number; puissance?: string; exp: number; moral: number; race?: number }[];
+    equipage: { nom: string; couleur: string }[];
+    heros?: string;
 }
 
 export interface FlotteDetectee extends FlotteBase {
@@ -138,8 +158,22 @@ export interface Alliance {
     commandants: number[];
 }
 
+export interface Competence {
+    comp: number;
+    val: number;
+}
+
+export interface Lieutenant {
+    nom: string;
+    pos: string;
+    att: number;
+    race: number;
+    competences: Competence[];
+}
+
 export type Rapport = {
     tour: number;
+    lieutenants: Lieutenant[];
     joueur: {
         numero: number;
         nom: string;
@@ -160,6 +194,7 @@ export type Rapport = {
     flottesDetectees: FlotteDetectee[];
     plansVaisseaux: PlanVaisseau[];
     budgetTechnologique: number;
+    combats: { x: number; y: number }[];
 };
 export type GlobalData = {
     commandants: Commandant[];
@@ -167,8 +202,22 @@ export type GlobalData = {
     races: Race[];
     marchandises: Marchandise[];
     politiques: Record<number, string>;
-    caracteristiquesBatiment: Record<number, string>;
+    caracteristiquesBatiment: CaracteristiqueBatiment[];
     caracteristiquesComposant: Record<number, string>;
     plansPublic: PlanVaisseau[];
     tailleVaisseaux: VaisseauTailleRule[];
+    batiments: Batiment[];
+};
+
+export type Batiment = {
+    code: string;
+    nom: string;
+    arme?: string;
+    structure: number;
+    caracteristiques: { code: number; value: number }[];
+};
+
+export type CaracteristiqueBatiment = {
+    code: number;
+    nom: string;
 };

@@ -87,7 +87,7 @@ h1, h2, h3, h4, h5, h6 {
 a {
     color: #b8b8b8;
 }
- 
+
 .app-nav a.active {
     background: #71deff;
     color: #114488;
@@ -201,4 +201,32 @@ a {
 .position {
     color: var(--accent);
     font-weight: bold;
+}
+.contributing-buildings {
+  font-size: 0.8em;
+  color: grey;
+}
+
+.heatmap-cell {
+    position: relative;
+    width: 50px;
+    height: 50px;
+}
+
+.heatmap-cell .tooltip {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #333;
+    color: #fff;
+    padding: 5px;
+    border-radius: 3px;
+    white-space: nowrap;
+    z-index: 1;
+}
+
+.heatmap-cell:hover .tooltip {
+    display: block;
 }

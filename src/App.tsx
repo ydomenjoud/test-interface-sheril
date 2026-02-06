@@ -12,6 +12,7 @@ import ListePlans from './screens/ListePlans';
 import CreatePlan from './screens/CreatePlan';
 import RechercheTechnologique from './screens/RechercheTechnologique';
 import PlayerSystemDetail from './screens/PlayerSystemDetail';
+import CombatDashboard from './screens/CombatDashboard';
 
 function App() {
     return (<ReportProvider>
@@ -33,6 +34,7 @@ function App() {
                             <Route path="/plans/creer" element={<CreatePlan/>}/>
                             <Route path="/recherche" element={<RechercheTechnologique/>}/>
                             <Route path="/player-system-detail/:key" element={<PlayerSystemDetail/>}/>
+                            <Route path="/combat/:logId" element={<CombatDashboard />} />
                         </Routes>
                     </main>
                 </div>

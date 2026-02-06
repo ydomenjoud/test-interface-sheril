@@ -4,10 +4,41 @@ import Commandant from "../components/utils/Commandant";
 import {commandantAsString} from "../utils/commandant";
 import Position from "../components/utils/Position";
 import { NavLink } from 'react-router-dom';
+import PopulationCell from '../components/systemes/PopulationCell';
+import MineraiCell from '../components/systemes/MineraiCell';
+import MarchandiseCell from '../components/systemes/MarchandiseCell';
+import RaceCell from '../components/systemes/RaceCell';
+import SolAirDefenseCell from '../components/systemes/SolAirDefenseCell';
+import BatimentsCell from '../components/systemes/BatimentsCell';
+import CapabilityCell from '../components/systemes/CapabilityCell';
+
+const CONSTRUCTION_VAISSEAUX_CODE = 0;
+
+const politiqueMap: { [key: number]: string } = {
+    0: "impôts",
+    1: "commerce",
+    2: "défense",
+    3: "construction",
+    4: "expansion",
+    5: "intégriste",
+    6: "totalitaire",
+    7: "esclavagiste",
+    8: "anti-Fremens",
+    9: "anti-Atalantes",
+    10: "anti-Zwaïas",
+    11: "anti-Yoksors",
+    12: "anti-Fergok",
+    13: "loisir",
+    14: "anti-Cyborg",
+};
 
 type SortKey =
   | 'etoile' | 'pos' | 'nom' | 'nbpla' | 'proprietaires'
-  | 'politique' | 'entretien' | 'revenu' | 'revenuEstime' | 'hscan' | 'bcont' | 'besp' | 'btech';
+  | 'politique' | 'entretien' | 'revenu' | 'hscan' | 'bcont' | 'besp' | 'btech' | 'pdc'
+  | 'minerai' | 'population' | 'race' | `marchandise-${number}`
+  | 'sol-air-defense' | 'protection' | 'militia'
+  | 'capacite-0' | 'capacite-1' | 'capacite-2' | 'capacite-3' | 'capacite-5' | 'capacite-6' | 'capacite-8' | 'capacite-9'
+  | 'batiments' | 'stabilite';
 type SortDir = 'asc' | 'desc';
 
 export default function ListeSystemes() {
@@ -16,6 +47,9 @@ export default function ListeSystemes() {
   const [pageSize, setPageSize] = useState(20);
   const [sortKey, setSortKey] = useState<SortKey>('nom');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [visibleColumns, setVisibleColumns] = useState<SortKey[]>([
+    'etoile', 'proprietaires', 'pos', 'nom', 'nbpla', 'pdc', 'race', 'population', 'politique', 'batiments',
+  ]);
 
   const [filterOwned, setFilterOwned] = useState<'all' | 'owned' | 'notowned'>('all');
   const [filterNom, setFilterNom] = useState('');
@@ -38,14 +72,82 @@ export default function ListeSystemes() {
       byPos.set(key, s);
     }
 
-    const list = Array.from(byPos.values()).map((s) => ({
-      ...s,
-      proprietaires: s.proprietaires || [],
-      posStr: `${s.pos.x}-${s.pos.y}`,
-      owned: currentId ? (s.proprietaires || []).includes(currentId) || (s as any).type === 'joueur' : false,
-    }));
+    const list = Array.from(byPos.values()).map((s) => {
+      const batiments = global?.batiments ?? [];
+      const caracteristiques = global?.caracteristiquesBatiment ?? [];
+      const systemBatiments = s.planetes?.flatMap((p: any) => p.batiments) ?? [];
+
+      const solAirDefense = systemBatiments
+        .map((b: any) => {
+            const batiment = batiments.find(bat => bat.code === b.techCode);
+            return batiment ? { ...b, batiment } : null;
+        })
+        .filter((b: any) => b && b.batiment.arme)
+        .sort((a: any, b: any) => b.count - a.count);
+
+      const protection = systemBatiments
+        .map((b: any) => batiments.find(bat => bat.code === b.techCode))
+        .filter((b: any) => b)
+        .reduce((acc: number, b: any) => acc + b.structure, 0);
+
+      const capacites: { [key: number]: number | string } = {};
+      const contributingBuildings: { [key: number]: { techCode: string; count: number }[] } = {};
+
+      caracteristiques.forEach(carac => {
+        const contributingSystemBatiments = systemBatiments.filter((b: any) => {
+            const globalBat = batiments.find(bat => bat.code === b.techCode);
+            return globalBat && globalBat.caracteristiques.some((c: any) => c.code === carac.code);
+        });
+
+        if (contributingSystemBatiments.length > 0) {
+            const buildingsWithCarac = contributingSystemBatiments
+                .map((b: any) => batiments.find(bat => bat.code === b.techCode))
+                .filter((b: any): b is NonNullable<typeof b> => b);
+
+            switch (carac.code) {
+                case 0:
+                    capacites[carac.code] = "Oui";
+                    break;
+                case 8:
+                    capacites[carac.code] = Math.max(...buildingsWithCarac.map((b: any) => b.caracteristiques.find((c: any) => c.code === carac.code).value));
+                    break;
+                default:
+                    capacites[carac.code] = buildingsWithCarac.reduce((acc: number, b: any) => acc + b.caracteristiques.find((c: any) => c.code === carac.code).value, 0);
+                    break;
+            }
+
+            if ([3, 5, 6].includes(carac.code)) {
+                const grouped = new Map<string, number>();
+                contributingSystemBatiments.forEach((b: any) => {
+                    grouped.set(b.techCode, (grouped.get(b.techCode) || 0) + b.count);
+                });
+
+                const sorted = Array.from(grouped.entries())
+                    .map(([techCode, count]) => ({ techCode, count }))
+                    .sort((a, b) => {
+                        if (b.count !== a.count) {
+                            return b.count - a.count;
+                        }
+                        return a.techCode.localeCompare(b.techCode);
+                    });
+                contributingBuildings[carac.code] = sorted;
+            }
+        }
+      });
+
+      return {
+        ...s,
+        proprietaires: s.proprietaires || [],
+        posStr: `${s.pos.x}-${s.pos.y}`,
+        owned: currentId ? (s.proprietaires || []).includes(currentId) || (s as any).type === 'joueur' : false,
+        solAirDefense,
+        protection,
+        capacites,
+        contributingBuildings,
+      };
+    });
     return list;
-  }, [rapport, currentId]);
+  }, [rapport, global, currentId]);
 
   const politiquesOptions = useMemo(() => {
     const set = new Set<number>();
@@ -92,16 +194,41 @@ export default function ListeSystemes() {
         case 'pos': av = a.pos.x * 1000 + a.pos.y; bv = b.pos.x * 1000 + b.pos.y; break;
         case 'nom': av = a.nom.toLowerCase(); bv = b.nom.toLowerCase(); break;
         case 'nbpla': av = a.nbPla ?? a.nombrePla ?? 0; bv = b.nbPla ?? b.nombrePla ?? 0; break;
+        case 'pdc': av = a.pdc ?? 0; bv = b.pdc ?? 0; break;
         case 'proprietaires': av = a.proprietaires; bv = b.proprietaires; break;
         case 'politique': av = a.politique ?? -9999; bv = b.politique ?? -9999; break;
         case 'entretien': av = a.entretien ?? 0; bv = b.entretien ?? 0; break;
         case 'revenu': av = a.revenu ?? 0; bv = b.revenu ?? 0; break;
-        case 'revenuEstime': av = a.revenuEstime ?? 0; bv = b.revenuEstime ?? 0; break;
-        case 'hscan': av = a.hscan ?? 0; bv = b.hscan ?? 0; break;
+        case 'hscan': av = a.scan ?? 0; bv = b.scan ?? 0; break;
         case 'bcont': av = a.bcont ?? 0; bv = b.bcont ?? 0; break;
         case 'besp': av = a.besp ?? 0; bv = b.besp ?? 0; break;
         case 'btech': av = a.btech ?? 0; bv = b.btech ?? 0; break;
-        default: av = 0; bv = 0;
+        case 'minerai': av = (a.stockmin ?? 0) + (a.revenumin ?? 0); bv = (b.stockmin ?? 0) + (b.revenumin ?? 0); break;
+        case 'population': av = (a.popAct ?? 0) + (a.popAug ?? 0); bv = (b.popAct ?? 0) + (b.popAug ?? 0); break;
+        case 'race': av = a.race ?? ''; bv = b.race ?? ''; break;
+        case 'sol-air-defense':
+            av = a.solAirDefense.reduce((total: number, b: any) => total + b.count, 0);
+            bv = b.solAirDefense.reduce((total: number, b: any) => total + b.count, 0);
+            break;
+        case 'protection': av = a.protection ?? 0; bv = b.protection ?? 0; break;
+        case 'capacite-0': av = a.capacites?.[0] === 'Oui' ? 1 : 0; bv = b.capacites?.[0] === 'Oui' ? 1 : 0; break;
+        case 'capacite-1': av = a.capacites?.[1] ?? 0; bv = b.capacites?.[1] ?? 0; break;
+        case 'capacite-2': av = a.capacites?.[2] ?? 0; bv = b.capacites?.[2] ?? 0; break;
+        case 'capacite-3': av = a.capacites?.[3] ?? 0; bv = b.capacites?.[3] ?? 0; break;
+        case 'capacite-5': av = a.capacites?.[5] ?? 0; bv = b.capacites?.[5] ?? 0; break;
+        case 'capacite-6': av = a.capacites?.[6] ?? 0; bv = b.capacites?.[6] ?? 0; break;
+        case 'capacite-8': av = a.capacites?.[8] ?? 0; bv = b.capacites?.[8] ?? 0; break;
+        case 'capacite-9': av = a.capacites?.[9] ?? 0; bv = b.capacites?.[9] ?? 0; break;
+        default:
+          if (sortKey.startsWith('marchandise-')) {
+            const code = parseInt(sortKey.split('-')[1], 10);
+            const aMarchandise = a.marchandises?.find((m: any) => m.code === code);
+            const bMarchandise = b.marchandises?.find((m: any) => m.code === code);
+            av = (aMarchandise?.num ?? 0) + (aMarchandise?.prod ?? 0);
+            bv = (bMarchandise?.num ?? 0) + (bMarchandise?.prod ?? 0);
+          } else {
+            av = 0; bv = 0;
+          }
       }
       if (av < bv) return sortDir === 'asc' ? -1 : 1;
       if (av > bv) return sortDir === 'asc' ? 1 : -1;
@@ -119,8 +246,24 @@ export default function ListeSystemes() {
       acc.technologique += (s.revenuEstime ?? 0) * (s.btech ?? 0) / 100;
       acc.contreEspionnage += (s.revenuEstime ?? 0) * (s.bcont ?? 0) / 100;
       acc.espionnage += (s.revenuEstime ?? 0) * (s.besp ?? 0) / 100;
+      acc.pdc += s.pdc ?? 0;
+      acc.revenumin += s.revenumin ?? 0;
+      acc.stockmin += s.stockmin ?? 0;
+      acc.popAct += s.popAct ?? 0;
+      acc.popMax += s.popMax ?? 0;
+      acc.popAug += s.popAug ?? 0;
+      (s.marchandises || []).forEach((m: any) => {
+        if (!acc.marchandises[m.code]) {
+          acc.marchandises[m.code] = { num: 0, prod: 0 };
+        }
+        acc.marchandises[m.code].num += m.num;
+        acc.marchandises[m.code].prod += m.prod;
+      });
       return acc;
-    }, { entretien: 0, revenu: 0, revenuEstime: 0, technologique: 0, contreEspionnage: 0, espionnage: 0 });
+    }, {
+      entretien: 0, revenu: 0, revenuEstime: 0, technologique: 0, contreEspionnage: 0, espionnage: 0, pdc: 0,
+      revenumin: 0, stockmin: 0, popAct: 0, popMax: 0, popAug: 0, marchandises: {} as { [key: number]: { num: number, prod: number } }
+    });
   }, [filtered]);
 
   const total = sorted.length;
@@ -142,6 +285,23 @@ export default function ListeSystemes() {
     );
   }
 
+  function toggleColumnGroup(columns: SortKey[]) {
+    setVisibleColumns(prev => {
+      const allPresent = columns.every(c => prev.includes(c));
+      if (allPresent) {
+        return prev.filter(c => !columns.includes(c));
+      } else {
+        const newColumns = [...prev];
+        for (const col of columns) {
+          if (!newColumns.includes(col)) {
+            newColumns.push(col);
+          }
+        }
+        return newColumns;
+      }
+    });
+  }
+
   return (
     <div style={{ padding: 12, overflow: 'auto', width: 'calc(100% - 20px)', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <h3>Systèmes</h3>
@@ -159,7 +319,7 @@ export default function ListeSystemes() {
           Politique:
           <select value={filterPolitique} onChange={e => { setFilterPolitique(e.target.value); setPage(1); }} style={{ marginLeft: 6 }}>
             <option value="all">Toutes</option>
-            {politiquesOptions.map(p => <option key={p} value={String(p)}>{p}</option>)}
+            {politiquesOptions.map(p => <option key={p} value={String(p)}>{politiqueMap[p]}</option>)}
           </select>
         </label>
         <label style={{ flex: 1, minWidth: 240 }}>
@@ -201,31 +361,99 @@ export default function ListeSystemes() {
             <option value={50}>50</option>
           </select>
         </label>
+
+        <label>
+          Colonnes:
+          <select
+            multiple
+            value={visibleColumns}
+            onChange={e => {
+              const vals = Array.from(e.currentTarget.selectedOptions).map(o => o.value as SortKey);
+              setVisibleColumns(vals);
+            }}
+            style={{ marginLeft: 6, minWidth: 140, height: 100 }}
+          >
+            <option value="etoile">Étoile</option>
+            <option value="pos">Position</option>
+            <option value="nom">Nom</option>
+            <option value="nbpla">Planètes</option>
+            {/* <option value="pdc">Pdc</option> */}
+            <option value="proprietaires">Commandants</option>
+            <option value="politique">Politique</option>
+            <option value="entretien">Entretien</option>
+            <option value="revenu">Revenu</option>
+            <option value="hscan">Portée détect.</option>
+            <option value="bcont">Contre-esp.</option>
+            <option value="besp">Espionnage</option>
+            <option value="btech">Technologique</option>
+            <option value="minerai">Minerai</option>
+            <option value="population">Population</option>
+            <option value="race">Race</option>
+            <option value="batiments">Batiments</option>
+            <option value="stabilite">Stabilité</option>
+            <option value="sol-air-defense">Sol-Air Defense</option>
+            <option value="protection">Protection</option>
+            <option value="militia">Militia</option>
+            <option value="capacite-0">Construction de vaisseaux</option>
+            <option value="capacite-1">Extraction de minerai</option>
+            <option value="capacite-2">Retraitement de minerai</option>
+            <option value="capacite-3">Facilités de construction</option>
+            <option value="capacite-5">Capacité réparation vaisseaux</option>
+            <option value="capacite-6">Bouclier magnétique</option>
+            <option value="capacite-8">Portée radar</option>
+            <option value="capacite-9">Capacité extraction avancée</option>
+            {global?.marchandises.map(m => <option key={m.code} value={`marchandise-${m.code}`}>{m.nom}</option>)}
+          </select>
+        </label>
+      </div>
+
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+        <button onClick={() => toggleColumnGroup(['stabilite', 'entretien', 'revenu', 'bcont', 'besp', 'btech'])}>Economie</button>
+        <button onClick={() => toggleColumnGroup(['minerai', 'capacite-1', 'capacite-2', 'capacite-9'])}>Minier</button>
+        <button onClick={() => toggleColumnGroup(['sol-air-defense', 'protection', 'capacite-6', 'capacite-8', 'capacite-5'])}>Défense</button>
+        <button onClick={() => toggleColumnGroup(['capacite-3', 'marchandise-0', 'marchandise-1', 'marchandise-2', 'marchandise-3', 'marchandise-4', 'marchandise-5', 'marchandise-6', 'marchandise-7', 'marchandise-8', 'marchandise-9', 'marchandise-10', 'marchandise-11', 'marchandise-12', 'marchandise-13', 'marchandise-14', 'marchandise-15'])}>Production</button>
       </div>
 
       <div style={{ overflow: 'auto' }}>
         <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {header('etoile', 'Étoile')}
-              {header('pos', 'Position')}
-              {header('nom', 'Nom')}
-              {header('nbpla', 'Planètes')}
-              {header('proprietaires', 'Commandants')}
-              {header('politique', 'Politique')}
-              {header('entretien', 'Entretien')}
-              {header('revenu', 'Revenu')}
-              {header('revenuEstime', 'Revenu estimé')}
-              {header('hscan', 'Portée détect.')}
-              {header('bcont', 'Contre-esp.')}
-              {header('besp', 'Espionnage')}
-              {header('btech', 'Technologique')}
+              {visibleColumns.includes('etoile') && header('etoile', 'Étoile')}
+              {visibleColumns.includes('proprietaires') && header('proprietaires', 'Commandants')}
+              {visibleColumns.includes('pos') && header('pos', 'Position')}
+              {visibleColumns.includes('nom') && header('nom', 'Nom')}
+              {visibleColumns.includes('nbpla') && header('nbpla', 'Planètes')}
+              {visibleColumns.includes('pdc') && header('pdc', 'Pdc')}
+              {visibleColumns.includes('politique') && header('politique', 'Politique')}
+              {visibleColumns.includes('population') && header('population', 'Population')}
+              {visibleColumns.includes('race') && header('race', 'Race')}
+              {visibleColumns.includes('batiments') && header('batiments', 'Batiments')}
+              {visibleColumns.includes('stabilite') && header('stabilite', 'Stabilité')}
+              {visibleColumns.includes('entretien') && header('entretien', 'Entretien')}
+              {visibleColumns.includes('revenu') && header('revenu', 'Revenu')}
+              {visibleColumns.includes('hscan') && header('hscan', 'Portée détect.')}
+              {visibleColumns.includes('bcont') && header('bcont', 'Contre-esp.')}
+              {visibleColumns.includes('besp') && header('besp', 'Espionnage')}
+              {visibleColumns.includes('btech') && header('btech', 'Technologique')}
+              {visibleColumns.includes('minerai') && header('minerai', 'Minerai')}
+              {visibleColumns.includes('capacite-1') && header('capacite-1', 'Extraction de minerai')}
+              {visibleColumns.includes('capacite-2') && header('capacite-2', 'Retraitement de minerai')}
+              {visibleColumns.includes('capacite-9') && header('capacite-9', 'Capacité extraction avancée')}
+              {visibleColumns.includes('sol-air-defense') && header('sol-air-defense', 'Sol-Air Defense')}
+              {visibleColumns.includes('protection') && header('protection', 'Protection')}
+              {visibleColumns.includes('militia') && header('militia', 'Militia')}
+              {visibleColumns.includes('capacite-0') && header('capacite-0', 'Construction de vaisseaux')}
+              {visibleColumns.includes('capacite-3') && header('capacite-3', 'Facilités de construction')}
+              {visibleColumns.includes('capacite-5') && header('capacite-5', 'Capacité réparation vaisseaux')}
+              {visibleColumns.includes('capacite-6') && header('capacite-6', 'Bouclier magnétique')}
+              {visibleColumns.includes('capacite-8') && header('capacite-8', 'Portée radar')}
+              {global?.marchandises.map(m => visibleColumns.includes(`marchandise-${m.code}`) && header(`marchandise-${m.code}`, m.nom))}
             </tr>
           </thead>
           <tbody>
             {pageItems.map((s: any, idx) => (
               <tr key={`${s.nom}-${idx}`}>
-                <td>
+                {visibleColumns.includes('etoile') && <td>
                   <img
                     src={`${process.env.PUBLIC_URL}/img/etoile${s.typeEtoile}.png`}
                     alt={`étoile ${s.typeEtoile}`}
@@ -233,46 +461,121 @@ export default function ListeSystemes() {
                     height={24}
                     style={{ display: 'block' }}
                   />
-                </td>
-                <td style={{ whiteSpace: 'nowrap' }}>
+                </td>}
+                {visibleColumns.includes('proprietaires') && <td style={{ whiteSpace: 'nowrap' }}>{s.proprietaires.map((p: number, key: number) =>
+                  <Commandant num={p} key={key} />
+                )}</td>}
+                {visibleColumns.includes('pos') && <td style={{ whiteSpace: 'nowrap' }}>
                   {s.owned
-                  ? <NavLink to={'/player-system-detail/' + s.posStr}><Position pos={s.pos} /></NavLink>
-                  : <Position pos={s.pos} />}
-                </td>
-                <td>{s.nom}</td>
-                <td style={{ textAlign: 'right' }}>{s.nbPla ?? 0}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>{s.proprietaires.map((p: number, key: number) =>
-                    <Commandant num={p} key={key} />
-                )}</td>
-                <td style={{ textAlign: 'right' }}>{s.politique ?? '—'}</td>
-                <td style={{ textAlign: 'right' }}>{typeof s.entretien === 'number' ? s.entretien.toFixed(1) : '—'}</td>
-                <td style={{ textAlign: 'right' }}>{typeof s.revenu === 'number' ? s.revenu.toFixed(1) : '—'}</td>
-                <td style={{ textAlign: 'right' }}>{typeof s.revenuEstime === 'number' ? s.revenuEstime.toFixed(1) : '—'}</td>
-                <td style={{ textAlign: 'right' }}>{s.hscan ?? '—'}</td>
-                <td style={{ textAlign: 'right' }}>{s.bcont ?? '—'}</td>
-                <td style={{ textAlign: 'right' }}>{s.besp ?? '—'}</td>
-                <td style={{ textAlign: 'right' }}>{s.btech ?? '—'}</td>
+                    ? <NavLink to={'/player-system-detail/' + s.posStr}><Position pos={s.pos} /></NavLink>
+                    : <Position pos={s.pos} />}
+                </td>}
+                {visibleColumns.includes('nom') && <td>{s.nom}</td>}
+                {visibleColumns.includes('nbpla') && <td style={{ textAlign: 'right' }}>{s.capacites?.[CONSTRUCTION_VAISSEAUX_CODE] === 'Oui' ? '🚀 ' : ''}{s.nbPla ?? 0}</td>}
+                {visibleColumns.includes('pdc') && <td style={{ textAlign: 'right' }} className={s.pdc === 0 ? 'zero-value' : ''}>
+                  {(s.marchandises?.find((m: any) => m.code === 7)?.num ?? 0) >= 100 ? '🤖 ' : ''}{s.pdc ?? '—'}
+                </td>}
+                {visibleColumns.includes('politique') && <td style={{ textAlign: 'right' }}>{s.politique !== undefined ? politiqueMap[s.politique] : '—'}</td>}
+                {visibleColumns.includes('population') && <PopulationCell system={s} />}
+                {visibleColumns.includes('race') && <RaceCell system={s} />}
+                {visibleColumns.includes('batiments') && <BatimentsCell system={s} />}
+                {/* Placeholder for Stabilite column */}
+                {visibleColumns.includes('stabilite') && <td></td>}
+                {visibleColumns.includes('entretien') && <td style={{ textAlign: 'right' }} className={s.entretien === 0 ? 'zero-value' : ''}>{typeof s.entretien === 'number' ? s.entretien.toFixed(1) : '—'}</td>}
+                {visibleColumns.includes('revenu') && <td style={{ textAlign: 'right' }} className={s.revenu === 0 ? 'zero-value' : ''}>
+                  {(() => {
+                    const metauxStock = s.marchandises?.find((m: any) => m.code === 12)?.num ?? 0;
+                    const luxeStock = s.marchandises?.find((m: any) => m.code === 2)?.num ?? 0;
+                    let icons = '';
+                    if (metauxStock >= 100) icons += '🪙';
+                    if (luxeStock >= 100) icons += '💎';
+                    return (
+                      <>
+                        {icons ? `${icons} ` : ''}
+                        {typeof s.revenu === 'number' ? s.revenu.toFixed(1) : '—'}
+                        &nbsp;[{typeof s.revenuEstime === 'number' ? s.revenuEstime.toFixed(1) : '—'}]
+                      </>
+                    );
+                  })()}
+                </td>}
+                {visibleColumns.includes('hscan') && <td style={{ textAlign: 'right' }} className={s.scan === 0 ? 'zero-value' : ''}>{s.scan ?? '—'}</td>}
+                {visibleColumns.includes('bcont') && <td style={{ textAlign: 'right' }} className={s.bcont === 0 ? 'zero-value' : ''}>
+                    {(s.marchandises?.find((m: any) => m.code === 8)?.num ?? 0) >= 100 ? '🔋 ' : ''}{s.bcont ?? '—'}
+                </td>}
+                {visibleColumns.includes('besp') && <td style={{ textAlign: 'right' }} className={s.besp === 0 ? 'zero-value' : ''}>
+                    {(s.marchandises?.find((m: any) => m.code === 8)?.num ?? 0) >= 100 ? '🔋 ' : ''}{s.besp ?? '—'}
+                </td>}
+                {visibleColumns.includes('btech') && <td style={{ textAlign: 'right' }} className={s.btech === 0 ? 'zero-value' : ''}>
+                    
+                    {(s.marchandises?.find((m: any) => m.code === 6)?.num ?? 0) >= 100 ? '💻 ' : ''}{s.btech ?? '—'}
+                </td>}
+                  
+                {visibleColumns.includes('minerai') && <MineraiCell system={s} />}
+                {visibleColumns.includes('capacite-1') && <CapabilityCell value={s.capacites?.[1] ?? 0} contributingBuildings={s.contributingBuildings?.[1] ?? []} />}
+                {visibleColumns.includes('capacite-2') && <td className={s.capacites?.[2] === 0 ? 'zero-value' : ''}>{s.capacites?.[2]}</td>}
+                {visibleColumns.includes('capacite-9') && <td className={s.capacites?.[9] === 0 ? 'zero-value' : ''}>{s.capacites?.[9]}</td>}
+                {visibleColumns.includes('sol-air-defense') && <SolAirDefenseCell buildings={s.solAirDefense} />}
+                {visibleColumns.includes('protection') && <td className={s.protection === 0 ? 'zero-value' : ''}>{s.protection}</td>}
+                {visibleColumns.includes('militia') && <td></td>}
+                {visibleColumns.includes('capacite-0') && <td>{s.capacites?.[0]}</td>}
+                {visibleColumns.includes('capacite-3') && <CapabilityCell value={s.capacites?.[3] ?? 0} contributingBuildings={s.contributingBuildings?.[3] ?? []} />}
+                {visibleColumns.includes('capacite-5') && <CapabilityCell value={s.capacites?.[5] ?? 0} contributingBuildings={s.contributingBuildings?.[5] ?? []} />}
+                {visibleColumns.includes('capacite-6') && <CapabilityCell value={s.capacites?.[6] ?? 0} contributingBuildings={s.contributingBuildings?.[6] ?? []} />}
+                {visibleColumns.includes('capacite-8') && <CapabilityCell value={s.capacites?.[8] ?? 0} contributingBuildings={s.contributingBuildings?.[8] ?? []} />}
+                {global?.marchandises.map(m => visibleColumns.includes(`marchandise-${m.code}`) && (
+                  <MarchandiseCell
+                    key={m.code}
+                    marchandise={m}
+                    marchandiseData={s.marchandises?.find((mar: any) => mar.code === m.code)}
+                  />
+                ))}
               </tr>
             ))}
             {pageItems.length === 0 && (
               <tr>
-                <td colSpan={13} style={{ textAlign: 'center', padding: 12, color: '#aaa' }}>
+                <td colSpan={16 + (global?.marchandises.length ?? 0)} style={{ textAlign: 'center', padding: 12, color: '#aaa' }}>
                   {rapport ? 'Aucun système ne correspond aux filtres.' : 'Chargez le rapport pour voir les systèmes.'}
                 </td>
               </tr>
             )}
           </tbody>
           <tfoot>
-            <tr>
-              <td colSpan={6} style={{ textAlign: 'right', fontWeight: 'bold' }}>Totaux:</td>
-              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.entretien.toFixed(1)}</td>
-              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.revenu.toFixed(1)}</td>
-              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.revenuEstime.toFixed(1)}</td>
-              <td></td>
-              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.contreEspionnage.toFixed(1)}</td>
-              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.espionnage.toFixed(1)}</td>
-              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.technologique.toFixed(1)}</td>
-            </tr>
+          <tr>
+              {visibleColumns.includes('etoile') && <td></td>}
+              {visibleColumns.includes('proprietaires') && <td></td>}
+              {visibleColumns.includes('pos') && <td></td>}
+              {visibleColumns.includes('nom') && <td style={{ textAlign: 'right', fontWeight: 'bold' }}>Totaux:</td>}
+              {visibleColumns.includes('nbpla') && <td></td>}
+              {visibleColumns.includes('pdc') && <td></td>}
+              {visibleColumns.includes('politique') && <td></td>}
+              {visibleColumns.includes('population') && <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.popAct} / {totals.popMax} [{(totals.popAct + totals.popAug).toFixed(0)}]</td>}
+              {visibleColumns.includes('race') && <td></td>}
+              {visibleColumns.includes('batiments') && <td></td>}
+              {visibleColumns.includes('stabilite') && <td></td>}
+              {visibleColumns.includes('entretien') && <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.entretien.toFixed(1)}</td>}
+              {visibleColumns.includes('revenu') && <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.revenu.toFixed(1)} [{totals.revenuEstime.toFixed(1)}]</td>}
+              {visibleColumns.includes('hscan') && <td></td>}
+              {visibleColumns.includes('bcont') && <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.contreEspionnage.toFixed(1)}</td>}
+              {visibleColumns.includes('besp') && <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.espionnage.toFixed(1)}</td>}
+              {visibleColumns.includes('btech') && <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.technologique.toFixed(1)}</td>}
+              {visibleColumns.includes('minerai') && <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{totals.stockmin} (+{totals.revenumin}) [{totals.stockmin + totals.revenumin}]</td>}
+              {visibleColumns.includes('capacite-1') && <td></td>}
+              {visibleColumns.includes('capacite-2') && <td></td>}
+              {visibleColumns.includes('capacite-9') && <td></td>}
+              {visibleColumns.includes('sol-air-defense') && <td></td>}
+              {visibleColumns.includes('protection') && <td></td>}
+              {visibleColumns.includes('militia') && <td></td>}
+              {visibleColumns.includes('capacite-0') && <td></td>}
+              {visibleColumns.includes('capacite-3') && <td></td>}
+              {visibleColumns.includes('capacite-5') && <td></td>}
+              {visibleColumns.includes('capacite-6') && <td></td>}
+              {visibleColumns.includes('capacite-8') && <td></td>}
+              {global?.marchandises.map(m => visibleColumns.includes(`marchandise-${m.code}`) && (
+                  <td key={m.code} style={{ textAlign: 'right', fontWeight: 'bold' }}>
+                      {totals.marchandises[m.code]?.num ?? 0} (+{totals.marchandises[m.code]?.prod ?? 0}) [{(totals.marchandises[m.code]?.num ?? 0) + (totals.marchandises[m.code]?.prod ?? 0)}]
+                  </td>
+              ))}
+          </tr>
           </tfoot>
         </table>
       </div>

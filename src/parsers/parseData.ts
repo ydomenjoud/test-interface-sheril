@@ -1,140 +1,179 @@
-import {GlobalData, Marchandise, Commandant, Race, Technologie, PlanVaisseau, VaisseauTailleRule} from '../types';
+import {
+    Batiment, CaracteristiqueBatiment,
+    Commandant,
+    GlobalData,
+    Marchandise,
+    PlanVaisseau,
+    Race,
+    Technologie,
+    VaisseauTailleRule
+} from '../types';
+import {getAttr, getAttrNum, qAll, qOne} from './parseRapport';
 
 export function parseDataXml(text: string): GlobalData {
     const doc = new DOMParser().parseFromString(text, 'text/xml');
-    const techs: Technologie[] = [];
-    doc.querySelectorAll('data > technologies > t')?.forEach(t => {
-        const base = t.getAttribute('base') || '';
-        const code = t.getAttribute('code') || '';
-        const niv = Number(t.getAttribute('niv') || 0);
-        const nom = t.getAttribute('nom') || '';
-        const type = Number(t.getAttribute('type') || 0) as 0 | 1;
-        const recherche = Number(t.getAttribute('recherche') || 0);
-        const description = t.querySelector('description')?.textContent?.trim() || undefined;
-        const parents: string[] = [];
-        t.querySelectorAll('parent')?.forEach(p => {
-            const c = p.getAttribute('code');
-            if (c) parents.push(c);
-        });
-        const caracteristiques = Array.from(t.querySelectorAll('caracteristique')).map(c => ({
-            code: Number(c.getAttribute('code') || 0), value: Number(c.getAttribute('value') || 0),
-        }));
-        const marchandises = Array.from(t.querySelectorAll('marchandise')).map(m => ({
-            code: Number(m.getAttribute('code') || 0),
-            nb: Number(m.getAttribute('nb') || 0),
-        }));
-        // Spécification (case/min/prix/type) si présente
-        const specEl = t.querySelector('specification');
-        const specification = specEl ? {
-            case: specEl.getAttribute('case') != null ? Number(specEl.getAttribute('case')) || 0 : undefined,
-            min: specEl.getAttribute('min') != null ? Number(specEl.getAttribute('min')) || 0 : undefined,
-            prix: specEl.getAttribute('prix') != null ? Number(specEl.getAttribute('prix')) || 0 : undefined,
-            type: specEl.getAttribute('type') || undefined,
-        } : undefined;
 
-        techs.push({
-            base, code, niv, nom, type, recherche, description, parents, caracteristiques, marchandises, specification,
+    const technologies: Technologie[] = [];
+    qAll(doc, ['technologies > t']).forEach((t) => {
+        const caracteristiques: { code: number; value: number }[] = [];
+        qAll(t, ['caracteristique']).forEach((c) => {
+            caracteristiques.push({
+                code: getAttrNum(c, ['code']),
+                value: getAttrNum(c, ['value']),
+            });
+        });
+
+        const marchandises: { code: number; nb: number }[] = [];
+        qAll(t, ['marchandise']).forEach((m) => {
+            marchandises.push({
+                code: getAttrNum(m, ['code']),
+                nb: getAttrNum(m, ['nb']),
+            });
+        });
+
+        const parents: string[] = [];
+        qAll(t, ['parent']).forEach((p) => {
+            parents.push(getAttr(p, ['code']));
+        });
+
+        const specification = qOne(t, ['specification']);
+
+        technologies.push({
+            base: getAttr(t, ['base']),
+            code: getAttr(t, ['code']),
+            niv: getAttrNum(t, ['niv']),
+            nom: getAttr(t, ['nom']),
+            type: getAttrNum(t, ['type']) as any,
+            recherche: getAttrNum(t, ['recherche']),
+            description: qOne(t, ['description'])?.textContent || undefined,
+            parents,
+            caracteristiques,
+            marchandises,
+            specification: specification ? {
+                case: getAttrNum(specification, ['case']),
+                min: getAttrNum(specification, ['min']),
+                prix: getAttrNum(specification, ['prix']),
+                type: getAttr(specification, ['type']),
+            } : undefined,
+        });
+    });
+
+    const commandants: Commandant[] = [];
+    qAll(doc, ['commandants > c']).forEach((c) => {
+        commandants.push({
+            numero: getAttrNum(c, ['num']),
+            nom: getAttr(c, ['nom']),
+            raceId: getAttrNum(c, ['race']),
         });
     });
 
     const races: Race[] = [];
-    doc.querySelectorAll('data > races > r')?.forEach((r, idx) => {
-        
-
+    qAll(doc, ['races > r']).forEach((r) => {
         races.push({
-            id: Number(r.getAttribute('code') || r.getAttribute('id') || idx + 1),
-            nom: r.getAttribute('nom') || `Race ${idx + 1}`,
-            couleur: r.getAttribute('color') || 'white',
-            graviteSupporte: {
-                min: +(r.getAttribute('grav_min') || 0),
-                max: +(r.getAttribute('grav_max') || 0),
-            },
-            temperatureSupporte: {
-                min: +(r.getAttribute('temp_min') || 0),
-                max: +(r.getAttribute('temp_max') || 0),
-            },
-            radiationSupporte: {
-                min: +(r.getAttribute('rad_min') || 0),
-                max: +(r.getAttribute('rad_max') || 0),
-            },
+            id: getAttrNum(r, ['code']),
+            nom: getAttr(r, ['nom']),
+            couleur: getAttr(r, ['color']),
+            graviteSupporte: {min: getAttrNum(r, ['grav_min']), max: getAttrNum(r, ['grav_max'])},
+            temperatureSupporte: {min: getAttrNum(r, ['temp_min']), max: getAttrNum(r, ['temp_max'])},
+            radiationSupporte: {min: getAttrNum(r, ['rad_min']), max: getAttrNum(r, ['rad_max'])},
         });
     });
 
     const marchandises: Marchandise[] = [];
-    doc.querySelectorAll('data > marchandises > m')?.forEach(m => {
+    qAll(doc, ['marchandises > m']).forEach((m) => {
         marchandises.push({
-            code: Number(m.getAttribute('code') || 0), nom: m.getAttribute('nom') || 'Marchandise',
+            code: getAttrNum(m, ['code']),
+            nom: getAttr(m, ['nom']),
         });
+    });
+
+    const politiques: Record<number, string> = {};
+    qAll(doc, ['politiques > p']).forEach((p) => {
+        politiques[getAttrNum(p, ['code'])] = getAttr(p, ['nom']);
     });
 
     const caracteristiquesBatiment: Record<number, string> = {};
-    doc.querySelectorAll('data > caracteristiques_batiment > c')?.forEach(c => {
-        const code = Number(c.getAttribute('code') || 0);
-        const nom = c.getAttribute('nom') || '';
-        caracteristiquesBatiment[code] = nom;
+    qAll(doc, ['caracteristiques_batiment > c']).forEach((c) => {
+        caracteristiquesBatiment[getAttrNum(c, ['code'])] = getAttr(c, ['nom']);
     });
 
     const caracteristiquesComposant: Record<number, string> = {};
-    doc.querySelectorAll('data > caracteristiques_composant > c')?.forEach(c => {
-        const code = Number(c.getAttribute('code') || 0);
-        const nom = c.getAttribute('nom') || '';
-        caracteristiquesComposant[code] = nom;
+    qAll(doc, ['caracteristiques_composant > c']).forEach((c) => {
+        caracteristiquesComposant[getAttrNum(c, ['code'])] = getAttr(c, ['nom']);
     });
 
-    const commandants: Commandant[] = [];
-    doc.querySelectorAll('data > commandants > c')?.forEach((r, idx) => {
-        commandants.push({
-            numero: Number(r.getAttribute('num')),
-            nom: r.getAttribute('nom') || 'non trouvé',
-            raceId: Number(r.getAttribute('race') || 0),
-        });
-    });
-    const politiques: Record<number, string> = {};
-    doc.querySelectorAll('data > politiques > p')?.forEach(c => {
-        const code = Number(c.getAttribute('code') || 0);
-        const nom = c.getAttribute('nom') || '';
-        politiques[code] = nom;
-    });
-
-    // Plans de vaisseaux publics
     const plansPublic: PlanVaisseau[] = [];
-    doc.querySelectorAll('data > planpublic > p')?.forEach(p => {
-        const nom = p.getAttribute('nom') || '';
-        const concepteur = Number(p.getAttribute('concepteur') || 0);
-        const marque = p.getAttribute('marque') || undefined;
-        const tour = Number(p.getAttribute('tour') || 0) || undefined;
-        const taille = Number(p.getAttribute('taille') || 0) || undefined;
-        const vitesse = Number(p.getAttribute('vitesse') || 0) || undefined;
-        const pc = Number(p.getAttribute('pc') || 0) || undefined;
-        const minerai = Number(p.getAttribute('minerai') || 0) || undefined;
-        const prix = Number(p.getAttribute('centaures') || p.getAttribute('prix') || 0) || undefined;
-        const ap = Number(p.getAttribute('ap') || 0) || undefined;
-        const as = Number(p.getAttribute('as') || 0) || undefined;
-        const royalties = Number(p.getAttribute('royalties') || 0) || undefined;
-
-        const composants = Array.from(p.querySelectorAll('comp')).map(c => ({
-            code: c.getAttribute('code') || '',
-            nb: Number(c.getAttribute('nb') || 0),
+    qAll(doc, ['planpublic > p']).forEach((p) => {
+        const composants = qAll(p, ['comp']).map((c) => ({
+            code: getAttr(c, ['code']),
+            nb: getAttrNum(c, ['nb']),
         }));
-
         plansPublic.push({
-            nom, concepteur, marque, tour, taille, vitesse, pc, minerai, prix, ap, as, royalties, composants,
+            nom: getAttr(p, ['nom']),
+            concepteur: getAttrNum(p, ['concepteur']),
+            marque: getAttr(p, ['marque']),
+            tour: getAttrNum(p, ['tour']),
+            taille: getAttrNum(p, ['taille']),
+            vitesse: getAttrNum(p, ['vitesse']),
+            pc: getAttrNum(p, ['pc']),
+            minerai: getAttrNum(p, ['minerai']),
+            prix: getAttrNum(p, ['centaures', 'prix']),
+            ap: getAttrNum(p, ['ap']),
+            as: getAttrNum(p, ['as']),
+            royalties: getAttrNum(p, ['royalties']),
+            composants,
         });
     });
 
-    // Règles de taille des vaisseaux
     const tailleVaisseaux: VaisseauTailleRule[] = [];
-    doc.querySelectorAll('data > taille_vaisseaux > t')?.forEach(t => {
-        const minCase = Number(t.getAttribute('mincase') ?? t.getAttribute('min_cases') ?? t.getAttribute('min') ?? 0);
-        const maxCase = Number(t.getAttribute('maxcase') ?? t.getAttribute('max_cases') ?? t.getAttribute('max') ?? 0);
-        const taille = Number(t.getAttribute('taille') ?? 0);
-        const vitesse = Number(t.getAttribute('vitesse') ?? t.getAttribute('vit') ?? 0);
-        tailleVaisseaux.push({ minCase, maxCase, taille, vitesse });
+    qAll(doc, ['taille_vaisseaux > t']).forEach((t) => {
+        tailleVaisseaux.push({
+            minCase: getAttrNum(t, ['min']),
+            maxCase: getAttrNum(t, ['max']),
+            taille: getAttrNum(t, ['taille']),
+            vitesse: getAttrNum(t, ['vitesse']),
+        });
     });
-    tailleVaisseaux.sort((a, b) => a.minCase - b.minCase);
+
+    const batiments: Batiment[] = [];
+    qAll(doc, ['technologies > t']).forEach((t) => {
+        const caracteristiques: { code: number; value: number }[] = [];
+        qAll(t, ['caracteristique']).forEach((c) => {
+            caracteristiques.push({
+                code: getAttrNum(c, ['code']),
+                value: getAttrNum(c, ['value']),
+            });
+        });
+
+        const specification = t.querySelector('specification');
+
+        batiments.push({
+            code: getAttr(t, ['code']),
+            nom: getAttr(t, ['nom']),
+            arme: getAttr(specification, ['arme']),
+            structure: getAttrNum(specification, ['structure']),
+            caracteristiques,
+        });
+    });
+
+    const caracteristiques: CaracteristiqueBatiment[] = [];
+    qAll(doc, ['caracteristiques_batiment > c']).forEach((c) => {
+        caracteristiques.push({
+            code: getAttrNum(c, ['code']),
+            nom: getAttr(c, ['nom']),
+        });
+    });
 
     return {
+        commandants,
+        technologies,
+        races,
+        marchandises,
         politiques,
-        technologies: techs, commandants, races, marchandises, caracteristiquesBatiment, caracteristiquesComposant, plansPublic, tailleVaisseaux,
+        caracteristiquesBatiment: caracteristiques,
+        caracteristiquesComposant,
+        plansPublic,
+        tailleVaisseaux,
+        batiments
     };
 }

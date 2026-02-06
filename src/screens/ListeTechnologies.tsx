@@ -39,7 +39,7 @@ export default function ListeTechnologies() {
       const atteignable = !connu && parentsKnown;
       const caracStr = (t.caracteristiques || [])
         .map(c => {
-          const label = t.type === 1 ? global?.caracteristiquesComposant[c.code] : global?.caracteristiquesBatiment[c.code];
+          const label = t.type === 1 ? global?.caracteristiquesComposant[c.code] : global?.caracteristiquesBatiment.find(cb => cb.code === c.code)?.nom;
           return `${label ?? c.code}:${c.value}`;
         }).join(', ');
       const parentsStr = (t.parents || []).join(', ');
@@ -218,7 +218,7 @@ export default function ListeTechnologies() {
 
               return pageItems2.map((t) => {
                 const carac = t.caracteristiques?.map((c, i) => {
-                  const label = t.type === 1 ? global?.caracteristiquesComposant[c.code] : global?.caracteristiquesBatiment[c.code];
+                  const label = t.type === 1 ? global?.caracteristiquesComposant[c.code] : global?.caracteristiquesBatiment.find(cb => cb.code === c.code)?.nom;
                   let value = c.value+'';
                   if(t.type === 0) {
                       switch (c.code) {
@@ -229,7 +229,7 @@ export default function ListeTechnologies() {
                   }
                   return (
                     <span key={i} className="badge" >
-                      {(label ?? c.code)}: <span className={'information'}>{value}</span>
+                      <>{(label ?? c.code)}: <span className={'information'}>{value}</span></>
                     </span>
                   );
                 });

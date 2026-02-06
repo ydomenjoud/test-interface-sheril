@@ -49,6 +49,7 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
     // Préchargement et re-render des images
     const [assetsVersion, setAssetsVersion] = useState(0);
     const shipImgRef = useRef<HTMLImageElement | null>(null);
+    const combatImgRef = useRef<HTMLImageElement | null>(null);
 
     // Redraw quand le canvas change de taille (évite l'étirement non proportionnel)
     const [canvasSizeVersion, setCanvasSizeVersion] = useState(0);
@@ -59,6 +60,12 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
             img.onload = () => setAssetsVersion(v => v + 1);
             img.src = `${process.env.PUBLIC_URL}/img/flotte.png`;
             shipImgRef.current = img;
+        }
+        if (!combatImgRef.current) {
+            const img = new Image();
+            img.onload = () => setAssetsVersion(v => v + 1);
+            img.src = `${process.env.PUBLIC_URL}/img/combat.png`;
+            combatImgRef.current = img;
         }
     }, []);
 
@@ -152,6 +159,7 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
         }
 
         const shipImg = shipImgRef.current;
+        const combatImg = combatImgRef.current;
 
         // ZONES DE DÉTECTION (scan) – systèmes et flottes du joueur
         // On calcule d’abord l’ensemble des cases détectées pour éviter tout empilement de couleurs.
@@ -398,6 +406,27 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
                 cHalo.restore();
             }
         });
+
+        // combats
+        if (rapport && rapport.combats) {
+            rapport.combats.forEach(c => {
+                const dx = ((c.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+                const dy = ((c.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+                const px = dx * cellSize;
+                const py = dy * cellSize;
+                if (px < 0 || py < 0 || px >= cols * cellSize || py >= rows * cellSize) return;
+
+                const size = cellSize;
+                const drawX = px;
+                const drawY = py;
+                const c2d = ctx as CanvasRenderingContext2D;
+                c2d.save();
+                if (combatImg && combatImg.complete && combatImg.naturalWidth > 0) {
+                    c2d.drawImage(combatImg, drawX, drawY, size, size);
+                }
+                c2d.restore();
+            });
+        }
 
     }, [rapport, systems, fleets, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion, selectedOwners]);
 

@@ -1,14 +1,14 @@
 import React, {createContext, useContext, useEffect, useMemo, useState, useCallback} from 'react';
-import {GlobalData, Rapport, XY, SystemeDetecte} from '../types';
-import {parseRapportXml, addManualDetectedSystems, getCachedDetectedSystems} from '../parsers/parseRapport';
-import {parseManualDetectedSystems} from '../parsers/parseManualSystems';
+import {GlobalData, Rapport, XY} from '../types';
+import {parseRapportXml} from '../parsers/parseRapport';
 import {parseDataXml} from '../parsers/parseData';
+import { CombatLogData } from '../types/combat';
+import { parseCombatLog } from '../parsers/parseCombatLog';
 
 type ReportContextType = {
     rapport?: Rapport;
     global?: GlobalData;
     loadRapportFile: (file: File) => Promise<void>;
-    addDetectedSystemsFromText: (text: string) => { added: number; errors: { line: number; message: string }[] };
     ready: boolean;
     cellSize: number;
     setCellSize: (n: number) => void;
@@ -17,6 +17,8 @@ type ReportContextType = {
     viewportCols: number;
     viewportRows: number;
     setViewportDims: (cols: number, rows: number) => void;
+    combatLogs: CombatLogData[];
+    loadCombatLog: (file: File) => Promise<void>;
 };
 
 const ReportContext = createContext<ReportContextType | undefined>(undefined);
@@ -34,13 +36,6 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         setViewportRows(rows);
     }, []);
 
-    const mergeDetectedWithOwned = useCallback((r: Rapport): SystemeDetecte[] => {
-        // Partir du cache (manuels + précédents), puis supprimer ceux devenus possédés
-        const cache = getCachedDetectedSystems();
-        const ownedKeys = new Set(r.systemesJoueur.map(s => `${s.pos.x}_${s.pos.y}`));
-        return cache.filter(sd => !ownedKeys.has(`${sd.pos.x}_${sd.pos.y}`));
-    }, []);
-
     const loadRapportFile = useCallback(async (file: File) => {
         const text = await file.text();
         // Parse and apply the report
@@ -55,19 +50,13 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         }
     }, [center]);
 
-    const addDetectedSystemsFromText = useCallback((text: string) => {
-        const { systems, errors } = parseManualDetectedSystems(text);
-        if (systems.length > 0) {
-            addManualDetectedSystems(systems);
-            setRapport(prev => {
-                if (!prev) return prev;
-                // Mettre à jour la liste des systèmes détectés depuis le cache
-                const updatedDetects = mergeDetectedWithOwned(prev);
-                return { ...prev, systemesDetectes: updatedDetects };
-            });
-        }
-        return { added: systems.length, errors };
-    }, [mergeDetectedWithOwned]);
+    const [combatLogs, setCombatLogs] = useState<CombatLogData[]>([]);
+
+    const loadCombatLog = useCallback(async (file: File) => {
+        const text = await file.text();
+        const parsed = parseCombatLog(file.name, text);
+        setCombatLogs(prev => [...prev, parsed]);
+    }, []);
 
     useEffect(() => {
         let alive = true;
@@ -100,9 +89,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
             const stored = localStorage.getItem('rapportXml');
             if (stored) {
                 const r = parseRapportXml(stored);
-                // mettre à jour les détectés avec le cache courant
-                const mergedDetected = mergeDetectedWithOwned(r);
-                setRapport({ ...r, systemesDetectes: mergedDetected });
+                setRapport(r);
                 if (!center && r.joueur.capitale) setCenter(r.joueur.capitale);
             }
         } catch {
@@ -116,7 +103,6 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         rapport,
         global,
         loadRapportFile,
-        addDetectedSystemsFromText,
         ready: Boolean(rapport && global),
         cellSize,
         setCellSize,
@@ -125,7 +111,9 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         viewportCols,
         viewportRows,
         setViewportDims,
-    }), [rapport, global, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims]);
+        combatLogs,
+        loadCombatLog,
+    }), [rapport, global, loadRapportFile, cellSize, center, viewportCols, viewportRows, setViewportDims,combatLogs, loadCombatLog]);
 
     return <ReportContext.Provider value={value}>{children}</ReportContext.Provider>;
 }
