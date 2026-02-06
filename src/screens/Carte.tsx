@@ -6,9 +6,12 @@ import InfoPanel from '../components/Map/InfoPanel';
 import { XY } from '../types';
 
 export default function Carte() {
-  const { rapport, global, cellSize, setCellSize, center, setCenter } = useReport();
+  const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText } = useReport();
   const [selected, setSelected] = useState<XY | undefined>(undefined);
   const [selectedOwners, setSelectedOwners] = useState<number[]>([]);
+  const [showPaste, setShowPaste] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
 
   const content = useMemo(() => {
     if (!rapport) {
@@ -69,6 +72,14 @@ export default function Carte() {
                 </option>
               ))}
           </select>
+          <button
+            type="button"
+            onClick={() => { setShowPaste(true); setPasteFeedback(null); }}
+            style={{ padding: '4px 8px' }}
+            title="Ajouter des détections systèmes depuis un collage"
+          >
+            + Détections…
+          </button>
         </div>
       </div>
 
@@ -82,6 +93,58 @@ export default function Carte() {
       </div>
 
       <InfoPanel selected={selected} />
+
+      {showPaste && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          }}
+          onClick={() => setShowPaste(false)}
+        >
+          <div
+            style={{ background: '#1e1e1e', color: '#eee', padding: 16, borderRadius: 6, minWidth: 600, maxWidth: '80%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginTop: 0 }}>Ajouter des systèmes détectés</h3>
+            <p style={{ marginTop: 0 }}>
+              Collez un système par ligne, au format:
+              <br/>
+              <code>nbpla=16; nom=Nb 9C; pop=3475; popMax=43547; pos=0_1_26; typeEtoile=1; proprios=4,1</code>
+            </p>
+            <textarea
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              placeholder={"Un système par ligne"}
+              style={{ width: '100%', height: 180 }}
+            />
+            {pasteFeedback && (
+              <div style={{ marginTop: 8, color: '#9f9' }}>{pasteFeedback}</div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+              <button type="button" onClick={() => setShowPaste(false)}>Annuler</button>
+              <button
+                type="button"
+                onClick={() => {
+                  const res = addDetectedSystemsFromText(pasteText);
+                  const msgParts = [] as string[];
+                  if (res.added > 0) msgParts.push(`${res.added} ajouté(s)`);
+                  if (res.errors.length > 0) msgParts.push(`${res.errors.length} erreur(s)`);
+                  setPasteFeedback(msgParts.join(' · ') || 'Aucune modification');
+                  if (res.errors.length === 0) {
+                    // fermer et reset pour un flux rapide
+                    setShowPaste(false);
+                    setPasteText('');
+                  }
+                }}
+                style={{ fontWeight: 'bold' }}
+              >
+                Importer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -112,6 +112,21 @@ function saveDetectedToLS(map: Map<string, SystemeDetecte>): void {
 
 const keyOf = (sd: Pick<SystemeDetecte, 'pos'>) => `${sd.pos.x}_${sd.pos.y}`;
 
+// Ajout manuel de systèmes détectés (persistance + cache)
+export function addManualDetectedSystems(systems: SystemeDetecte[]) {
+    if (!systems || systems.length === 0) return;
+    const merged = new Map(__detectedSystemsCache);
+    systems.forEach(sd => {
+        merged.set(keyOf(sd), sd);
+    });
+    __detectedSystemsCache = merged;
+    try { saveDetectedToLS(merged); } catch { /* ignore */ }
+}
+
+export function getCachedDetectedSystems(): SystemeDetecte[] {
+    return Array.from(__detectedSystemsCache.values());
+}
+
 export function parseRapportXml(text: string): Rapport {
     const doc = new DOMParser().parseFromString(text, 'text/xml');
 
