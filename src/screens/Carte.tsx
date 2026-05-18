@@ -6,7 +6,7 @@ import InfoPanel from '../components/Map/InfoPanel';
 import {XY} from '../types';
 
 export default function Carte() {
-  const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText } = useReport();
+  const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText, allTags, selectedTags, setSelectedTags } = useReport();
   const [selected, setSelected] = useState<XY | undefined>(undefined);
   const [selectedOwners, setSelectedOwners] = useState<number[]>([]);
   const [showPaste, setShowPaste] = useState(false);
@@ -76,6 +76,38 @@ export default function Carte() {
             + Détections…
           </button>
         </div>
+
+        {/* Filtre par tags */}
+        {allTags.length > 0 && (
+          <div style={{ marginLeft: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label htmlFor="tag-filter">Filtrer par tag(s):</label>
+            <select
+              id="tag-filter"
+              multiple
+              size={Math.min(4, allTags.length)}
+              value={selectedTags}
+              onChange={(e) => {
+                const values = Array.from(e.target.selectedOptions).map(o => o.value);
+                setSelectedTags(values);
+              }}
+            >
+              {allTags.map(tag => (
+                <option key={tag} value={tag}>
+                  {tag}
+                </option>
+              ))}
+            </select>
+            {selectedTags.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedTags([])}
+                style={{ padding: '2px 6px', fontSize: '0.8em' }}
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        )}
       </div>
       {noRapportMessage}
 

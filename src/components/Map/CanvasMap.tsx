@@ -34,7 +34,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
 }
 
 export default function CanvasMap({onSelect, selectedOwners}: Props) {
-    const {rapport, global, cellSize, center, setCenter, setViewportDims, notes} = useReport();
+    const {rapport, global, cellSize, center, setCenter, setViewportDims, notes, selectedTags} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Ref sur le center pour des mises à jour synchrones dans le drag
@@ -249,6 +249,15 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
 
         // INDICATEURS DE NOTES
         Object.keys(notes).forEach(noteKey => {
+            const noteList = notes[noteKey];
+            if (!noteList || noteList.length === 0) return;
+
+            // Filtrage par tags
+            if (selectedTags.length > 0) {
+                const hasMatchingTag = noteList.some(n => n.tag && selectedTags.includes(n.tag));
+                if (!hasMatchingTag) return;
+            }
+
             const [nx, ny] = noteKey.split('_').map(Number);
             let dx = ((ny - leftY + BOUNDS.maxY) % BOUNDS.maxY);
             let dy = ((nx - topX + BOUNDS.maxX) % BOUNDS.maxX);
@@ -288,8 +297,16 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
             return selectedOwners.includes(owner);
         };
 
-        // systèmes
+        // systems
         systems.forEach(s => {
+            // Filtrage par tags si sélectionné
+            if (selectedTags.length > 0) {
+                const posKey = `${s.pos.x}_${s.pos.y}`;
+                const cellNotes = notes[posKey] || [];
+                const hasMatchingTag = cellNotes.some(n => n.tag && selectedTags.includes(n.tag));
+                if (!hasMatchingTag) return;
+            }
+
             let dx = ((s.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
             let dy = ((s.pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
 
@@ -495,7 +512,7 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
                 cHalo.restore();
             }
         }
-    }, [rapport, global, systems, fleets, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion, selectedOwners, notes]);
+    }, [rapport, global, systems, fleets, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {

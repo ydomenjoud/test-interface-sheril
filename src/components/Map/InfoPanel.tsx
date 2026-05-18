@@ -11,9 +11,10 @@ type Props = {
 };
 
 export default function InfoPanel({ selected }: Props) {
-  const { rapport, global, notes, addNote, deleteNote } = useReport();
+  const { rapport, global, notes, addNote, deleteNote, allTags } = useReport();
   const [noteText, setNoteText] = useState('');
   const [noteColor, setNoteColor] = useState('#ffcc00');
+  const [noteTag, setNoteTag] = useState('');
 
   const atPos = useMemo(() => {
     if (!selected) return { systems: [], fleets: [] as any[] };
@@ -64,8 +65,9 @@ export default function InfoPanel({ selected }: Props) {
   const handleAddNote = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected || !noteText.trim()) return;
-    addNote(selected, noteText, noteColor);
+    addNote(selected, noteText, noteColor, noteTag.trim() || undefined);
     setNoteText('');
+    setNoteTag('');
   };
 
   if (!selected) {
@@ -164,6 +166,19 @@ export default function InfoPanel({ selected }: Props) {
             />
             <input
               type="text"
+              value={noteTag}
+              onChange={(e) => setNoteTag(e.target.value)}
+              placeholder="Tag..."
+              list="tags-list"
+              style={{ width: 80, padding: '4px 8px', background: '#123', color: '#eee', border: '1px solid #345' }}
+            />
+            <datalist id="tags-list">
+              {allTags.map(tag => (
+                <option key={tag} value={tag} />
+              ))}
+            </datalist>
+            <input
+              type="text"
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
               placeholder="Ajouter une note..."
@@ -188,7 +203,23 @@ export default function InfoPanel({ selected }: Props) {
                   fontSize: '0.9em'
                 }}
               >
-                <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{note.text}</div>
+                <div style={{ flex: 1 }}>
+                  {note.tag && (
+                    <span style={{
+                      display: 'inline-block',
+                      background: '#345',
+                      color: '#ccc',
+                      padding: '1px 5px',
+                      borderRadius: 3,
+                      fontSize: '0.8em',
+                      marginRight: 6,
+                      verticalAlign: 'middle'
+                    }}>
+                      {note.tag}
+                    </span>
+                  )}
+                  <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap', display: 'inline' }}>{note.text}</div>
+                </div>
                 <button
                   onClick={() => deleteNote(selected, note.id)}
                   style={{

@@ -18,7 +18,10 @@ type ReportContextType = {
     viewportRows: number;
     setViewportDims: (cols: number, rows: number) => void;
     notes: Record<string, Note[]>;
-    addNote: (pos: XY, text: string, color: string) => void;
+    allTags: string[];
+    selectedTags: string[];
+    setSelectedTags: (tags: string[]) => void;
+    addNote: (pos: XY, text: string, color: string, tag?: string) => void;
     deleteNote: (pos: XY, noteId: string) => void;
 };
 
@@ -32,6 +35,15 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
     const [viewportCols, setViewportCols] = useState<number>(0);
     const [viewportRows, setViewportRows] = useState<number>(0);
     const [notes, setNotes] = useState<Record<string, Note[]>>({});
+    const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+    const allTags = useMemo(() => {
+        const tags = new Set<string>();
+        Object.values(notes).flat().forEach(note => {
+            if (note.tag) tags.add(note.tag);
+        });
+        return Array.from(tags).sort();
+    }, [notes]);
 
     const setViewportDims = useCallback((cols: number, rows: number) => {
         setViewportCols(cols);
@@ -45,11 +57,12 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         return cache.filter(sd => !ownedKeys.has(`${sd.pos.x}_${sd.pos.y}`));
     }, []);
 
-    const addNote = useCallback((pos: XY, text: string, color: string) => {
+    const addNote = useCallback((pos: XY, text: string, color: string, tag?: string) => {
         const key = `${pos.x}_${pos.y}`;
         const newNote: Note = {
             id: Math.random().toString(36).substr(2, 9),
             text,
+            tag,
             color,
             date: Date.now()
         };
@@ -169,9 +182,12 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         viewportRows,
         setViewportDims,
         notes,
+        allTags,
+        selectedTags,
+        setSelectedTags,
         addNote,
         deleteNote,
-    }), [rapport, global, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, addNote, deleteNote]);
+    }), [rapport, global, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, allTags, selectedTags, addNote, deleteNote]);
 
     return <ReportContext.Provider value={value}>{children}</ReportContext.Provider>;
 }

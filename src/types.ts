@@ -3,6 +3,7 @@ export type XY = { x: number; y: number };
 export type Note = {
     id: string;
     text: string;
+    tag?: string;
     color: string;
     date: number;
 };
@@ -70,7 +71,7 @@ export type Planete = {
     proprietaire?: number;
     pdc: number; // points de construction
     minerai?: number;
-    batiments: { techCode: string; count: number }[]; 
+    batiments: { techCode: string; count: number }[];
     populations: {
         raceId: number;
         nb: number,
