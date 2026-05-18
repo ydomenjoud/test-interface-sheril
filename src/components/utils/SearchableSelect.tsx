@@ -22,9 +22,9 @@ export default function SearchableSelect(props: {
   }, [open, selected]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = query.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     if (!q) return options;
-    return options.filter(o => o.label.toLowerCase().includes(q));
+    return options.filter(o => o.label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q));
   }, [options, query]);
 
   useEffect(() => {

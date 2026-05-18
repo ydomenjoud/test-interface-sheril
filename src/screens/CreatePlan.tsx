@@ -116,6 +116,21 @@ export default function CreatePlan() {
     return out;
   }, [totals.marchTotals, global]);
 
+  const toRoman = (n: number) => {
+    const map: [number, string][] = [
+      [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']
+    ];
+    let res = '';
+    let num = n;
+    for (const [val, rom] of map) {
+      while (num >= val) {
+        res += rom;
+        num -= val;
+      }
+    }
+    return res;
+  };
+
   return (
     <div style={{ padding: 12, overflow: 'auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <h3>Créer un plan de vaisseau</h3>
@@ -126,7 +141,7 @@ export default function CreatePlan() {
           <SearchableSelect
             options={compTechs.map(t => ({
               value: t.code,
-              label: `${t.nom} (${t.code}) — ${t.specification?.case ?? 0} case, min ${t.specification?.min ?? 0}, prix ${t.specification?.prix ?? 0}`
+              label: `${t.nom} (type ${toRoman(t.niv)}) [${t.code}] — ${t.specification?.case ?? 0} case, min ${t.specification?.min ?? 0}, prix ${t.specification?.prix ?? 0}`
             }))}
             value={selectedCode}
             onChange={setSelectedCode}
@@ -178,7 +193,7 @@ export default function CreatePlan() {
 
               return (
                 <tr key={e.code}>
-                  <td>{t.nom}</td>
+                  <td>{t.nom} de type {toRoman(t.niv)}</td>
                   <td style={{ textAlign: 'right' }}>{unitCase}</td>
                   <td style={{ textAlign: 'right' }}>{unitMin}</td>
                   <td style={{ textAlign: 'right' }}>{unitPrix}</td>
