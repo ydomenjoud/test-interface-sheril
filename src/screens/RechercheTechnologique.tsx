@@ -10,6 +10,7 @@ export default function RechercheTechnologique() {
     const tour = rapport?.tour;
 
     const [assigns, setAssigns] = useState<Assign[]>([]);
+    const [manualBudget, setManualBudget] = useState<number | null>(null);
     const [selectedCode, setSelectedCode] = useState<string>('');
 
     // Effect to LOAD data from localStorage when the tour changes
@@ -20,9 +21,13 @@ export default function RechercheTechnologique() {
         }
 
         const researchKey = `recherche-technologique-tour-${tour}`;
+        const budgetKey = `recherche-technologique-budget-tour-${tour}`;
         try {
             const saved = localStorage.getItem(researchKey);
             setAssigns(saved ? JSON.parse(saved) : []);
+
+            const savedBudget = localStorage.getItem(budgetKey);
+            setManualBudget(savedBudget ? parseFloat(savedBudget) : null);
         } catch (e) {
             console.error("Failed to parse assigns from localStorage", e);
             setAssigns([]);
@@ -50,12 +55,18 @@ export default function RechercheTechnologique() {
         }
 
         const researchKey = `recherche-technologique-tour-${tour}`;
+        const budgetKey = `recherche-technologique-budget-tour-${tour}`;
         try {
             localStorage.setItem(researchKey, JSON.stringify(assigns));
+            if (manualBudget !== null) {
+                localStorage.setItem(budgetKey, manualBudget.toString());
+            } else {
+                localStorage.removeItem(budgetKey);
+            }
         } catch (e) {
             console.error("Failed to save assigns to localStorage", e);
         }
-    }, [assigns, tour]); // This effect runs only when `assigns` changes.
+    }, [assigns, manualBudget, tour]); // This effect runs only when `assigns` or `manualBudget` changes.
 
 
     const atteignables = rapport?.technologiesAtteignables;
@@ -69,7 +80,7 @@ export default function RechercheTechnologique() {
         return a.type > b.type ? 1 : -1;
     });
 
-    const budget = useMemo(() => {
+    const calculatedBudget = useMemo(() => {
         if (!rapport?.systemesJoueur) {
             return 0;
         }
@@ -79,6 +90,8 @@ export default function RechercheTechnologique() {
             return total + (revenuEstime * btech / 100);
         }, 0);
     }, [rapport]);
+
+    const budget = manualBudget !== null ? manualBudget : calculatedBudget;
 
     const totalAllocated = assigns.reduce((s, a) => s + (a.amount || 0), 0);
     const percent = budget > 0 ? Math.min(100, Math.ceil((totalAllocated / budget) * 100)) : 0;
@@ -158,8 +171,31 @@ export default function RechercheTechnologique() {
         <h3>Recherche technologique - tour {tour}</h3>
 
         <div style={{marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap'}}>
-            <div className="badge" style={{background: '#123', color: '#ddd'}}>
-                Budget: <b>{budget.toFixed(1)}</b>
+            <div className="badge" style={{background: '#123', color: '#ddd', display: 'flex', alignItems: 'center', gap: 8}}>
+                Budget:
+                <input
+                    type="number"
+                    value={manualBudget !== null ? manualBudget : calculatedBudget.toFixed(1)}
+                    onChange={e => setManualBudget(parseFloat(e.target.value))}
+                    style={{
+                        background: 'transparent',
+                        color: 'inherit',
+                        border: '1px solid #456',
+                        width: 80,
+                        textAlign: 'right',
+                        fontSize: 'inherit',
+                        fontWeight: 'bold'
+                    }}
+                />
+                {manualBudget !== null && (
+                    <button
+                        onClick={() => setManualBudget(null)}
+                        style={{padding: '0 4px', fontSize: 10, cursor: 'pointer'}}
+                        title="Réinitialiser au budget calculé"
+                    >
+                        ↺
+                    </button>
+                )}
             </div>
             <div className="badge" style={{background: '#123', color: '#ddd'}}>
                 Alloué: <b>{totalAllocated.toFixed(1)}</b>
