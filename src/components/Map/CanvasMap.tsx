@@ -217,14 +217,18 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
                     const tx = wrapX(src.pos.x + dyCell); // déplacement vertical
                     const ty = wrapY(src.pos.y + dxCell); // déplacement horizontal
 
-                    const cxIdx = ((ty - leftY + BOUNDS.maxY) % BOUNDS.maxY);
-                    const cyIdx = ((tx - topX + BOUNDS.maxX) % BOUNDS.maxX);
-                    const px = cxIdx * cellSize;
-                    const py = cyIdx * cellSize;
+                    const cxIdxBase = ((ty - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+                    const cyIdxBase = ((tx - topX + BOUNDS.maxX) % BOUNDS.maxX);
 
-                    if (px < 0 || py < 0 || px >= cols * cellSize || py >= rows * cellSize) continue;
-
-                    detected.add(`${cxIdx},${cyIdx}`);
+                    let cxIdx = cxIdxBase;
+                    while (cxIdx < cols) {
+                        let cyIdx = cyIdxBase;
+                        while (cyIdx < rows) {
+                            detected.add(`${cxIdx},${cyIdx}`);
+                            cyIdx += BOUNDS.maxX;
+                        }
+                        cxIdx += BOUNDS.maxY;
+                    }
                 }
             }
         });
@@ -258,15 +262,27 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
 
         // systèmes
         systems.forEach(s => {
-            const dx = ((s.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
-            const dy = ((s.pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
-            const px = dx * cellSize;
-            const py = dy * cellSize;
-            if (px < 0 || py < 0 || px >= cols * cellSize || py >= rows * cellSize) return;
+            let dx = ((s.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+            let dy = ((s.pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
 
+            // Gérer le wrapping si le viewport est plus grand que la galaxie
+            while (dx < cols) {
+                let currentDy = dy;
+                while (currentDy < rows) {
+                    const px = dx * cellSize;
+                    const py = currentDy * cellSize;
+
+                    renderSystem(s, px, py);
+                    currentDy += BOUNDS.maxX;
+                }
+                dx += BOUNDS.maxY;
+            }
+        });
+
+        function renderSystem(s: any, px: number, py: number) {
             // Couleur(s) en fonction de la possession
-            const owners = (s as any).owners as number[] | undefined;
-            const isGlobalOnly = (s as any).isGlobalOnly;
+            const owners = s.owners as number[] | undefined;
+            const isGlobalOnly = s.isGlobalOnly;
             let col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna);
             if (isGlobalOnly) col = '#333'; // Plus sombre pour les systèmes non détectés
 
@@ -351,17 +367,27 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
                 cHalo.stroke();
                 cHalo.restore();
             }
-            // plus de bordure
-        });
+        }
 
         // flottes
         fleets.forEach(f => {
-            const dx = ((f.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
-            const dy = ((f.pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
-            const px = dx * cellSize;
-            const py = dy * cellSize;
-            if (px < 0 || py < 0 || px >= cols * cellSize || py >= rows * cellSize) return;
+            let dx = ((f.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+            let dy = ((f.pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
 
+            while (dx < cols) {
+                let currentDy = dy;
+                while (currentDy < rows) {
+                    const px = dx * cellSize;
+                    const py = currentDy * cellSize;
+
+                    renderFleet(f, px, py);
+                    currentDy += BOUNDS.maxX;
+                }
+                dx += BOUNDS.maxY;
+            }
+        });
+
+        function renderFleet(f: any, px: number, py: number) {
             // Taille et placement de l'icône de vaisseau
             // Exigence: l'image du vaisseau doit faire un tiers de la largeur d'une case et être centrée
             const size = Math.floor(cellSize / 3);
@@ -423,8 +449,8 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
             // HALO de sélection pour les flottes (autour de l'icône centrée)
             if (isFleetSelected((f as any).owner)) {
                 const col = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna);
-                const haloColor = col
-                const lineW = 2
+                const haloColor = col;
+                const lineW = 2;
                 const blur = Math.max(10, Math.floor(lineW * 1.5));
                 const pad = 0;
                 const x = drawX - pad;
@@ -440,9 +466,8 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
                 cHalo.strokeRect(x, y, w, h);
                 cHalo.restore();
             }
-        });
-
-    }, [rapport, systems, fleets, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion, selectedOwners]);
+        }
+    }, [rapport, global, systems, fleets, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion, selectedOwners]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
