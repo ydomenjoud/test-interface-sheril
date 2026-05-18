@@ -1,4 +1,5 @@
-import {GlobalData, Marchandise, Commandant, Race, Technologie, PlanVaisseau, VaisseauTailleRule} from '../types';
+import {GlobalData, Marchandise, Commandant, Race, Technologie, PlanVaisseau, VaisseauTailleRule, SystemData} from '../types';
+import {parsePosString} from '../utils/position';
 
 export function parseDataXml(text: string): GlobalData {
     const doc = new DOMParser().parseFromString(text, 'text/xml');
@@ -133,8 +134,21 @@ export function parseDataXml(text: string): GlobalData {
     });
     tailleVaisseaux.sort((a, b) => a.minCase - b.minCase);
 
+    const systemes: SystemData[] = [];
+    doc.querySelectorAll('data > systemes > s')?.forEach(s => {
+        const nom = s.getAttribute('nom') || '';
+        const position = s.getAttribute('position') || '';
+        if (position) {
+            systemes.push({
+                nom,
+                pos: parsePosString(position),
+            });
+        }
+    });
+
     return {
         politiques,
         technologies: techs, commandants, races, marchandises, caracteristiquesBatiment, caracteristiquesComposant, plansPublic, tailleVaisseaux,
+        systemes,
     };
 }

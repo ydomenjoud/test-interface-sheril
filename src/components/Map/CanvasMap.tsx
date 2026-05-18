@@ -34,7 +34,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
 }
 
 export default function CanvasMap({onSelect, selectedOwners}: Props) {
-    const {rapport, cellSize, center, setCenter, setViewportDims} = useReport();
+    const {rapport, global, cellSize, center, setCenter, setViewportDims} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Ref sur le center pour des mises à jour synchrones dans le drag
@@ -75,13 +75,53 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
     const currentPlayerId = rapport?.joueur.numero || 0; // placeholder si besoin d'ID joueur
 
     const systems = useMemo(() => {
-        if (!rapport) return [];
-        return [...rapport.systemesJoueur.map(s => ({
-            ...s, owners: s.proprietaires?.length ? s.proprietaires : [currentPlayerId],
-        })), ...rapport.systemesDetectes.map(s => ({
-            ...s, owners: s.proprietaires,
-        })),];
-    }, [rapport, currentPlayerId]);
+        const list: any[] = [];
+        const seen = new Set<string>();
+
+        // 1. Systèmes du joueur (priorité max)
+        if (rapport) {
+            rapport.systemesJoueur.forEach(s => {
+                const key = `${s.pos.x}_${s.pos.y}`;
+                list.push({
+                    ...s,
+                    owners: s.proprietaires?.length ? s.proprietaires : [currentPlayerId],
+                    isGlobalOnly: false
+                });
+                seen.add(key);
+            });
+
+            // 2. Systèmes détectés
+            rapport.systemesDetectes.forEach(s => {
+                const key = `${s.pos.x}_${s.pos.y}`;
+                if (!seen.has(key)) {
+                    list.push({
+                        ...s,
+                        owners: s.proprietaires,
+                        isGlobalOnly: false
+                    });
+                    seen.add(key);
+                }
+            });
+        }
+
+        // 3. Systèmes globaux (data.xml) - si pas déjà présent
+        if (global?.systemes) {
+            global.systemes.forEach(s => {
+                const key = `${s.pos.x}_${s.pos.y}`;
+                if (!seen.has(key)) {
+                    list.push({
+                        ...s,
+                        type: 'detecte', // On le traite comme un système détecté vide
+                        owners: [],
+                        isGlobalOnly: true
+                    });
+                    seen.add(key);
+                }
+            });
+        }
+
+        return list;
+    }, [rapport, global, currentPlayerId]);
 
     const fleets = useMemo(() => {
         if (!rapport) return [];
@@ -226,12 +266,15 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
 
             // Couleur(s) en fonction de la possession
             const owners = (s as any).owners as number[] | undefined;
-            const col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna);
+            const isGlobalOnly = (s as any).isGlobalOnly;
+            let col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna);
+            if (isGlobalOnly) col = '#333'; // Plus sombre pour les systèmes non détectés
 
             // Taille du disque en fonction du typeEtoile:
             // type 1 => 50% de la case, type 9/10 => 100% de la case, interpolation linéaire entre 1..9
             const t = Math.max(1, Math.min(10, Number(s.typeEtoile) || 1));
-            const factor = t >= 9 ? 1 : (0.5 + ((t - 1) * (0.5 / 8))); // t=1 -> 0.5, t=9 -> 1.0
+            const baseFactor = t >= 9 ? 1 : (0.5 + ((t - 1) * (0.5 / 8))); // t=1 -> 0.5, t=9 -> 1.0
+            const factor = isGlobalOnly ? baseFactor * 0.5 : baseFactor; // Taille plus petite par défaut si global uniquement
             const diameter = cellSize * factor;
             const radius = diameter / 2;
 

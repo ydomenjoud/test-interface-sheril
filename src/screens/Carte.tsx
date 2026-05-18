@@ -13,16 +13,11 @@ export default function Carte() {
   const [pasteText, setPasteText] = useState('');
   const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
 
-  const content = useMemo(() => {
-    if (!rapport) {
-      return (
-        <div style={{ color: '#555', padding: 20 }}>
-          Veuillez charger votre rapport.xml via le header. Les données globales sont chargées automatiquement.
-        </div>
-      );
-    }
-    return null;
-  }, [rapport]);
+  const noRapportMessage = !rapport ? (
+    <div className="no-rapport-hint" style={{ padding: '4px 12px', background: '#332200', color: '#ffcc00', fontSize: '0.9em' }}>
+      Aucun rapport chargé. Seuls les systèmes connus de la galaxie sont affichés.
+    </div>
+  ) : null;
 
   return (
     <div className="carte-wrap">
@@ -82,14 +77,18 @@ export default function Carte() {
           </button>
         </div>
       </div>
+      {noRapportMessage}
 
       <div className="carte-canvas-area">
-        {!rapport ? content : (
-          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-            <CanvasMap onSelect={(xy) => setSelected(xy)} selectedOwners={selectedOwners} />
-            <MiniMap onCenter={(x, y) => setCenter({ x, y })} />
+        {!global && (
+          <div style={{ padding: 20, color: '#aaa' }}>
+            Chargement des données de la galaxie...
           </div>
         )}
+        <div style={{ position: 'relative', width: '100%', height: '100%', display: global ? 'block' : 'none' }}>
+          <CanvasMap onSelect={(xy) => setSelected(xy)} selectedOwners={selectedOwners} />
+          <MiniMap onCenter={(x, y) => setCenter({ x, y })} />
+        </div>
       </div>
 
       <InfoPanel selected={selected} />

@@ -11,26 +11,48 @@ type Props = {
 };
 
 export default function InfoPanel({ selected }: Props) {
-  const { rapport } = useReport();
+  const { rapport, global } = useReport();
 
   const atPos = useMemo(() => {
-    if (!selected || !rapport) return { systems: [], fleets: [] as any[] };
-    const systems = [
-      ...rapport.systemesJoueur.filter(s => s.pos.x === selected.x && s.pos.y === selected.y),
-      ...rapport.systemesDetectes.filter(s => s.pos.x === selected.x && s.pos.y === selected.y),
-    ];
-    const fleets = [
+    if (!selected) return { systems: [], fleets: [] as any[] };
+    const systems: any[] = [];
+    const seen = new Set<string>();
+
+    if (rapport) {
+      rapport.systemesJoueur.filter(s => s.pos.x === selected.x && s.pos.y === selected.y).forEach(s => {
+        systems.push(s);
+        seen.add(`${s.pos.x}_${s.pos.y}`);
+      });
+      rapport.systemesDetectes.filter(s => s.pos.x === selected.x && s.pos.y === selected.y).forEach(s => {
+        if (!seen.has(`${s.pos.x}_${s.pos.y}`)) {
+          systems.push(s);
+          seen.add(`${s.pos.x}_${s.pos.y}`);
+        }
+      });
+    }
+
+    if (global?.systemes) {
+      global.systemes.filter(s => s.pos.x === selected.x && s.pos.y === selected.y).forEach(s => {
+        if (!seen.has(`${s.pos.x}_${s.pos.y}`)) {
+          systems.push(s);
+          seen.add(`${s.pos.x}_${s.pos.y}`);
+        }
+      });
+    }
+
+    const fleets = rapport ? [
       ...rapport.flottesJoueur.filter(f => f.pos.x === selected.x && f.pos.y === selected.y),
       ...rapport.flottesDetectees.filter(f => f.pos.x === selected.x && f.pos.y === selected.y),
-    ];
+    ] : [];
+
     return { systems, fleets };
-  }, [selected, rapport]);
+  }, [selected, rapport, global]);
 
   const system = useMemo(() => {
     return atPos.systems[0];
   }, [atPos.systems]);
 
-  const isOwner = useMemo(() => system?.proprietaires?.some(p => p === rapport?.joueur?.numero), [system, rapport])
+  const isOwner = useMemo(() => system?.proprietaires?.some((p: any) => p === rapport?.joueur?.numero), [system, rapport])
 
   if (!selected) {
     return <div className="carte-info">Cliquez sur une case de la carte pour voir le détail.</div>;

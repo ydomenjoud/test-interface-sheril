@@ -25,7 +25,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
     const [rapport, setRapport] = useState<Rapport | undefined>(undefined);
     const [global, setGlobal] = useState<GlobalData | undefined>(undefined);
     const [cellSize, setCellSize] = useState<number>(32);
-    const [center, setCenter] = useState<XY | undefined>(undefined);
+    const [center, setCenter] = useState<XY | undefined>({x: 20, y: 20});
     const [viewportCols, setViewportCols] = useState<number>(0);
     const [viewportRows, setViewportRows] = useState<number>(0);
 
@@ -117,7 +117,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         global,
         loadRapportFile,
         addDetectedSystemsFromText,
-        ready: Boolean(rapport && global),
+        ready: Boolean(global),
         cellSize,
         setCellSize,
         center,

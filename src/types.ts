@@ -161,6 +161,11 @@ export type Rapport = {
     plansVaisseaux: PlanVaisseau[];
     budgetTechnologique: number;
 };
+export type SystemData = {
+    nom: string;
+    pos: XY;
+}
+
 export type GlobalData = {
     commandants: Commandant[];
     technologies: Technologie[];
@@ -171,4 +176,5 @@ export type GlobalData = {
     caracteristiquesComposant: Record<number, string>;
     plansPublic: PlanVaisseau[];
     tailleVaisseaux: VaisseauTailleRule[];
+    systemes: SystemData[];
 };
