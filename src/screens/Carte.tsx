@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from 'react';
-import { useReport } from '../context/ReportContext';
+import React, {useState} from 'react';
+import {useReport} from '../context/ReportContext';
 import CanvasMap from '../components/Map/CanvasMap';
 import MiniMap from '../components/Map/MiniMap';
 import InfoPanel from '../components/Map/InfoPanel';
-import { XY } from '../types';
+import {XY} from '../types';
 
 export default function Carte() {
   const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText } = useReport();
