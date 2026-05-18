@@ -331,10 +331,11 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
             let col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna);
             if (isGlobalOnly) col = '#333'; // Plus sombre pour les systèmes non détectés
 
-            // Taille du disque en fonction du typeEtoile:
-            // type 1 => 50% de la case, type 9/10 => 100% de la case, interpolation linéaire entre 1..9
-            const t = Math.max(1, Math.min(10, Number(s.typeEtoile) || 1));
-            const baseFactor = t >= 9 ? 1 : (0.5 + ((t - 1) * (0.5 / 8))); // t=1 -> 0.5, t=9 -> 1.0
+            // Taille du disque en fonction du nombre de planètes:
+            // 10 planètes => 50% de la case, 20 planètes => 100% de la case
+            const nbPla = Number(s.nbPla) || 0;
+            const t = Math.max(10, Math.min(20, nbPla));
+            const baseFactor = 0.45 + ((t - 10) * (0.5 / 10)); // 10 -> 0.5, 20 -> 1.0
             const factor = isGlobalOnly ? baseFactor * 0.5 : baseFactor; // Taille plus petite par défaut si global uniquement
             const diameter = cellSize * factor;
             const radius = diameter / 2;
