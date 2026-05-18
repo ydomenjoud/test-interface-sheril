@@ -1,5 +1,12 @@
 export type XY = { x: number; y: number };
 
+export type Note = {
+    id: string;
+    text: string;
+    color: string;
+    date: number;
+};
+
 export type Range = {min: number, max: number};
 
 export type Race = {

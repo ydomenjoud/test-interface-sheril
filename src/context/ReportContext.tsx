@@ -1,5 +1,5 @@
 import React, {createContext, useContext, useEffect, useMemo, useState, useCallback} from 'react';
-import {GlobalData, Rapport, XY, SystemeDetecte} from '../types';
+import {GlobalData, Rapport, XY, SystemeDetecte, Note} from '../types';
 import {parseRapportXml, addManualDetectedSystems, getCachedDetectedSystems} from '../parsers/parseRapport';
 import {parseManualDetectedSystems} from '../parsers/parseManualSystems';
 import {parseDataXml} from '../parsers/parseData';
@@ -17,6 +17,9 @@ type ReportContextType = {
     viewportCols: number;
     viewportRows: number;
     setViewportDims: (cols: number, rows: number) => void;
+    notes: Record<string, Note[]>;
+    addNote: (pos: XY, text: string, color: string) => void;
+    deleteNote: (pos: XY, noteId: string) => void;
 };
 
 const ReportContext = createContext<ReportContextType | undefined>(undefined);
@@ -28,6 +31,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
     const [center, setCenter] = useState<XY | undefined>({x: 20, y: 20});
     const [viewportCols, setViewportCols] = useState<number>(0);
     const [viewportRows, setViewportRows] = useState<number>(0);
+    const [notes, setNotes] = useState<Record<string, Note[]>>({});
 
     const setViewportDims = useCallback((cols: number, rows: number) => {
         setViewportCols(cols);
@@ -39,6 +43,40 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         const cache = getCachedDetectedSystems();
         const ownedKeys = new Set(r.systemesJoueur.map(s => `${s.pos.x}_${s.pos.y}`));
         return cache.filter(sd => !ownedKeys.has(`${sd.pos.x}_${sd.pos.y}`));
+    }, []);
+
+    const addNote = useCallback((pos: XY, text: string, color: string) => {
+        const key = `${pos.x}_${pos.y}`;
+        const newNote: Note = {
+            id: Math.random().toString(36).substr(2, 9),
+            text,
+            color,
+            date: Date.now()
+        };
+        setNotes(prev => {
+            const updated = {
+                ...prev,
+                [key]: [...(prev[key] || []), newNote]
+            };
+            localStorage.setItem('mapNotes', JSON.stringify(updated));
+            return updated;
+        });
+    }, []);
+
+    const deleteNote = useCallback((pos: XY, noteId: string) => {
+        const key = `${pos.x}_${pos.y}`;
+        setNotes(prev => {
+            if (!prev[key]) return prev;
+            const updated = {
+                ...prev,
+                [key]: prev[key].filter(n => n.id !== noteId)
+            };
+            if (updated[key].length === 0) {
+                delete updated[key];
+            }
+            localStorage.setItem('mapNotes', JSON.stringify(updated));
+            return updated;
+        });
     }, []);
 
     const loadRapportFile = useCallback(async (file: File) => {
@@ -97,6 +135,11 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
     // Au chargement, si un rapport a déjà été chargé auparavant, le recharger automatiquement
     useEffect(() => {
         try {
+            const storedNotes = localStorage.getItem('mapNotes');
+            if (storedNotes) {
+                setNotes(JSON.parse(storedNotes));
+            }
+
             const stored = localStorage.getItem('rapportXml');
             if (stored) {
                 const r = parseRapportXml(stored);
@@ -125,7 +168,10 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         viewportCols,
         viewportRows,
         setViewportDims,
-    }), [rapport, global, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims]);
+        notes,
+        addNote,
+        deleteNote,
+    }), [rapport, global, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, addNote, deleteNote]);
 
     return <ReportContext.Provider value={value}>{children}</ReportContext.Provider>;
 }

@@ -1,6 +1,6 @@
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
-import {FlotteBase, FlotteDetectee, FlotteJoueur, XY} from '../../types';
+import {FlotteBase, FlotteDetectee, FlotteJoueur, XY, Note} from '../../types';
 import Commandant from "../utils/Commandant";
 import Position from "../utils/Position";
 import {getDescriptionPuissance, getPuissance, getPuissanceFromString} from "../../utils/puissance";
@@ -11,7 +11,9 @@ type Props = {
 };
 
 export default function InfoPanel({ selected }: Props) {
-  const { rapport, global } = useReport();
+  const { rapport, global, notes, addNote, deleteNote } = useReport();
+  const [noteText, setNoteText] = useState('');
+  const [noteColor, setNoteColor] = useState('#ffcc00');
 
   const atPos = useMemo(() => {
     if (!selected) return { systems: [], fleets: [] as any[] };
@@ -53,6 +55,18 @@ export default function InfoPanel({ selected }: Props) {
   }, [atPos.systems]);
 
   const isOwner = useMemo(() => system?.proprietaires?.some((p: any) => p === rapport?.joueur?.numero), [system, rapport])
+
+  const currentNotes = useMemo(() => {
+    if (!selected) return [];
+    return notes[`${selected.x}_${selected.y}`] || [];
+  }, [selected, notes]);
+
+  const handleAddNote = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selected || !noteText.trim()) return;
+    addNote(selected, noteText, noteColor);
+    setNoteText('');
+  };
 
   if (!selected) {
     return <div className="carte-info">Cliquez sur une case de la carte pour voir le détail.</div>;
@@ -136,6 +150,65 @@ export default function InfoPanel({ selected }: Props) {
           )}
           </tbody>
         </table>
+      </div>
+      <div className="info-block">
+        <h4>Notes</h4>
+        <form onSubmit={handleAddNote} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="color"
+              value={noteColor}
+              onChange={(e) => setNoteColor(e.target.value)}
+              style={{ width: 40, height: 30, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+              title="Choisir une couleur"
+            />
+            <input
+              type="text"
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder="Ajouter une note..."
+              style={{ flex: 1, padding: '4px 8px', background: '#123', color: '#eee', border: '1px solid #345' }}
+            />
+            <button type="submit" style={{ padding: '4px 12px' }}>Ajouter</button>
+          </div>
+        </form>
+
+        {currentNotes.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {currentNotes.map((note: Note) => (
+              <div
+                key={note.id}
+                style={{
+                  borderLeft: `4px solid ${note.color}`,
+                  background: 'rgba(255,255,255,0.05)',
+                  padding: '6px 10px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  fontSize: '0.9em'
+                }}
+              >
+                <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{note.text}</div>
+                <button
+                  onClick={() => deleteNote(selected, note.id)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#a66',
+                    cursor: 'pointer',
+                    padding: '0 4px',
+                    fontSize: '1.1em'
+                  }}
+                  title="Supprimer la note"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em' }}>Aucune note pour cette case.</div>
+        )}
       </div>
     </div>
   );

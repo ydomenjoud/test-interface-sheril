@@ -34,7 +34,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
 }
 
 export default function CanvasMap({onSelect, selectedOwners}: Props) {
-    const {rapport, global, cellSize, center, setCenter, setViewportDims} = useReport();
+    const {rapport, global, cellSize, center, setCenter, setViewportDims, notes} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Ref sur le center pour des mises à jour synchrones dans le drag
@@ -245,6 +245,34 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
             const px = ix * cellSize;
             const py = iy * cellSize;
             cScan.fillRect(px, py, cellSize, cellSize);
+        });
+
+        // INDICATEURS DE NOTES
+        Object.keys(notes).forEach(noteKey => {
+            const [nx, ny] = noteKey.split('_').map(Number);
+            let dx = ((ny - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+            let dy = ((nx - topX + BOUNDS.maxX) % BOUNDS.maxX);
+
+            while (dx < cols) {
+                let currentDy = dy;
+                while (currentDy < rows) {
+                    const px = dx * cellSize;
+                    const py = currentDy * cellSize;
+                    const noteList = notes[noteKey];
+                    if (noteList && noteList.length > 0) {
+                        const lastColor = noteList[noteList.length - 1].color;
+                        cScan.fillStyle = lastColor;
+                        // Petit triangle en haut à droite pour indiquer une note
+                        cScan.beginPath();
+                        cScan.moveTo(px + cellSize, py);
+                        cScan.lineTo(px + cellSize - 8, py);
+                        cScan.lineTo(px + cellSize, py + 8);
+                        cScan.fill();
+                    }
+                    currentDy += BOUNDS.maxX;
+                }
+                dx += BOUNDS.maxY;
+            }
         });
         cScan.restore();
 
@@ -467,7 +495,7 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
                 cHalo.restore();
             }
         }
-    }, [rapport, global, systems, fleets, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion, selectedOwners]);
+    }, [rapport, global, systems, fleets, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion, selectedOwners, notes]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
