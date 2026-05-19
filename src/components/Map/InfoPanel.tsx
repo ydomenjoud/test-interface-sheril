@@ -88,6 +88,7 @@ export default function InfoPanel({ selected }: Props) {
           <tr>
             <th>Nom</th>
             <th>Planètes</th>
+            <th>Population</th>
             <th>Commandants</th>
             { isOwner &&<th></th>}
           </tr>
@@ -97,6 +98,7 @@ export default function InfoPanel({ selected }: Props) {
             <tr>
               <td>{system.nom}</td>
               <td style={{ textAlign: 'right' }}>{system.nbPla ?? '—'}</td>
+                <td>{system.pop}/{system.popMax}</td>
               <td style={{ textAlign: 'right' }}>
                 {Array.isArray(system.proprietaires) && system.proprietaires.length
                   ? system.proprietaires.map((p: number, key: number) => <Commandant num={p} key={key} />)

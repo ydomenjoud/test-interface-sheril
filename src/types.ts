@@ -99,6 +99,8 @@ export interface SystemBase {
     bcont?: number;
     besp?: number;
     btech?: number;
+    pop?: number;
+    popMax?: number;
 }
 
 export interface SystemeJoueur extends SystemBase {

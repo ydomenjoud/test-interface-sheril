@@ -182,6 +182,8 @@ export function parseRapportXml(text: string): Rapport {
         const planetes: any[] = [];
         let revenuEstime = 0;
         const pNodes = qAll(s, ['planetes > p',]);
+        let populationActuelle = 0;
+        let populationMax = 0;
         pNodes.forEach((p) => {
             const proprietaire = getAttrNum(p, ['prop']);
             proprietaires.add(proprietaire);
@@ -221,6 +223,8 @@ export function parseRapportXml(text: string): Rapport {
                 const nb = Number(nbStr);
                 const growth = Number(getAttr(pop, ['popAug']) || '0');
                 const max = Number(getAttr(pop, ['popMax']) || '0');
+                populationActuelle+=nb;
+                populationMax+=max;
 
                 if (!Number.isNaN(raceId) && !Number.isNaN(nb) && nb > 0) {
                     populations.push({ raceId, nb, max, growth });
@@ -264,6 +268,8 @@ export function parseRapportXml(text: string): Rapport {
             type: 'joueur',
             nom,
             pos,
+            pop: populationActuelle,
+            popMax: populationMax,
             typeEtoile,
             nbPla,
             proprietaires: sortedProprietaires,
@@ -284,6 +290,8 @@ export function parseRapportXml(text: string): Rapport {
     let sysDetNodes = qAll(joueurNode, ['detections > systeme', 'detection > systeme']);
     sysDetNodes.forEach((s) => {
         const pos = parsePosString(getAttr(s, ['pos']) || '0_1_1');
+        const pop = getAttrNum(s, ['pop']) || 0;
+        const popMax = getAttrNum(s, ['popMax']) || 0;
         const nom = getAttr(s, ['nom']) || 'Système';
         const rawStar = getAttrNum(s, ['typeEtoile', 'typeetoile', 'type']);
         const typeEtoile = rawStar ?? 0;
@@ -294,7 +302,7 @@ export function parseRapportXml(text: string): Rapport {
             if (!Number.isNaN(v)) proprietaires.push(v);
         });
         const sortedProprietaires = Array.from(proprietaires).sort((a, b) => a - b);
-        systemesDetectes.push({type: 'detecte', nom, pos, typeEtoile, nbPla, proprietaires: sortedProprietaires});
+        systemesDetectes.push({type: 'detecte', nom, pos, pop, popMax, typeEtoile, nbPla, proprietaires: sortedProprietaires});
     });
 
     // Fusionner avec le cache précédent (clé = position)
@@ -349,7 +357,6 @@ export function parseRapportXml(text: string): Rapport {
             puiss: getAttr(f, ['puiss']) || 'inconnue',
         });
     });
-    console.log(flottesDetectees);
 
     const alliances: Alliance[] = [];
     let allianceNode = qAll(joueurNode, ['alliance']);
