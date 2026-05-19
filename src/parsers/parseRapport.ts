@@ -344,11 +344,12 @@ export function parseRapportXml(text: string): Rapport {
             num: getAttrNum(f, ['num']) ?? 0,
             nom: getAttr(f, ['nom']) || 'Flotte',
             pos,
-            nbVso: getAttrNum(f, ['nbvso']) ?? 0,
+            nbVso: getAttrNum(f, ['nbVso']) ?? 0,
             proprio: getAttrNum(f, ['proprio']) ?? 0,
             puiss: getAttr(f, ['puiss']) || 'inconnue',
         });
     });
+    console.log(flottesDetectees);
 
     const alliances: Alliance[] = [];
     let allianceNode = qAll(joueurNode, ['alliance']);

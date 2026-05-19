@@ -118,6 +118,7 @@ export default function InfoPanel({ selected }: Props) {
           <tr>
             <th>Nom</th>
             <th>Propriétaire</th>
+            <th>Vaisseaux</th>
             <th>Puissance</th>
           </tr>
           </thead>
@@ -143,6 +144,7 @@ export default function InfoPanel({ selected }: Props) {
                 <td style={{ textAlign: 'right' }}>
                   {typeof owner === 'number' ? <Commandant num={owner} /> : '—'}
                 </td>
+                  <td>{f.nbVso}</td>
                 <td style={{ textAlign: 'right' }}>{puissanceDesc}</td>
               </tr>
             );
