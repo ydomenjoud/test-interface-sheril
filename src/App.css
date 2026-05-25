@@ -152,6 +152,118 @@ a {
     height: 160px;
 }
 
+.combat-legend {
+    font-size: 0.8em;
+    color: #999;
+    margin: 0 0 8px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.combat-legend-spatial {
+    color: #e07a2f;
+}
+
+.combat-legend-planetary {
+    color: #b565d8;
+}
+
+.combat-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.combat-card {
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+}
+
+.combat-card--spatial {
+    border-left: 3px solid #e07a2f;
+}
+
+.combat-card--planetary {
+    border-left: 3px solid #b565d8;
+}
+
+.combat-card-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.25);
+    border: none;
+    color: #eee;
+    cursor: pointer;
+    text-align: left;
+}
+
+.combat-card-summary {
+    padding: 6px 10px 8px;
+    font-size: 0.9em;
+    line-height: 1.45;
+}
+
+.combat-summary-line {
+    margin: 0 0 6px;
+    color: #e8e8e8;
+    font-size: 0.92em;
+}
+
+.combat-card-details {
+    padding: 0 8px 8px;
+    border-top: 1px solid #333;
+}
+
+.combat-detail-block {
+    margin-top: 8px;
+    font-size: 0.85em;
+}
+
+.combat-detail-block p {
+    margin: 0;
+    color: #ccc;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.combat-kind-badge {
+    font-size: 0.85em;
+    font-weight: 600;
+}
+
+.combat-kind-badge--spatial {
+    color: #e07a2f;
+}
+
+.combat-kind-badge--planetary {
+    color: #b565d8;
+}
+
+.combat-detail-html {
+    overflow-x: auto;
+}
+
+.combat-detail-html table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+    background: #111;
+}
+
+.combat-detail-html td,
+.combat-detail-html th {
+    border: 1px solid #555;
+    padding: 4px 6px;
+    text-align: center;
+    color: #ddd;
+}
+
 .info-block {
     margin-bottom: 10px;
 }

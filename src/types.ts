@@ -148,6 +148,26 @@ export interface Alliance {
     commandants: number[];
 }
 
+export type CombatKind = 'spatial' | 'planetary';
+
+export type CombatDetailBlock = {
+    plain: string;
+    html: string;
+};
+
+export type CombatEvent = {
+    id: string;
+    kind: CombatKind;
+    pos: XY;
+    systemName?: string;
+    playerFleet?: string;
+    enemyFleet?: string;
+    enemyCommander?: string;
+    planetsCaptured?: number;
+    summary: string;
+    details: CombatDetailBlock[];
+};
+
 export type Rapport = {
     tour: number;
     joueur: {
@@ -170,6 +190,7 @@ export type Rapport = {
     flottesDetectees: FlotteDetectee[];
     plansVaisseaux: PlanVaisseau[];
     budgetTechnologique: number;
+    combats: CombatEvent[];
 };
 export type SystemData = {
     nom: string;
