@@ -1,6 +1,9 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
 import {BOUNDS, torusDelta, wrapX, wrapY} from '../../utils/position';
+import {getSectorNumber, isSectorLabelCell, sectorBackgroundColor, sectorLabelColor} from '../../utils/sectors';
+import {countCombatsByKind} from '../../parsers/parseCombatMessages';
+import {drawCombatMarkers} from '../../utils/combatMarkers';
 import {Alliance, XY} from '../../types';
 import {lightenHexColor} from "../../utils/global";
 
@@ -132,6 +135,8 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
         })),];
     }, [rapport, currentPlayerId]);
 
+    const combats = rapport?.combats ?? [];
+
 
     useEffect(() => {
         const cvs = canvasRef.current;
@@ -161,6 +166,31 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
 
         const topX = wrapX(center.x - halfRows);
         const leftY = wrapY(center.y - halfCols);
+
+        // fond des secteurs 10×10 (16 secteurs sur la carte 40×40)
+        for (let r = 0; r < rows; r++) {
+            const xCoord = torusDelta(center.x, r - halfRows, BOUNDS.maxX);
+            for (let c = 0; c < cols; c++) {
+                const yCoord = torusDelta(center.y, c - halfCols, BOUNDS.maxY);
+                const sectorBg = sectorBackgroundColor(xCoord, yCoord);
+                if (sectorBg) {
+                    ctx.fillStyle = sectorBg;
+                    ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+                }
+                if (isSectorLabelCell(xCoord, yCoord)) {
+                    const labelSize = Math.max(12, Math.floor(cellSize * 1.4));
+                    ctx.fillStyle = sectorLabelColor();
+                    ctx.font = `600 ${labelSize}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(
+                        String(getSectorNumber(xCoord, yCoord)),
+                        c * cellSize + cellSize / 2,
+                        r * cellSize + cellSize / 2,
+                    );
+                }
+            }
+        }
 
         // grille + en-têtes
         for (let r = 0; r <= rows; r++) {
@@ -283,6 +313,7 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
                 dx += BOUNDS.maxY;
             }
         });
+
         cScan.restore();
 
         // Fonction utilitaire: déterminer si un élément correspond à la sélection
@@ -513,7 +544,23 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
                 cHalo.restore();
             }
         }
-    }, [rapport, global, systems, fleets, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags]);
+
+        // Marqueurs de combat au-dessus des systèmes (S = spatial, P = planétaire)
+        if (combats.length > 0) {
+            const cCombat = ctx as CanvasRenderingContext2D;
+            cCombat.save();
+            for (let r = 0; r < rows; r++) {
+                const xCoord = torusDelta(center.x, r - halfRows, BOUNDS.maxX);
+                for (let c = 0; c < cols; c++) {
+                    const yCoord = torusDelta(center.y, c - halfCols, BOUNDS.maxY);
+                    const counts = countCombatsByKind(combats, {x: xCoord, y: yCoord});
+                    if (counts.spatial <= 0 && counts.planetary <= 0) continue;
+                    drawCombatMarkers(cCombat, c * cellSize, r * cellSize, cellSize, counts.spatial, counts.planetary);
+                }
+            }
+            cCombat.restore();
+        }
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {

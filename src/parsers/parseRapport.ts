@@ -1,5 +1,6 @@
 import {Alliance, FlotteDetectee, FlotteJoueur, Rapport, SystemeDetecte, SystemeJoueur, PlanVaisseau} from '../types';
 import {isPos, parsePosString} from '../utils/position';
+import {parseCombatMessages, RawMessage} from './parseCombatMessages';
 
 function getAttr(el: Element | null | undefined, names: string[]): string  {
     if (!el) return '';
@@ -407,11 +408,20 @@ export function parseRapportXml(text: string): Rapport {
         }
     });
 
+    const rawMessages: RawMessage[] = qAll(joueurNode, ['messages > m', 'command > messages > m']).map((m, index) => ({
+        type: getAttr(m, ['type']) || 'EVT',
+        text: m.textContent || '',
+        html: m.innerHTML || m.textContent || '',
+        index,
+    }));
+    const combats = parseCombatMessages(rawMessages);
+
     const rapport: Rapport = {
         tour,
         technologiesAtteignables,
         technologiesConnues, joueur, systemesJoueur, systemesDetectes: mergedSystemesDetectes, flottesJoueur, flottesDetectees, plansVaisseaux,
         budgetTechnologique,
+        combats,
     };
 
     return rapport;

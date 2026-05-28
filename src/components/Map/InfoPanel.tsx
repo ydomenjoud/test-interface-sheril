@@ -1,6 +1,12 @@
 import React, {useMemo, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
-import {FlotteBase, FlotteDetectee, FlotteJoueur, XY, Note} from '../../types';
+import {CombatEvent, FlotteBase, FlotteDetectee, FlotteJoueur, XY, Note} from '../../types';
+import {
+  combatsAtPosition,
+  combatKindLabel,
+  formatCombatDetailText,
+  isCombatTableHtml,
+} from '../../parsers/parseCombatMessages';
 import Commandant from "../utils/Commandant";
 import Position from "../utils/Position";
 import {getDescriptionPuissance, getPuissance, getPuissanceFromString} from "../../utils/puissance";
@@ -61,6 +67,11 @@ export default function InfoPanel({ selected }: Props) {
     if (!selected) return [];
     return notes[`${selected.x}_${selected.y}`] || [];
   }, [selected, notes]);
+
+  const cellCombats = useMemo(() => {
+    if (!selected || !rapport?.combats?.length) return [];
+    return combatsAtPosition(rapport.combats, selected);
+  }, [selected, rapport]);
 
   const handleAddNote = (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,6 +169,25 @@ export default function InfoPanel({ selected }: Props) {
         </table>
       </div>
       <div className="info-block">
+        <h4>Combats</h4>
+        <p className="combat-legend">
+          <span className="combat-legend-spatial">S</span> spatial (bas-gauche)
+          <span className="combat-legend-planetary">P</span> planétaire (haut-gauche)
+        </p>
+        {cellCombats.length > 0 ? (
+          <div className="combat-list">
+            {cellCombats.map((combat) => (
+              <CombatCard key={combat.id} combat={combat} />
+            ))}
+          </div>
+        ) : (
+          <div style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em' }}>
+            Aucun combat signalé sur cette case.
+          </div>
+        )}
+      </div>
+
+      <div className="info-block">
         <h4>Notes</h4>
         <form onSubmit={handleAddNote} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -245,6 +275,64 @@ export default function InfoPanel({ selected }: Props) {
           <div style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em' }}>Aucune note pour cette case.</div>
         )}
       </div>
+    </div>
+  );
+}
+
+function CombatCard({combat}: { combat: CombatEvent }) {
+  const [open, setOpen] = useState(false);
+  const isSpatial = combat.kind === 'spatial';
+
+  return (
+    <div className={`combat-card combat-card--${combat.kind}`}>
+      <button
+        type="button"
+        className="combat-card-header"
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+      >
+        <span className={`combat-kind-badge combat-kind-badge--${combat.kind}`}>
+          {isSpatial ? 'S' : 'P'} {combatKindLabel(combat.kind)}
+        </span>
+        <span className="combat-card-toggle">{open ? '▼' : '▶'}</span>
+      </button>
+      <div className="combat-card-summary">
+        {combat.summary && <p className="combat-summary-line">{combat.summary}</p>}
+        {combat.systemName && (
+          <div><strong>Système :</strong> {combat.systemName}</div>
+        )}
+        {combat.playerFleet && (
+          <div><strong>Votre flotte :</strong> {combat.playerFleet}</div>
+        )}
+        {isSpatial && combat.enemyFleet && (
+          <div><strong>Adversaire :</strong> {combat.enemyFleet}
+            {combat.enemyCommander ? ` (${combat.enemyCommander})` : ''}
+          </div>
+        )}
+        {!isSpatial && combat.planetsCaptured != null && (
+          <div><strong>Planètes prises :</strong> {combat.planetsCaptured}</div>
+        )}
+      </div>
+      {open && (
+        <div className="combat-card-details">
+          {combat.details.map((block, i) => {
+            const text = formatCombatDetailText(block);
+            if (!text && !isCombatTableHtml(block.html)) return null;
+            return (
+              <div key={i} className="combat-detail-block">
+                {isCombatTableHtml(block.html) ? (
+                  <div
+                    className="combat-detail-html"
+                    dangerouslySetInnerHTML={{__html: block.html}}
+                  />
+                ) : (
+                  <p>{text}</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
