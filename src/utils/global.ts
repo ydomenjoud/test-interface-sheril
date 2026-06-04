@@ -2,6 +2,7 @@
 import {Technologie} from "../types";
 
 export function toRoman(n: number): string {
+    n = n+1;
     const romans = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
     if (n <= 0) return romans[0];
     if (n >= romans.length) return romans[romans.length - 1];
@@ -15,6 +16,10 @@ export function romanFromNiv(niv?: number): string {
 export function formatTechName(t?: Technologie): string {
     if (!t) return '';
     return `${t.nom} ${romanFromNiv(t.niv)}`;
+}
+
+export function encodeBluePrint(entries:  {code: string, qty: number}[]) {
+   return btoa(entries.map(e => `${e.code}:${e.qty}`).join('%'));
 }
 
 /**

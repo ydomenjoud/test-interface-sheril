@@ -3,23 +3,44 @@ import {useReport} from '../context/ReportContext';
 import {Technologie} from '../types';
 import SearchableSelect from '../components/utils/SearchableSelect';
 import {useSearchParams} from 'react-router-dom';
+import {encodeBluePrint, toRoman} from "../utils/global";
 
 type Entry = { code: string; qty: number };
 
 export default function CreatePlan() {
-    const {global} = useReport();
+    const {global, rapport} = useReport();
+    const [onlyKnown, setOnlyKnown] = useState<boolean>(false);
+    const [compTechs, setCompTechs] = useState<Technologie[]>([]);
 
-    const compTechs = useMemo(() => {
-        const list = (global?.technologies ?? []).filter(t => t.type === 1);
-        // garder uniquement celles avec une specification.case (composants pertinents)
-        return list.filter(t => (t.specification?.case ?? 0) > 0);
-    }, [global]);
+
+    // Activer le filtre par défaut si un rapport est chargé
+    useEffect(() => {
+        if (rapport) {
+            setOnlyKnown(true);
+        }
+    }, [rapport]);
+
+    useEffect(() => {
+        let list = (global?.technologies ?? []).filter(t => t.type === 1);
+        // garder uniquement les composants
+        list = list.filter(t => (t.type === 1));
+        // on va virer les cargo inutilités
+        list = list.filter(t => t.base !== 'cargo')
+
+        if (onlyKnown && rapport) {
+            const connues = new Set(rapport.technologiesConnues);
+            list = list.filter(t => connues.has(t.code));
+        }
+
+        setCompTechs(list);
+    }, [global?.technologies, global?.technologies?.length, onlyKnown, rapport]);
 
     const techByCode = useMemo(() => {
         const map = new Map<string, Technologie>();
-        compTechs.forEach(t => map.set(t.code, t));
+        const list = (global?.technologies ?? []).filter(t => t.type === 1);
+        list.forEach(t => map.set(t.code, t));
         return map;
-    }, [compTechs]);
+    }, [global]);
 
     // Codes de caractéristiques
     const techCharCodes = useMemo(() => {
@@ -41,20 +62,40 @@ export default function CreatePlan() {
     const [entries, setEntries] = useState<Entry[]>([]);
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // Chargement du blueprint depuis l'URL
+    // Chargement initial du blueprint depuis l'URL
     useEffect(() => {
-        const bp = searchParams.get('bp');
+        const queryParams = new URLSearchParams(window.location.search);
+        let bp = queryParams.get('bp');
+
+        if (!bp) {
+            bp = searchParams.get('bp');
+        }
+
+        // Si non trouvé via searchParams (possible avec HashRouter et URL mal formée), chercher dans le hash
+        if (!bp) {
+            const hash = window.location.hash;
+            const searchIndex = hash.indexOf('?');
+            if (searchIndex !== -1) {
+                const params = new URLSearchParams(hash.substring(searchIndex));
+                bp = params.get('bp');
+            }
+        }
+
         if (bp && global?.technologies) {
             try {
+                // Si le blueprint actuel est déjà le même que celui de l'URL, on ne fait rien
+                if (bp === blueprint) return;
+
                 const decoded = atob(bp);
-                const lines = decoded.split('\n');
+                // Le format attendu est code1:qty1%code2:qty2...
+                const items = decoded.split('%');
                 const newEntries: Entry[] = [];
-                for (const line of lines) {
-                    const parts = line.split('%').map(s => s.trim());
+                for (const item of items) {
+                    const parts = item.split(':').map(s => s.trim());
                     if (parts.length === 2) {
-                        const qty = parseInt(parts[0], 10);
-                        const code = parts[1];
-                        if (!isNaN(qty) && code) {
+                        const code = parts[0];
+                        const qty = parseInt(parts[1], 10);
+                        if (code && !isNaN(qty)) {
                             newEntries.push({code, qty});
                         }
                     }
@@ -66,15 +107,13 @@ export default function CreatePlan() {
                 console.error("Erreur lors du décodage du blueprint:", e);
             }
         }
-    }, [global, searchParams, entries.length]); // On attend que global soit chargé pour avoir les technos (même si on en a pas besoin pour remplir entries, c'est plus sûr pour la cohérence visuelle immédiate)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [global?.technologies, searchParams]);
 
-    const blueprint = btoa(entries
-        .map(e => `${e.qty} % ${e.code}`)
-        .join('\n'));
+    const blueprint = encodeBluePrint(entries);
 
     const copyShareLink = () => {
         const url = new URL(window.location.href);
-        url.searchParams.set('bp', blueprint);
         navigator.clipboard.writeText(url.toString())
             .then(() => alert("Lien de partage copié dans le presse-papier !"))
             .catch(err => console.error("Erreur lors de la copie du lien:", err));
@@ -83,11 +122,17 @@ export default function CreatePlan() {
     // Mise à jour de l'URL quand le blueprint change
     useEffect(() => {
         if (entries.length > 0) {
-            setSearchParams({bp: blueprint}, {replace: true});
+            if (searchParams.get('bp') !== blueprint) {
+                // setSearchParams ne marche pas avec le router hash
+                const url = "/test-interface-sheril/?bp=" + encodeURIComponent(blueprint) +"#/plans/creer";
+                window.history.replaceState(null, '', url);
+            }
         } else {
-            setSearchParams({}, {replace: true});
+            if (searchParams.has('bp')) {
+                setSearchParams({}, {replace: true});
+            }
         }
-    }, [blueprint, setSearchParams, entries.length]);
+    }, [blueprint, setSearchParams, entries.length, searchParams]);
 
     function addEntry() {
         const code = selectedCode || compTechs[0]?.code;
@@ -127,6 +172,9 @@ export default function CreatePlan() {
             }
             return [...prev, {code, qty}];
         });
+
+        setSelectedCode('');
+        setSelectedQty(1);
     }
 
     function setQty(code: string, qty: number) {
@@ -149,8 +197,8 @@ export default function CreatePlan() {
         if (!tech) return;
 
         // Trouver une technologie avec la même base et le niveau immédiatement supérieur
-        const nextLevelTech = Array.from(techByCode.values()).find(t =>
-            t.base === tech.base && t.niv === tech.niv + 1
+        const nextLevelTech = Array.from(global?.technologies || []).find(t =>
+            t.type === 1 && t.base === tech.base && t.niv === tech.niv + 1
         );
 
         if (!nextLevelTech) return;
@@ -198,8 +246,8 @@ export default function CreatePlan() {
         if (!tech) return;
 
         // Trouver une technologie avec la même base et le niveau immédiatement inférieur
-        const prevLevelTech = Array.from(techByCode.values()).find(t =>
-            t.base === tech.base && t.niv === tech.niv - 1
+        const prevLevelTech = Array.from(global?.technologies || []).find(t =>
+            t.type === 1 && t.base === tech.base && t.niv === tech.niv - 1
         );
 
         if (!prevLevelTech) return;
@@ -253,10 +301,16 @@ export default function CreatePlan() {
         let detectionMax = 0;
         let hasConstructionModule = false;
         let multipleConstructionError = false;
+        const missingTechs: string[] = [];
 
         for (const e of entries) {
             const t = techByCode.get(e.code);
             if (!t || e.qty <= 0) continue;
+
+            if (rapport && !rapport.technologiesConnues.includes(e.code)) {
+                missingTechs.push(`${t.nom} (type ${toRoman(t.niv)})`);
+            }
+
             const s = t.specification || {};
             const unitCase = s.case ?? 0;
             const unitMin = s.min ?? 0;
@@ -305,28 +359,34 @@ export default function CreatePlan() {
         return {
             totalCase, totalMinerai, totalPrix, marchTotals, charTotals,
             taille, baseSpeed, propulsionMax, detectionMax, vitesse,
-            multipleConstructionError
-        };
-    }, [entries, techByCode, global, techCharCodes]);
+            multipleConstructionError,
+        missingTechs
+    };
+}, [entries, techByCode, global, techCharCodes, rapport]);
+
+    const isConstructible = useMemo(() => {
+        if (!rapport) return true; // Si pas de rapport, on ne sait pas, on ne bloque pas l'indicateur par défaut ou on gère autrement ? L'utilisateur dit "si on ne connait pas", donc si on n'a pas chargé le rapport, on ne peut pas affirmer qu'il ne connait pas. Mais le bouton "Seulement connues" est grisé si pas de rapport.
+        return totals.missingTechs.length === 0;
+    }, [totals.missingTechs, rapport]);
 
     const charList = useMemo(() => {
-        const out: { code: number; nom: string; value: number }[] = [];
-        totals.charTotals.forEach((value, code) => {
-            const nom = global?.caracteristiquesComposant[code] ?? String(code);
-            out.push({code, nom, value});
-        });
-        // Ajouter les caractéristiques non cumulables
-        if (totals.propulsionMax > 0) {
-            const nom = global?.caracteristiquesComposant[techCharCodes.propulsion] || 'Propulsion';
-            out.push({code: techCharCodes.propulsion, nom, value: totals.propulsionMax});
-        }
-        if (totals.detectionMax > 0) {
-            const nom = global?.caracteristiquesComposant[techCharCodes.detection] || 'Détection';
-            out.push({code: techCharCodes.detection, nom, value: totals.detectionMax});
-        }
-        out.sort((a, b) => a.code - b.code);
-        return out;
-    }, [totals.charTotals, totals.propulsionMax, totals.detectionMax, global, techCharCodes]);
+            const out: { code: number; nom: string; value: number }[] = [];
+            totals.charTotals.forEach((value, code) => {
+                const nom = global?.caracteristiquesComposant[code] ?? String(code);
+                out.push({code, nom, value});
+            });
+            // Ajouter les caractéristiques non cumulables
+            if (totals.propulsionMax > 0) {
+                const nom = global?.caracteristiquesComposant[techCharCodes.propulsion] || 'Propulsion';
+                out.push({code: techCharCodes.propulsion, nom, value: totals.propulsionMax});
+            }
+            if (totals.detectionMax > 0) {
+                const nom = global?.caracteristiquesComposant[techCharCodes.detection] || 'Détection';
+                out.push({code: techCharCodes.detection, nom, value: totals.detectionMax});
+            }
+            out.sort((a, b) => a.code - b.code);
+            return out;
+        }, [totals.charTotals, totals.propulsionMax, totals.detectionMax, global, techCharCodes]);
 
     const marchList = useMemo(() => {
         const out: { code: number; nom: string; nb: number }[] = [];
@@ -337,21 +397,6 @@ export default function CreatePlan() {
         out.sort((a, b) => a.code - b.code);
         return out;
     }, [totals.marchTotals, global]);
-
-    const toRoman = (n: number) => {
-        const map: [number, string][] = [
-            [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']
-        ];
-        let res = '';
-        let num = n + 1;
-        for (const [val, rom] of map) {
-            while (num >= val) {
-                res += rom;
-                num -= val;
-            }
-        }
-        return res;
-    };
 
 
     return (
@@ -384,6 +429,27 @@ export default function CreatePlan() {
         </label>
         <button onClick={addEntry} disabled={compTechs.length === 0 && !selectedCode}>Ajouter</button>
 
+        <button
+            onClick={() => setOnlyKnown(!onlyKnown)}
+            disabled={!rapport}
+            title={!rapport ? "Veuillez charger votre rapport XML pour filtrer par technologies connues" : ""}
+            style={{
+                marginLeft: 12,
+                backgroundColor: onlyKnown ? '#2e7d32' : '#37474f',
+                color: 'white',
+                border: 'none',
+                padding: '8px 12px',
+                borderRadius: 4,
+                cursor: rapport ? 'pointer' : 'not-allowed',
+                opacity: rapport ? 1 : 0.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+            }}
+        >
+            {onlyKnown ? '✓ ' : ''}Seulement technologies connues
+        </button>
+
       </div>
 
       <div style={{overflow: 'auto'}}>
@@ -415,17 +481,20 @@ export default function CreatePlan() {
                     return <span key={i} className="badge">{nom}: <span className="information">{m.nb}</span></span>;
                 });
 
-                const nextLevelTech = Array.from(techByCode.values()).find(nt =>
-                    nt.base === t.base && nt.niv === t.niv + 1
+                const nextLevelTech = Array.from(global?.technologies || []).find(nt =>
+                    nt.type === 1 && nt.base === t.base && nt.niv === t.niv + 1
                 );
-                const prevLevelTech = Array.from(techByCode.values()).find(pt =>
-                    pt.base === t.base && pt.niv === t.niv - 1
+                const prevLevelTech = Array.from(global?.technologies || []).find(pt =>
+                    pt.type === 1 && pt.base === t.base && pt.niv === t.niv - 1
                 );
 
+                const isKnown = !rapport || rapport.technologiesConnues.includes(e.code);
+
                 return (
-                    <tr key={e.code}>
+                    <tr key={e.code} style={{backgroundColor: isKnown ? 'transparent' : 'rgba(255, 0, 0, 0.1)'}}>
                   <td>
                     {t.nom} de type {toRoman(t.niv)}
+                    {!isKnown && <span style={{color: '#ff4444', marginLeft: 8, fontWeight: 'bold'}} title="Technologie inconnue ou niveau insuffisant">⚠</span>}
                       <div style={{
                           display: 'inline-flex',
                           gap: 4,
@@ -517,7 +586,7 @@ export default function CreatePlan() {
           Cases: <b>{totals.totalCase}</b>
         </div>
         <div className="badge" style={{background: '#123', color: '#ddd'}}>
-          PDC: <b>{Math.floor(totals.totalCase / 2)}</b>
+          PDC: <b>{Math.min(1, Math.floor(totals.totalCase / 2))}</b>
         </div>
         <div className="badge" style={{background: '#123', color: '#ddd'}}>
           Minerai: <b>{totals.totalMinerai}</b>
@@ -563,20 +632,31 @@ export default function CreatePlan() {
           )}
       </div>
      <div style={{marginTop: 12}}>
-        <h4>Schéma de création
-        <button
-            onClick={copyShareLink}
-            disabled={entries.length === 0}
-            style={{backgroundColor: '#2c3e50', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer'}}
-        >
-            Partager le schéma
-        </button></h4>
+        <h4 style={{display: 'flex', alignItems: 'center', gap: 10}}>
+            Schéma de création
+            {entries.length > 0 && rapport && (
+                isConstructible ? (
+                    <span className="badge" style={{background: '#2e7d32', color: 'white', fontSize: '0.7em'}}>Constructible</span>
+                ) : (
+                    <span className="badge" style={{background: '#c62828', color: 'white', fontSize: '0.7em'}} title={`Technologies manquantes: ${totals.missingTechs.join(', ')}`}>
+                        Non constructible (technologies manquantes)
+                    </span>
+                )
+            )}
+      </h4>
         <textarea
             style={{width: '100%', backgroundColor: 'white', padding: '10px', color: '#000'}}
             defaultValue={blueprint}
             readOnly={true}
             onFocus={(e) => e.target.select()}
         ></textarea>
+           <button
+               onClick={copyShareLink}
+               disabled={entries.length === 0}
+               style={{backgroundColor: '#2c3e50', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer'}}
+           >
+            Partager le schéma
+        </button>
      </div>
     </div>
     </div>

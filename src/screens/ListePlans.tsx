@@ -2,7 +2,8 @@ import React, { useMemo, useState, useCallback } from 'react';
 import Commandant from '../components/utils/Commandant';
 import { useReport } from '../context/ReportContext';
 import { PlanVaisseau, Technologie } from '../types';
-import { useNavigate } from 'react-router-dom';
+import {Link, useNavigate} from 'react-router-dom';
+import {encodeBluePrint} from "../utils/global";
 
 type SortKey = 'nom' | 'concepteur' | 'marque' | 'tour' | 'taille' | 'vitesse' | 'pc' | 'minerai' | 'prix' | 'composants';
 type SortDir = 'asc' | 'desc';
@@ -171,6 +172,7 @@ export default function ListePlans() {
               {header('minerai', 'Minerai')}
               {header('prix', 'Prix')}
               {header('composants', 'Composants')}
+                <th>Blueprint</th>
             </tr>
           </thead>
           <tbody>
@@ -186,11 +188,16 @@ export default function ListePlans() {
                 <td style={{ textAlign: 'right' }}>{p.minerai ?? '—'}</td>
                 <td style={{ textAlign: 'right' }}>{typeof p.prix === 'number' ? p.prix.toFixed(1) : '—'}</td>
                 <td style={{ whiteSpace: 'normal' }}>{p.compStr || '—'}</td>
+                <td>
+                    <Link to={`/plans/creer?bp=${encodeBluePrint(p.composants.map(c => ({code: c.code, qty: c.nb})))}`}>
+                      détail
+                    </Link>
+                </td>
               </tr>
             ))}
             {pageItems.length === 0 && (
               <tr>
-                <td colSpan={10} style={{ textAlign: 'center', padding: 12, color: '#aaa' }}>
+                <td colSpan={11} style={{ textAlign: 'center', padding: 12, color: '#aaa' }}>
                   {(global || rapport) ? 'Aucun plan ne correspond aux filtres.' : 'Chargez les données pour voir les plans.'}
                 </td>
               </tr>
