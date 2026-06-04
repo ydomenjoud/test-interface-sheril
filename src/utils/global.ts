@@ -10,7 +10,7 @@ export function toRoman(n: number): string {
 }
 export function romanFromNiv(niv?: number): string {
     // niv 0 => 1 => I, niv 4 => 5 => V ; cap à X
-    const lvl = Math.max(1, Math.min(10, ((niv ?? 0) + 1)));
+    const lvl = Math.max(0, Math.min(10, ((niv ?? 0))));
     return toRoman(lvl);
 }
 export function formatTechName(t?: Technologie): string {
