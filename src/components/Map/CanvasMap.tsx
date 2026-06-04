@@ -135,6 +135,7 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
         })),];
     }, [rapport, currentPlayerId]);
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const combats = rapport?.combats ?? [];
 
 
