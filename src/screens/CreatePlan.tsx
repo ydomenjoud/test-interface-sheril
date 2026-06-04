@@ -41,7 +41,7 @@ export default function CreatePlan() {
     const [entries, setEntries] = useState<Entry[]>([]);
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // Chargement du blueprint depuis l'URL
+    // Chargement initial du blueprint depuis l'URL
     useEffect(() => {
         const bp = searchParams.get('bp');
         if (bp && global?.technologies) {
@@ -66,11 +66,13 @@ export default function CreatePlan() {
                 console.error("Erreur lors du décodage du blueprint:", e);
             }
         }
-    }, [global, searchParams, entries.length]); // On attend que global soit chargé pour avoir les technos (même si on en a pas besoin pour remplir entries, c'est plus sûr pour la cohérence visuelle immédiate)
+        // On ne veut exécuter cela qu'au chargement initial quand les technos sont prêtes
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [global?.technologies]);
 
     const blueprint = btoa(entries
-        .map(e => `${e.qty} % ${e.code}`)
-        .join('\n'));
+        .map(e => `${e.code}:${e.qty}`)
+        .join('%'));
 
     const copyShareLink = () => {
         const url = new URL(window.location.href);
@@ -127,6 +129,9 @@ export default function CreatePlan() {
             }
             return [...prev, {code, qty}];
         });
+
+        setSelectedCode('');
+        setSelectedQty(1);
     }
 
     function setQty(code: string, qty: number) {
