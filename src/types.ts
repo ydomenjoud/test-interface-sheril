@@ -24,6 +24,7 @@ export type Commandant = { numero?: number; nom?: string; raceId?: number; }
 
 export type TechCaracteristique = { code: number; value: number };
 export type TechMarchandise = { code: number; nb: number };
+export type TechArme = { degat_bouclier: number; degat_coque: number; degat_sol: number; portee: number; vitesse: number };
 
 // Spécification d'une technologie (utile pour les composants de vaisseaux)
 export type TechSpecification = {
@@ -37,6 +38,7 @@ export type Technologie = {
     base: string; code: string; niv: number; nom: string; type: 0 | 1; // 0 batiment, 1 composant
     recherche: number; description?: string; parents: string[]; caracteristiques: TechCaracteristique[]; marchandises?: TechMarchandise[];
     specification?: TechSpecification;
+    arme?: TechArme;
 };
 
 // Composants d'un plan de vaisseau

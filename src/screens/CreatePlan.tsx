@@ -64,22 +64,8 @@ export default function CreatePlan() {
 
     // Chargement initial du blueprint depuis l'URL
     useEffect(() => {
-        const queryParams = new URLSearchParams(window.location.search);
-        let bp = queryParams.get('bp');
 
-        if (!bp) {
-            bp = searchParams.get('bp');
-        }
-
-        // Si non trouvé via searchParams (possible avec HashRouter et URL mal formée), chercher dans le hash
-        if (!bp) {
-            const hash = window.location.hash;
-            const searchIndex = hash.indexOf('?');
-            if (searchIndex !== -1) {
-                const params = new URLSearchParams(hash.substring(searchIndex));
-                bp = params.get('bp');
-            }
-        }
+        let bp = searchParams.get('bp');
 
         if (bp && global?.technologies) {
             try {
@@ -112,27 +98,17 @@ export default function CreatePlan() {
 
     const blueprint = encodeBluePrint(entries);
 
-    const copyShareLink = () => {
-        const url = new URL(window.location.href);
-        navigator.clipboard.writeText(url.toString())
-            .then(() => alert("Lien de partage copié dans le presse-papier !"))
+    const copyBluePrint = () => {
+        navigator.clipboard.writeText(blueprint)
             .catch(err => console.error("Erreur lors de la copie du lien:", err));
     };
 
     // Mise à jour de l'URL quand le blueprint change
     useEffect(() => {
         if (entries.length > 0) {
-            if (searchParams.get('bp') !== blueprint) {
-                // setSearchParams ne marche pas avec le router hash
-                const url = "/test-interface-sheril/?bp=" + encodeURIComponent(blueprint) +"#/plans/creer";
-                window.history.replaceState(null, '', url);
-            }
-        } else {
-            if (searchParams.has('bp')) {
-                setSearchParams({}, {replace: true});
-            }
+            setSearchParams({bp: blueprint}, {replace: true});
         }
-    }, [blueprint, setSearchParams, entries.length, searchParams]);
+    }, [blueprint, setSearchParams, entries.length]);
 
     function addEntry() {
         const code = selectedCode || compTechs[0]?.code;
@@ -360,9 +336,9 @@ export default function CreatePlan() {
             totalCase, totalMinerai, totalPrix, marchTotals, charTotals,
             taille, baseSpeed, propulsionMax, detectionMax, vitesse,
             multipleConstructionError,
-        missingTechs
-    };
-}, [entries, techByCode, global, techCharCodes, rapport]);
+            missingTechs
+        };
+    }, [entries, techByCode, global, techCharCodes, rapport]);
 
     const isConstructible = useMemo(() => {
         if (!rapport) return true; // Si pas de rapport, on ne sait pas, on ne bloque pas l'indicateur par défaut ou on gère autrement ? L'utilisateur dit "si on ne connait pas", donc si on n'a pas chargé le rapport, on ne peut pas affirmer qu'il ne connait pas. Mais le bouton "Seulement connues" est grisé si pas de rapport.
@@ -370,23 +346,23 @@ export default function CreatePlan() {
     }, [totals.missingTechs, rapport]);
 
     const charList = useMemo(() => {
-            const out: { code: number; nom: string; value: number }[] = [];
-            totals.charTotals.forEach((value, code) => {
-                const nom = global?.caracteristiquesComposant[code] ?? String(code);
-                out.push({code, nom, value});
-            });
-            // Ajouter les caractéristiques non cumulables
-            if (totals.propulsionMax > 0) {
-                const nom = global?.caracteristiquesComposant[techCharCodes.propulsion] || 'Propulsion';
-                out.push({code: techCharCodes.propulsion, nom, value: totals.propulsionMax});
-            }
-            if (totals.detectionMax > 0) {
-                const nom = global?.caracteristiquesComposant[techCharCodes.detection] || 'Détection';
-                out.push({code: techCharCodes.detection, nom, value: totals.detectionMax});
-            }
-            out.sort((a, b) => a.code - b.code);
-            return out;
-        }, [totals.charTotals, totals.propulsionMax, totals.detectionMax, global, techCharCodes]);
+        const out: { code: number; nom: string; value: number }[] = [];
+        totals.charTotals.forEach((value, code) => {
+            const nom = global?.caracteristiquesComposant[code] ?? String(code);
+            out.push({code, nom, value});
+        });
+        // Ajouter les caractéristiques non cumulables
+        if (totals.propulsionMax > 0) {
+            const nom = global?.caracteristiquesComposant[techCharCodes.propulsion] || 'Propulsion';
+            out.push({code: techCharCodes.propulsion, nom, value: totals.propulsionMax});
+        }
+        if (totals.detectionMax > 0) {
+            const nom = global?.caracteristiquesComposant[techCharCodes.detection] || 'Détection';
+            out.push({code: techCharCodes.detection, nom, value: totals.detectionMax});
+        }
+        out.sort((a, b) => a.code - b.code);
+        return out;
+    }, [totals.charTotals, totals.propulsionMax, totals.detectionMax, global, techCharCodes]);
 
     const marchList = useMemo(() => {
         const out: { code: number; nom: string; nb: number }[] = [];
@@ -398,6 +374,23 @@ export default function CreatePlan() {
         return out;
     }, [totals.marchTotals, global]);
 
+
+    const caractArmes = {
+        degat_bouclier: 0,
+        degat_coque: 0,
+        degat_sol: 0,
+    }
+
+    entries.forEach(({qty, code}) => {
+        const t = techByCode.get(code);
+        if(!t){ return }
+        if(t.arme){
+            const {degat_bouclier, degat_coque, degat_sol} = t.arme;
+            caractArmes.degat_bouclier += qty * degat_bouclier;
+            caractArmes.degat_coque += qty * degat_coque;
+            caractArmes.degat_sol += qty * degat_sol;
+        }
+    })
 
     return (
         <div style={{padding: 12, overflow: 'auto', height: '100%', display: 'flex', flexDirection: 'column'}}>
@@ -456,7 +449,7 @@ export default function CreatePlan() {
         <table className="tech-table" style={{width: '100%', borderCollapse: 'collapse'}}>
           <thead>
             <tr>
-              <th style={{width: 300}}>Composant</th>
+              <th style={{width: '350px'}}>Composant</th>
               <th style={{textAlign: 'right'}}>Case</th>
               <th style={{textAlign: 'right'}}>Minerai</th>
               <th style={{textAlign: 'right'}}>Prix</th>
@@ -494,7 +487,8 @@ export default function CreatePlan() {
                     <tr key={e.code} style={{backgroundColor: isKnown ? 'transparent' : 'rgba(255, 0, 0, 0.1)'}}>
                   <td>
                     {t.nom} de type {toRoman(t.niv)}
-                    {!isKnown && <span style={{color: '#ff4444', marginLeft: 8, fontWeight: 'bold'}} title="Technologie inconnue ou niveau insuffisant">⚠</span>}
+                      {!isKnown && <span style={{color: '#ff4444', marginLeft: 8, fontWeight: 'bold'}}
+                                         title="Technologie inconnue ou niveau insuffisant">⚠</span>}
                       <div style={{
                           display: 'inline-flex',
                           gap: 4,
@@ -541,9 +535,9 @@ export default function CreatePlan() {
                   <td style={{textAlign: 'right'}}>
                     <input
                         type="number"
-                        min={0}
+                        min={1}
                         value={e.qty}
-                        onChange={ev => setQty(e.code, parseInt(ev.target.value || '0', 10))}
+                        onChange={ev => setQty(e.code, parseInt(ev.target.value || '1', 10))}
                         style={{width: 80}}
                     />
 
@@ -596,7 +590,7 @@ export default function CreatePlan() {
         </div>
       </div>
 
-    <div className={"split3"}>
+    <div className={"split4"}>
       <div style={{marginTop: 12}}>
         <h4>Marchandises totales</h4>
           {marchList.length === 0 ? (
@@ -632,18 +626,34 @@ export default function CreatePlan() {
           )}
       </div>
      <div style={{marginTop: 12}}>
+        <h4 style={{display: 'flex', alignItems: 'center', gap: 10}}>Armes</h4>
+        <span className={""}> Dégats coque :
+            <span className={"information"}> {caractArmes.degat_coque}</span>
+        </span><br />
+        <span className=""> Dégats bouclier :
+            <span className={"information"}> {caractArmes.degat_bouclier}</span>
+        </span><br />
+        <span className=""> Dégats sol :
+            <span className={"information"}> {caractArmes.degat_sol}</span>
+        </span><br />
+     </div>
+
+     <div style={{marginTop: 12}}>
         <h4 style={{display: 'flex', alignItems: 'center', gap: 10}}>
             Schéma de création
+      </h4>
+         <div>
             {entries.length > 0 && rapport && (
                 isConstructible ? (
-                    <span className="badge" style={{background: '#2e7d32', color: 'white', fontSize: '0.7em'}}>Constructible</span>
+                    <span className="badge"
+                          style={{background: '#2e7d32', color: 'white', fontSize: '0.7em'}}>Constructible</span>
                 ) : (
-                    <span className="badge" style={{background: '#c62828', color: 'white', fontSize: '0.7em'}} title={`Technologies manquantes: ${totals.missingTechs.join(', ')}`}>
+                    <span className="badge" style={{background: '#c62828', color: 'white', fontSize: '0.7em'}}
+                          title={`Technologies manquantes: ${totals.missingTechs.join(', ')}`}>
                         Non constructible (technologies manquantes)
                     </span>
                 )
-            )}
-      </h4>
+            )}</div>
         <textarea
             style={{width: '100%', backgroundColor: 'white', padding: '10px', color: '#000'}}
             defaultValue={blueprint}
@@ -651,11 +661,18 @@ export default function CreatePlan() {
             onFocus={(e) => e.target.select()}
         ></textarea>
            <button
-               onClick={copyShareLink}
+               onClick={copyBluePrint}
                disabled={entries.length === 0}
-               style={{backgroundColor: '#2c3e50', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer'}}
+               style={{
+                   backgroundColor: '#2c3e50',
+                   color: 'white',
+                   border: 'none',
+                   padding: '8px 16px',
+                   borderRadius: 4,
+                   cursor: 'pointer'
+               }}
            >
-            Partager le schéma
+            Copier le schema dans le presse-papier
         </button>
      </div>
     </div>
