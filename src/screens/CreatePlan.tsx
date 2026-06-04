@@ -2,7 +2,7 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {useReport} from '../context/ReportContext';
 import {Technologie} from '../types';
 import SearchableSelect from '../components/utils/SearchableSelect';
-import {useSearchParams, useLocation} from 'react-router-dom';
+import {useSearchParams} from 'react-router-dom';
 import {encodeBluePrint, toRoman} from "../utils/global";
 
 type Entry = { code: string; qty: number };
@@ -125,7 +125,7 @@ export default function CreatePlan() {
             if (searchParams.get('bp') !== blueprint) {
                 // setSearchParams ne marche pas avec le router hash
                 const url = "/test-interface-sheril/?bp=" + encodeURIComponent(blueprint) +"#/plans/creer";
-                window.location.href = url;
+                window.history.replaceState(null, '', url);
             }
         } else {
             if (searchParams.has('bp')) {
