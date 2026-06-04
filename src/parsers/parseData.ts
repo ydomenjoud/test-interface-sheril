@@ -33,14 +33,24 @@ export function parseDataXml(text: string): GlobalData {
             type: specEl.getAttribute('type') || undefined,
         } : undefined;
 
+        // cara armes
+        const specArme = t.querySelector('arme');
+        const arme = specArme ? {
+            degat_bouclier: Number(specArme.getAttribute('degat_bouclier') || 0),
+            degat_coque: Number(specArme.getAttribute('degat_coque') || 0),
+            degat_sol: Number(specArme.getAttribute('degat_sol') || 0),
+            portee: Number(specArme.getAttribute('portee') || 0),
+            vitesse: Number(specArme.getAttribute('vitesse') || 0),
+        } : undefined;
+
         techs.push({
-            base, code, niv, nom, type, recherche, description, parents, caracteristiques, marchandises, specification,
+            base, code, niv, nom, type, recherche, description, parents, caracteristiques, marchandises, specification, arme
         });
     });
 
     const races: Race[] = [];
     doc.querySelectorAll('data > races > r')?.forEach((r, idx) => {
-        
+
 
         races.push({
             id: Number(r.getAttribute('code') || r.getAttribute('id') || idx + 1),
