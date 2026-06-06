@@ -580,7 +580,7 @@ export default function CreatePlan() {
           Cases: <b>{totals.totalCase}</b>
         </div>
         <div className="badge" style={{background: '#123', color: '#ddd'}}>
-          PDC: <b>{Math.min(1, Math.floor(totals.totalCase / 2))}</b>
+          PDC: <b>{Math.max(1, Math.floor(totals.totalCase / 2))}</b>
         </div>
         <div className="badge" style={{background: '#123', color: '#ddd'}}>
           Minerai: <b>{totals.totalMinerai}</b>
