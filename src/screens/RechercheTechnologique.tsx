@@ -91,6 +91,16 @@ export default function RechercheTechnologique() {
         }, 0);
     }, [rapport]);
 
+    const calculatedIncome = useMemo(() => {
+        if (!rapport?.systemesJoueur) {
+            return 0;
+        }
+        return rapport.systemesJoueur.reduce((total, systeme) => {
+            const revenuEstime = systeme.revenuEstime ?? 0;
+            return total + revenuEstime;
+        }, 0);
+    }, [rapport]);
+
     const budget = manualBudget !== null ? manualBudget : calculatedBudget;
 
     const totalAllocated = assigns.reduce((s, a) => s + (a.amount || 0), 0);
@@ -167,10 +177,29 @@ export default function RechercheTechnologique() {
         }, {coutRecherche: 0, percent: 0});
     }, [rows]);
 
+    const shareCode = btoa(rows.map(row=> `${row.a.code}:${row.rowPct}`).join('%'));
+
+    const copyShareCode = () => {
+        navigator.clipboard.writeText(shareCode)
+            .catch(err => console.error("Erreur lors de la copie du lien:", err));
+    };
+
+    const currencyFormatter = new Intl.NumberFormat('fr-FR', {
+        style: 'decimal',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+
+    });
+
+
+
     return (<div style={{padding: 12, overflow: 'auto', height: '100%', display: 'flex', flexDirection: 'column'}}>
         <h3>Recherche technologique - tour {tour}</h3>
 
         <div style={{marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap'}}>
+            <div className="badge cur" style={{background: '#123', color: '#ddd'}}>
+                Recettes prévues: <b>{currencyFormatter.format(calculatedIncome)}</b>
+            </div>
             <div className="badge" style={{background: '#123', color: '#ddd', display: 'flex', alignItems: 'center', gap: 8}}>
                 Budget:
                 <input
@@ -198,16 +227,32 @@ export default function RechercheTechnologique() {
                 )}
             </div>
             <div className="badge" style={{background: '#123', color: '#ddd'}}>
-                Alloué: <b>{totalAllocated.toFixed(1)}</b>
+                Alloué: <b className="cur">{currencyFormatter.format(totalAllocated)}</b>
             </div>
             <div className="badge" style={{background: '#123', color: '#ddd'}}>
-                Reste: <b>{Math.max(0, budget - totalAllocated).toFixed(1)}</b>
+                Reste: <b className="cur">{currencyFormatter.format(Math.max(0, budget - totalAllocated))}</b>
             </div>
             <div className="badge" style={{background: '#235', color: '#ddd'}}>
                 % alloué: <b>{percent}%</b>
             </div>
             <div className="badge" style={{background: '#235', color: '#ddd'}}>
-                1% = <b>{Math.floor(budget / 100)}%</b>
+                1% = <b className="cur">{Math.floor(budget / 100)}</b>
+            </div>
+            <div style={{display: 'flex', justifyContent: 'flex-end', flex: 12}}>
+               <button
+                   onClick={copyShareCode}
+                   disabled={rows.length === 0}
+                   style={{
+                       backgroundColor: '#2c3e50',
+                       color: 'white',
+                       border: 'none',
+                       padding: '8px 16px',
+                       borderRadius: 4,
+                       cursor: 'pointer'
+                   }}
+               >
+                Copier l'assignation dans le presse papier
+            </button>
             </div>
         </div>
 
