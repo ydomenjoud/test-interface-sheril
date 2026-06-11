@@ -4,11 +4,12 @@ import CanvasMap from '../components/Map/CanvasMap';
 import MiniMap from '../components/Map/MiniMap';
 import InfoPanel from '../components/Map/InfoPanel';
 import {XY} from '../types';
+import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
 
 export default function Carte() {
   const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText, allTags, selectedTags, setSelectedTags } = useReport();
   const [selected, setSelected] = useState<XY | undefined>(undefined);
-  const [selectedOwners, setSelectedOwners] = useState<number[]>([]);
+  const [selectedOwners, setSelectedOwners] = useState<(number)[]>([]);
   const [showPaste, setShowPaste] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
@@ -19,6 +20,18 @@ export default function Carte() {
     </div>
   ) : null;
 
+  const selectedOwnersOption: DropdownOption<number>[] = [];
+    (global?.commandants || [])
+        .filter(c => typeof c.numero === 'number')
+        .forEach(c => {
+            selectedOwnersOption.push({
+                value: (c.numero || 0),
+                label: (c.nom || `#${c.numero}`) + ` (${c.numero})`,
+                className: 'race' + c.raceId
+            });
+        })
+
+    const selectedTagsOption: DropdownOption<string>[] = allTags.map(tag => ({ value: tag, label: tag }));
   return (
     <div className="carte-wrap">
       <div className="carte-toolbar">
@@ -48,64 +61,23 @@ export default function Carte() {
         </div>
         {/* Filtre multi-sélection des commandants */}
         <div style={{ marginLeft: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label htmlFor="owner-filter">Filtrer par commandant(s):</label>
-          <select
-            id="owner-filter"
-            multiple
-            size={4}
-            value={selectedOwners.map(String)}
-            onChange={(e) => {
-              const values = Array.from(e.target.selectedOptions).map(o => parseInt(o.value, 10)).filter(n => !Number.isNaN(n));
-              setSelectedOwners(values);
-            }}
-          >
-            {(global?.commandants || [])
-              .filter(c => typeof c.numero === 'number')
-              .map(c => (
-                <option key={c.numero} value={String(c.numero)}>
-                  {c.nom || `#${c.numero}`}
-                </option>
-              ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => { setShowPaste(true); setPasteFeedback(null); }}
-            style={{ padding: '4px 8px' }}
-            title="Ajouter des détections systèmes depuis un collage"
-          >
-            + Détections…
-          </button>
+            <MultiSelectDropdown
+                title="Filtrer par commandant"
+                options={selectedOwnersOption}
+                selectedValues={selectedOwners}
+                onChange={setSelectedOwners}
+            />
         </div>
 
         {/* Filtre par tags */}
         {allTags.length > 0 && (
           <div style={{ marginLeft: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <label htmlFor="tag-filter">Filtrer par tag(s):</label>
-            <select
-              id="tag-filter"
-              multiple
-              size={Math.min(4, allTags.length)}
-              value={selectedTags}
-              onChange={(e) => {
-                const values = Array.from(e.target.selectedOptions).map(o => o.value);
-                setSelectedTags(values);
-              }}
-            >
-              {allTags.map(tag => (
-                <option key={tag} value={tag}>
-                  {tag}
-                </option>
-              ))}
-            </select>
-            {selectedTags.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setSelectedTags([])}
-                style={{ padding: '2px 6px', fontSize: '0.8em' }}
-              >
-                Reset
-              </button>
-            )}
+            <MultiSelectDropdown
+                title="Filtrer par tag"
+                options={selectedTagsOption}
+                selectedValues={selectedTags}
+                onChange={setSelectedTags}
+            />
           </div>
         )}
       </div>

@@ -348,7 +348,7 @@ export function parseRapportXml(text: string): Rapport {
     let fltDetNodes = qAll(joueurNode, ['detections > flotte', 'detection > flotte']);
     fltDetNodes.forEach((f) => {
         const pos = parsePosString(getAttr(f, ['pos']) || '0_1_1');
-        flottesDetectees.push({
+        const flotte: FlotteDetectee = {
             type: 'detecte',
             num: getAttrNum(f, ['num']) ?? 0,
             nom: getAttr(f, ['nom']) || 'Flotte',
@@ -356,7 +356,13 @@ export function parseRapportXml(text: string): Rapport {
             nbVso: getAttrNum(f, ['nbVso']) ?? 0,
             proprio: getAttrNum(f, ['proprio']) ?? 0,
             puiss: getAttr(f, ['puiss']) || 'inconnue',
-        });
+        }
+        if(
+            !flottesDetectees.some(f => f.num === flotte.num && f.proprio === flotte.proprio)
+            && !flottesJoueur.some(f => f.num === flotte.num && f.proprio === flotte.proprio)
+        ) {
+            flottesDetectees.push(flotte);
+        }
     });
 
     const alliances: Alliance[] = [];
