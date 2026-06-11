@@ -104,16 +104,18 @@ export default function RechercheTechnologique() {
     const budget = manualBudget !== null ? manualBudget : calculatedBudget;
 
     const totalAllocated = assigns.reduce((s, a) => s + (a.amount || 0), 0);
-    const percent = budget > 0 ? Math.min(100, Math.ceil((totalAllocated / budget) * 100)) : 0;
+    const totalPercent = budget > 0 ? Math.min(100, Math.ceil((totalAllocated / budget) * 100)) : 0;
 
     function addAssign() {
         const code = selectedCode || availableTechs?.[0]?.code;
         if (!code) return;
         if (assigns.some(a => a.code === code)) return;
         const t = (global?.technologies ?? []).find(tt => tt.code === code);
-        const def = t?.recherche ?? 0;
-        const remainingBudget = Math.max(0, 100 - percent) * budget / 100;
-        const amount = Math.floor(Math.min(def, remainingBudget));
+        const seuil = t?.recherche ?? 0;
+        // pourcentage
+        const percent = Math.ceil((seuil / budget) * 100);
+        const amount = percent * budget / 100;
+
         setAssigns(prev => [...prev, {code, amount}]);
         setSelectedCode('');
     }
@@ -136,21 +138,8 @@ export default function RechercheTechnologique() {
         const assign = assigns.find(a => a.code === code);
         if (!assign) return;
 
-        const t = (global?.technologies ?? []).find(tt => tt.code === code);
-        const maxAmount = t?.recherche;
-
-        const currentAmount = assign.amount || 0;
-        let newAmount = currentAmount + onePercentAmount;
-
-        // Ensure new amount does not make total allocation exceed budget
-        // const remainingBudget = budget - totalAllocated;
-        // if (newAmount - currentAmount > remainingBudget) {
-        //     newAmount = currentAmount + remainingBudget;
-        // }
-
-        if (maxAmount !== undefined) {
-            newAmount = Math.min(Math.floor(newAmount), maxAmount);
-        }
+        const currentPercent = Math.floor(assign.amount / budget * 100);
+        let newAmount = (currentPercent+1) * budget / 100;
 
         setAmount(code, newAmount);
     }
@@ -158,14 +147,16 @@ export default function RechercheTechnologique() {
     function decreasePercent(code: string) {
         const assign = assigns.find(a => a.code === code);
         if (!assign) return;
-        const newAmount = Math.floor((assign.amount || 0) - onePercentAmount);
+        const currentPercent = Math.floor(assign.amount / budget * 100);
+        const newAmount = (currentPercent-1) * budget / 100;
         setAmount(code, newAmount); // setAmount handles Math.max(0, ...)
     }
 
     const rows = assigns.map(a => {
         const t = (global?.technologies ?? []).find(tt => tt.code === a.code);
         const amount = a.amount || 0;
-        const rowPct = budget > 0 ? Math.min(100, Math.ceil((amount / budget) * 100)) : 0;
+        const percent = +((amount / budget)*100).toFixed(1);
+        const rowPct = budget > 0 ? Math.min(100, percent) : 0;
         return {a, t, rowPct};
     });
 
@@ -180,18 +171,14 @@ export default function RechercheTechnologique() {
     const shareCode = btoa(rows.map(row=> `${row.a.code}:${row.rowPct}`).join('%'));
 
     const copyShareCode = () => {
-        navigator.clipboard.writeText(shareCode)
-            .catch(err => console.error("Erreur lors de la copie du lien:", err));
+        navigator.clipboard.writeText(shareCode).catch(err => console.error("Erreur lors de la copie du lien:", err));
     };
 
     const currencyFormatter = new Intl.NumberFormat('fr-FR', {
         style: 'decimal',
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-
     });
-
-
 
     return (<div style={{padding: 12, overflow: 'auto', height: '100%', display: 'flex', flexDirection: 'column'}}>
         <h3>Recherche technologique - tour {tour}</h3>
@@ -233,7 +220,7 @@ export default function RechercheTechnologique() {
                 Reste: <b className="cur">{currencyFormatter.format(Math.max(0, budget - totalAllocated))}</b>
             </div>
             <div className="badge" style={{background: '#235', color: '#ddd'}}>
-                % alloué: <b>{percent}%</b>
+                % alloué: <b>{totalPercent}%</b>
             </div>
             <div className="badge" style={{background: '#235', color: '#ddd'}}>
                 1% = <b className="cur">{Math.floor(budget / 100)}</b>
@@ -295,7 +282,7 @@ export default function RechercheTechnologique() {
                         <input
                             type="number"
                             min={0}
-                            max={t?.recherche || 0}
+                            readOnly={true}
                             value={a.amount}
                             onChange={e => setAmount(a.code, parseFloat(e.target.value || '0'))}
                             style={{width: 120, textAlign: 'right'}}
@@ -321,7 +308,7 @@ export default function RechercheTechnologique() {
                     <td style={{textAlign: 'left', fontWeight: 'bold'}}>Totaux:</td>
                     <td></td>
                     <td style={{textAlign: 'right', fontWeight: 'bold'}}>{tableTotals.coutRecherche}</td>
-                    <td></td>
+                    <td style={{textAlign: 'right', fontWeight: 'bold'}}>{totalAllocated}</td>
                     <td style={{textAlign: 'right', fontWeight: 'bold'}}>{tableTotals.percent}%</td>
                     <td></td>
                 </tr>
