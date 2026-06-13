@@ -37,7 +37,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
 }
 
 export default function CanvasMap({onSelect, selectedOwners}: Props) {
-    const {rapport, global, cellSize, center, setCenter, setViewportDims, notes, selectedTags} = useReport();
+    const {rapport, global, cellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Ref sur le center pour des mises à jour synchrones dans le drag
@@ -135,8 +135,11 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
         })),];
     }, [rapport, currentPlayerId]);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const combats = rapport?.combats ?? [];
+    const combats = useMemo(() => {
+        const fromRapport = rapport?.combats ?? [];
+        const fromPublic = publicCombats ?? [];
+        return [...fromRapport, ...fromPublic];
+    }, [rapport, publicCombats]);
 
 
     useEffect(() => {
@@ -548,17 +551,24 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
 
         // Marqueurs de combat au-dessus des systèmes (S = spatial, P = planétaire)
         if (combats.length > 0) {
+            try { console.debug(`[CanvasMap] total combats: ${combats.length}`); } catch (e) { }
             const cCombat = ctx as CanvasRenderingContext2D;
             cCombat.save();
+            let combatLogCount = 0;
             for (let r = 0; r < rows; r++) {
                 const xCoord = torusDelta(center.x, r - halfRows, BOUNDS.maxX);
                 for (let c = 0; c < cols; c++) {
                     const yCoord = torusDelta(center.y, c - halfCols, BOUNDS.maxY);
                     const counts = countCombatsByKind(combats, {x: xCoord, y: yCoord});
                     if (counts.spatial <= 0 && counts.planetary <= 0) continue;
+                    if (combatLogCount < 50) {
+                        try { console.debug(`[CanvasMap] combat at ${xCoord}-${yCoord}`, counts); } catch (e) { }
+                        combatLogCount += 1;
+                    }
                     drawCombatMarkers(cCombat, c * cellSize, r * cellSize, cellSize, counts.spatial, counts.planetary);
                 }
             }
+            try { if (combatLogCount > 0) console.info(`[CanvasMap] logged ${combatLogCount} combat positions`); } catch (e) { }
             cCombat.restore();
         }
     }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags]);
