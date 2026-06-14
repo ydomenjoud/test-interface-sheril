@@ -7,9 +7,27 @@ import {drawCombatMarkers} from '../../utils/combatMarkers';
 import {Alliance, XY} from '../../types';
 import {lightenHexColor} from "../../utils/global";
 
+const OWNER_BADGE_COLORS: Record<number, string> = {
+    1: '#0066CC',
+    2: '#FFCC00',
+    3: '#CC0033',
+    4: '#009933',
+    5: '#777777',
+};
+const RACE_BADGE_COLORS: Record<number, string> = {
+    0: '#CC00FF',
+    1: '#0066CC',
+    2: '#FFCC00',
+    3: '#CC0033',
+    4: '#009933',
+    5: '#777777',
+};
+
 type Props = {
     onSelect: (xy: XY) => void;
     selectedOwners?: number[]; // liste des commandants sélectionnés pour filtrage visuel
+    showCombatBadges: boolean;
+    showOwnerBadges: boolean;
 };
 
 export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[]) {
@@ -20,7 +38,10 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     if (owners.length > 1 ){
         const withoutNeutral = owners.filter(o => o !== 0);
         // si tous pareil, on renvoit la couleur,
-        const colors: Set<string> = new Set(withoutNeutral.map(o => colorForOwnership(currentPlayerId, [o], alliances, pna)));
+        const colors: Set<string> = new Set(withoutNeutral
+            .map(o => colorForOwnership(currentPlayerId, [o], alliances, pna))
+            .filter((s): s is string => !!s)
+        );
         if(colors.size === 1) {
             return colors.values().next().value;
         } else {
@@ -36,7 +57,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#f80c0c';
 }
 
-export default function CanvasMap({onSelect, selectedOwners}: Props) {
+export default function CanvasMap({onSelect, selectedOwners, showCombatBadges, showOwnerBadges}: Props) {
     const {rapport, global, cellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -76,6 +97,28 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
     }, []);
 
     const currentPlayerId = rapport?.joueur.numero || 0; // placeholder si besoin d'ID joueur
+
+    const ownerRaceColor = useCallback((owner?: number): string | undefined => {
+        if (owner == null) return undefined;
+        if (owner === 0) return 'grey';
+        if (!global) return undefined;
+
+        const commandant = global.commandants?.find(c => c.numero === owner);
+        if (commandant) {
+            const raceId = commandant.raceId;
+            const raceColor = global.races?.find(r => r.id === raceId)?.couleur;
+            // some data.xml files may omit color or use generic 'white' — prefer our mapping in that case
+            if (raceColor && raceColor.trim() && raceColor.toLowerCase() !== 'white') {
+                return raceColor;
+            }
+            // For commandants, use race mapping. Race 0 is a valid race color and is not the neutral owner.
+            if (raceId != null) {
+                return RACE_BADGE_COLORS[raceId] || OWNER_BADGE_COLORS[owner];
+            }
+        }
+
+        return OWNER_BADGE_COLORS[owner];
+    }, [global]);
 
     const systems = useMemo(() => {
         const list: any[] = [];
@@ -421,19 +464,19 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
                     c2d.moveTo(cx, cy);
                     c2d.arc(cx, cy, radius, start, end);
                     c2d.closePath();
-                    c2d.fillStyle = colors[i];
+                    c2d.fillStyle = colors[i] || '#000000';
                     c2d.fill();
                     angle = end;
                 }
             } else {
-                c2d.fillStyle = col;
+                c2d.fillStyle = col || '#000000';
                 c2d.fill();
             }
             c2d.restore();
 
             // HALO de sélection pour les systèmes (couleur via colorForOwnership)
             if (isSystemSelected(owners)) {
-                const haloColor = lightenHexColor(col, 100);
+                const haloColor = lightenHexColor(col || '#000000', 100);
                 const lineW = 2;
                 const blur = Math.max(10, Math.floor(lineW * 1.5));
                 const rHalo = radius + lineW / 2; // halo juste à l'extérieur du disque
@@ -447,6 +490,54 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
                 cHalo.arc(cx, cy, rHalo, 0, Math.PI * 2);
                 cHalo.stroke();
                 cHalo.restore();
+            }
+
+            // Badges propriétaires en bas à droite de la case
+            if (showOwnerBadges && owners && owners.length > 0) {
+                const badgePadding = Math.max(2, Math.floor(cellSize * 0.08));
+                const badgeSpacing = Math.max(1, Math.floor(cellSize * 0.03));
+                const badgeBaseSize = Math.max(12, Math.floor(cellSize * 0.38));
+                const maxVisibleOwners = 4;
+                const visibleOwners = owners.slice(0, maxVisibleOwners);
+                const extraOwners = owners.length - visibleOwners.length;
+                const badgeSize = Math.min(
+                    badgeBaseSize,
+                    Math.max(8, Math.floor((cellSize - badgePadding * 2 - badgeSpacing * (visibleOwners.length - 1)) / visibleOwners.length))
+                );
+                const badgeY = py + cellSize - badgeSize - badgePadding;
+
+                visibleOwners.forEach((owner, index) => {
+                    const badgeX = px + cellSize - badgePadding - (badgeSize + badgeSpacing) * (index + 1);
+                    const badgeColor = ownerRaceColor(owner) || '#000000';
+                    c2d.save();
+                    c2d.fillStyle = badgeColor;
+                    c2d.strokeStyle = '#000000';
+                    c2d.lineWidth = 1;
+                    c2d.fillRect(badgeX, badgeY, badgeSize, badgeSize);
+                    c2d.strokeRect(badgeX, badgeY, badgeSize, badgeSize);
+                    c2d.fillStyle = '#ffffff';
+                    c2d.font = `bold ${Math.max(8, Math.floor(badgeSize * 0.65))}px sans-serif`;
+                    c2d.textAlign = 'center';
+                    c2d.textBaseline = 'middle';
+                    c2d.fillText(String(owner), badgeX + badgeSize / 2, badgeY + badgeSize / 2 + 0.5);
+                    c2d.restore();
+                });
+
+                if (extraOwners > 0) {
+                    const badgeX = px + cellSize - badgePadding - (badgeSize + badgeSpacing) * (visibleOwners.length + 1);
+                    c2d.save();
+                    c2d.fillStyle = '#222';
+                    c2d.strokeStyle = '#000000';
+                    c2d.lineWidth = 1;
+                    c2d.fillRect(badgeX, badgeY, badgeSize, badgeSize);
+                    c2d.strokeRect(badgeX, badgeY, badgeSize, badgeSize);
+                    c2d.fillStyle = '#ffffff';
+                    c2d.font = `bold ${Math.max(8, Math.floor(badgeSize * 0.55))}px sans-serif`;
+                    c2d.textAlign = 'center';
+                    c2d.textBaseline = 'middle';
+                    c2d.fillText(`+${extraOwners}`, badgeX + badgeSize / 2, badgeY + badgeSize / 2 + 0.5);
+                    c2d.restore();
+                }
             }
         }
 
@@ -483,7 +574,7 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
                 c2d.drawImage(shipImg, drawX, drawY, size, size);
             }
             const col = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna);
-            c2d.strokeStyle = col;
+            c2d.strokeStyle = col || '#000000';
             c2d.lineWidth = 1;
             c2d.strokeRect(drawX, drawY, size, size);
 
@@ -540,9 +631,9 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
                 const h = size + pad * 2;
                 const cHalo = ctx as CanvasRenderingContext2D;
                 cHalo.save();
-                cHalo.strokeStyle = haloColor;
+                cHalo.strokeStyle = haloColor || '#000000';
                 cHalo.lineWidth = lineW;
-                cHalo.shadowColor = haloColor;
+                cHalo.shadowColor = haloColor || '#000000';
                 cHalo.shadowBlur = blur;
                 cHalo.strokeRect(x, y, w, h);
                 cHalo.restore();
@@ -550,7 +641,7 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
         }
 
         // Marqueurs de combat au-dessus des systèmes (S = spatial, P = planétaire)
-        if (combats.length > 0) {
+        if (showCombatBadges && combats.length > 0) {
             try { console.debug(`[CanvasMap] total combats: ${combats.length}`); } catch (e) { }
             const cCombat = ctx as CanvasRenderingContext2D;
             cCombat.save();
@@ -571,7 +662,7 @@ export default function CanvasMap({onSelect, selectedOwners}: Props) {
             try { if (combatLogCount > 0) console.info(`[CanvasMap] logged ${combatLogCount} combat positions`); } catch (e) { }
             cCombat.restore();
         }
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {

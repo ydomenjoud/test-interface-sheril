@@ -10,6 +10,8 @@ export default function Carte() {
   const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText, allTags, selectedTags, setSelectedTags } = useReport();
   const [selected, setSelected] = useState<XY | undefined>(undefined);
   const [selectedOwners, setSelectedOwners] = useState<(number)[]>([]);
+  const [showCombatBadges, setShowCombatBadges] = useState(true);
+  const [showOwnerBadges, setShowOwnerBadges] = useState(true);
   const [showPaste, setShowPaste] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
@@ -69,6 +71,25 @@ export default function Carte() {
             />
         </div>
 
+        <div style={{ marginLeft: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee' }}>
+            <input
+              type="checkbox"
+              checked={showCombatBadges}
+              onChange={(e) => setShowCombatBadges(e.target.checked)}
+            />
+            Badges combats
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee' }}>
+            <input
+              type="checkbox"
+              checked={showOwnerBadges}
+              onChange={(e) => setShowOwnerBadges(e.target.checked)}
+            />
+            Badges propriétaires
+          </label>
+        </div>
+
         {/* Filtre par tags */}
         {allTags.length > 0 && (
           <div style={{ marginLeft: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -90,7 +111,12 @@ export default function Carte() {
           </div>
         )}
         <div style={{ position: 'relative', width: '100%', height: '100%', display: global ? 'block' : 'none' }}>
-          <CanvasMap onSelect={(xy) => setSelected(xy)} selectedOwners={selectedOwners} />
+          <CanvasMap
+            onSelect={(xy) => setSelected(xy)}
+            selectedOwners={selectedOwners}
+            showCombatBadges={showCombatBadges}
+            showOwnerBadges={showOwnerBadges}
+          />
           <MiniMap onCenter={(x, y) => setCenter({ x, y })} />
         </div>
       </div>
