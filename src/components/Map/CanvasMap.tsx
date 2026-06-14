@@ -28,6 +28,7 @@ type Props = {
     selectedOwners?: number[]; // liste des commandants sélectionnés pour filtrage visuel
     showCombatBadges: boolean;
     showOwnerBadges: boolean;
+    showFleetBadges: boolean;
 };
 
 export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[]) {
@@ -57,7 +58,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#f80c0c';
 }
 
-export default function CanvasMap({onSelect, selectedOwners, showCombatBadges, showOwnerBadges}: Props) {
+export default function CanvasMap({onSelect, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges}: Props) {
     const {rapport, global, cellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -70,21 +71,8 @@ export default function CanvasMap({onSelect, selectedOwners, showCombatBadges, s
     // Gestion du drag
     const dragRef = useRef({dragging: false, lastX: 0, lastY: 0, accX: 0, accY: 0});
 
-    // Préchargement et re-render des images
-    const [assetsVersion, setAssetsVersion] = useState(0);
-    const shipImgRef = useRef<HTMLImageElement | null>(null);
-
     // Redraw quand le canvas change de taille (évite l'étirement non proportionnel)
     const [canvasSizeVersion, setCanvasSizeVersion] = useState(0);
-
-    useEffect(() => {
-        if (!shipImgRef.current) {
-            const img = new Image();
-            img.onload = () => setAssetsVersion(v => v + 1);
-            img.src = `${process.env.PUBLIC_URL}/img/flotte.png`;
-            shipImgRef.current = img;
-        }
-    }, []);
 
     useEffect(() => {
         const cvs = canvasRef.current;
@@ -267,8 +255,6 @@ export default function CanvasMap({onSelect, selectedOwners, showCombatBadges, s
             ctx.font = '12px sans-serif';
             ctx.fillText(String(yCoord), xPos + 4, 12);
         }
-
-        const shipImg = shipImgRef.current;
 
         // ZONES DE DÉTECTION (scan) – systèmes et flottes du joueur
         // On calcule d’abord l’ensemble des cases détectées pour éviter tout empilement de couleurs.
@@ -542,41 +528,56 @@ export default function CanvasMap({onSelect, selectedOwners, showCombatBadges, s
         }
 
         // flottes
-        fleets.forEach(f => {
-            let dx = ((f.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
-            let dy = ((f.pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+        if (showFleetBadges) {
+            fleets.forEach(f => {
+                let dx = ((f.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+                let dy = ((f.pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
 
-            while (dx < cols) {
-                let currentDy = dy;
-                while (currentDy < rows) {
-                    const px = dx * cellSize;
-                    const py = currentDy * cellSize;
+                while (dx < cols) {
+                    let currentDy = dy;
+                    while (currentDy < rows) {
+                        const px = dx * cellSize;
+                        const py = currentDy * cellSize;
 
-                    renderFleet(f, px, py);
-                    currentDy += BOUNDS.maxX;
+                        renderFleet(f, px, py);
+                        currentDy += BOUNDS.maxX;
+                    }
+                    dx += BOUNDS.maxY;
                 }
-                dx += BOUNDS.maxY;
-            }
-        });
+            });
+        }
 
         function renderFleet(f: any, px: number, py: number) {
-            // Taille et placement de l'icône de vaisseau
-            // Exigence: l'image du vaisseau doit faire un tiers de la largeur d'une case et être centrée
-            const size = Math.floor(cellSize / 3);
-            const drawX = px + (cellSize - size) / 2;
-            const drawY = py + (cellSize - size) / 2;
+            const diameter = Math.max(10, Math.floor(cellSize / 3));
+            const cx = px + cellSize / 2;
+            const cy = py + cellSize / 2;
             const c2d = ctx as CanvasRenderingContext2D;
             c2d.save();
             if (!isFleetSelected((f as any).owner)) {
                 c2d.filter = 'grayscale(1)';
             }
-            if (shipImg && shipImg.complete && shipImg.naturalWidth > 0) {
-                c2d.drawImage(shipImg, drawX, drawY, size, size);
-            }
-            const col = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna);
-            c2d.strokeStyle = col || '#000000';
-            c2d.lineWidth = 1;
-            c2d.strokeRect(drawX, drawY, size, size);
+
+            const ownerColor = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna) || '#000000';
+            const badgeColor = '#ffffff';
+            const textColor = '#000000';
+            const strokeColor = ownerColor;
+
+            c2d.fillStyle = badgeColor;
+            c2d.beginPath();
+            c2d.arc(cx, cy, diameter / 2, 0, Math.PI * 2);
+            c2d.fill();
+
+            c2d.strokeStyle = strokeColor;
+            c2d.lineWidth = Math.max(1, Math.floor(cellSize * 0.06));
+            c2d.stroke();
+
+            const ships = typeof (f as any).nbVso === 'number' ? (f as any).nbVso : undefined;
+            const label = ships && ships > 1 ? String(ships) : 'F';
+            c2d.fillStyle = textColor;
+            c2d.font = `bold ${Math.max(8, Math.floor(diameter * 0.55))}px sans-serif`;
+            c2d.textAlign = 'center';
+            c2d.textBaseline = 'middle';
+            c2d.fillText(label, cx, cy + 0.5);
 
             // Flèche de direction (flottes du joueur uniquement, si "direction" est défini)
             const t = (f as any).direction;
@@ -618,24 +619,22 @@ export default function CanvasMap({onSelect, selectedOwners, showCombatBadges, s
             }
             c2d.restore();
 
-            // HALO de sélection pour les flottes (autour de l'icône centrée)
+            // HALO de sélection pour les flottes (autour du badge circulaire)
             if (isFleetSelected((f as any).owner)) {
                 const col = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna);
-                const haloColor = col;
+                const haloColor = col || '#000000';
                 const lineW = 2;
                 const blur = Math.max(10, Math.floor(lineW * 1.5));
-                const pad = 0;
-                const x = drawX - pad;
-                const y = drawY - pad;
-                const w = size + pad * 2;
-                const h = size + pad * 2;
+                const radius = diameter / 2 + lineW + 1;
                 const cHalo = ctx as CanvasRenderingContext2D;
                 cHalo.save();
-                cHalo.strokeStyle = haloColor || '#000000';
+                cHalo.strokeStyle = haloColor;
                 cHalo.lineWidth = lineW;
-                cHalo.shadowColor = haloColor || '#000000';
+                cHalo.shadowColor = haloColor;
                 cHalo.shadowBlur = blur;
-                cHalo.strokeRect(x, y, w, h);
+                cHalo.beginPath();
+                cHalo.arc(cx, cy, radius, 0, Math.PI * 2);
+                cHalo.stroke();
                 cHalo.restore();
             }
         }
@@ -662,7 +661,7 @@ export default function CanvasMap({onSelect, selectedOwners, showCombatBadges, s
             try { if (combatLogCount > 0) console.info(`[CanvasMap] logged ${combatLogCount} combat positions`); } catch (e) { }
             cCombat.restore();
         }
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, assetsVersion, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {

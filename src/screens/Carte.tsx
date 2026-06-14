@@ -12,6 +12,7 @@ export default function Carte() {
   const [selectedOwners, setSelectedOwners] = useState<(number)[]>([]);
   const [showCombatBadges, setShowCombatBadges] = useState(true);
   const [showOwnerBadges, setShowOwnerBadges] = useState(true);
+  const [showFleetBadges, setShowFleetBadges] = useState(true);
   const [showPaste, setShowPaste] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
@@ -88,6 +89,14 @@ export default function Carte() {
             />
             Badges propriétaires
           </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee' }}>
+            <input
+              type="checkbox"
+              checked={showFleetBadges}
+              onChange={(e) => setShowFleetBadges(e.target.checked)}
+            />
+            Badges flottes
+          </label>
         </div>
 
         {/* Filtre par tags */}
@@ -116,6 +125,7 @@ export default function Carte() {
             selectedOwners={selectedOwners}
             showCombatBadges={showCombatBadges}
             showOwnerBadges={showOwnerBadges}
+            showFleetBadges={showFleetBadges}
           />
           <MiniMap onCenter={(x, y) => setCenter({ x, y })} />
         </div>
