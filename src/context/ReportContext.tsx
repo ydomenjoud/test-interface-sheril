@@ -1,6 +1,7 @@
 import React, {createContext, useContext, useEffect, useMemo, useState, useCallback} from 'react';
-import {GlobalData, Rapport, XY, SystemeDetecte, Note} from '../types';
+import {GlobalData, Rapport, XY, SystemeDetecte, Note, CombatEvent} from '../types';
 import {parseRapportXml, addManualDetectedSystems, getCachedDetectedSystems} from '../parsers/parseRapport';
+import {parsePublicCombatsHtml} from '../parsers/parsePublicCombats';
 import {parseManualDetectedSystems} from '../parsers/parseManualSystems';
 import {parseDataXml} from '../parsers/parseData';
 
@@ -23,6 +24,8 @@ type ReportContextType = {
     setSelectedTags: (tags: string[]) => void;
     addNote: (pos: XY, text: string, color: string, tag?: string) => void;
     deleteNote: (pos: XY, noteId: string) => void;
+    publicCombats: CombatEvent[];
+    refreshStats: () => Promise<void>;
 };
 
 const ReportContext = createContext<ReportContextType | undefined>(undefined);
@@ -36,6 +39,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
     const [viewportRows, setViewportRows] = useState<number>(0);
     const [notes, setNotes] = useState<Record<string, Note[]>>({});
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
+    const [publicCombats, setPublicCombats] = useState<CombatEvent[]>([]);
 
     const allTags = useMemo(() => {
         const tags = new Set<string>();
@@ -120,6 +124,42 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         return { added: systems.length, errors };
     }, [mergeDetectedWithOwned]);
 
+    const refreshStats = useCallback(async () => {
+        try {
+            const [dataTxt, combatsTxt] = await Promise.all([
+                fetch(`https://sheril.pbem-france.net/stats/data.xml`).then(r => r.text()).catch(() => ''),
+                fetch('https://sheril.pbem-france.net/stats/combats.htm').then(r => r.text()).catch(() => ''),
+            ]);
+            if (dataTxt) {
+                try {
+                    const data = parseDataXml(dataTxt);
+                    setGlobal(data);
+                    const style = document.createElement("style");
+                    style.innerHTML = data.races
+                        .map(r => `.race${r.id} { color: ${r.couleur}; }`)
+                        .join("\n");
+                    document.head.appendChild(style);
+                } catch {
+                    // ignore parse errors
+                }
+            }
+            if (combatsTxt) {
+                try {
+                    const parsed = parsePublicCombatsHtml(combatsTxt);
+                    try {
+                        console.info(`[ReportContext] refreshStats -> parsed ${parsed.length} public combats`);
+                        if (parsed.length > 0) console.debug(parsed.slice(0, 5));
+                    } catch (e) { /* ignore logging errors */ }
+                    setPublicCombats(parsed);
+                } catch {
+                    // ignore
+                }
+            }
+        } catch {
+            // ignore
+        }
+    }, []);
+
     useEffect(() => {
         let alive = true;
         (async () => {
@@ -144,6 +184,57 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
             alive = false;
         };
     }, []);
+
+    const normalizeName = useCallback((n?: string) => {
+        if (!n) return '';
+        return n.normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+    }, []);
+
+    const resolveCombatPosFromGlobal = useCallback((ev: any, systems: {nom: string; pos: {x: number; y: number}}[]) => {
+        if (!ev) return ev;
+        if (ev.pos && ev.pos.x && ev.pos.y && (ev.pos.x !== 0 || ev.pos.y !== 0)) return ev;
+        const name = ev.systemName || '';
+        const n = normalizeName(name);
+        if (!n) return ev;
+        for (const s of systems) {
+            if (!s || !s.nom) continue;
+            if (normalizeName(s.nom) === n) {
+                try { console.info(`[ReportContext] resolved public combat '${name}' -> ${s.pos.x}-${s.pos.y}`); } catch (e) {}
+                return {...ev, pos: {x: s.pos.x, y: s.pos.y}};
+            }
+        }
+        return ev;
+    }, [normalizeName]);
+
+    // Récupération des combats publics (page HTML) et parsing
+    useEffect(() => {
+        let alive = true;
+        (async () => {
+            try {
+                const txt = await fetch('https://sheril.pbem-france.net/stats/combats.htm').then(r => r.text());
+                if (!alive) return;
+                const parsed = parsePublicCombatsHtml(txt || '');
+                try {
+                    console.info(`[ReportContext] fetched combats.htm -> parsed ${parsed.length} public combats`);
+                    if (parsed.length > 0) console.debug(parsed.slice(0, 5));
+                } catch (e) { /* ignore logging errors */ }
+                // try to resolve positions if global already present
+                const resolved = (global && global.systemes && global.systemes.length > 0)
+                    ? parsed.map(p => resolveCombatPosFromGlobal(p, global.systemes))
+                    : parsed;
+                setPublicCombats(resolved);
+            } catch {
+                // ignore errors silently
+            }
+        })();
+        return () => { alive = false; };
+    }, [global, resolveCombatPosFromGlobal]);
+
+    // When global data becomes available, try to resolve any public combats positions
+    useEffect(() => {
+        if (!global || !global.systemes || global.systemes.length === 0) return;
+        setPublicCombats(prev => prev.map(p => resolveCombatPosFromGlobal(p, global.systemes)));
+    }, [global, resolveCombatPosFromGlobal]);
 
     // Au chargement, si un rapport a déjà été chargé auparavant, le recharger automatiquement
     useEffect(() => {
@@ -171,6 +262,8 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
     const value = useMemo<ReportContextType>(() => ({
         rapport,
         global,
+        publicCombats,
+        refreshStats,
         loadRapportFile,
         addDetectedSystemsFromText,
         ready: Boolean(global),
@@ -187,7 +280,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         setSelectedTags,
         addNote,
         deleteNote,
-    }), [rapport, global, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, allTags, selectedTags, addNote, deleteNote]);
+    }), [rapport, global, publicCombats, refreshStats, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, allTags, selectedTags, addNote, deleteNote]);
 
     return <ReportContext.Provider value={value}>{children}</ReportContext.Provider>;
 }

@@ -4,7 +4,7 @@ import Commandant from "./utils/Commandant";
 import {NavLink} from "react-router-dom";
 
 export default function Header() {
-    const {rapport, loadRapportFile, setCenter} = useReport();
+    const {rapport, loadRapportFile, setCenter, refreshStats} = useReport();
     const rapportInput = useRef<HTMLInputElement>(null);
 
     return (<header className="app-header">
@@ -50,6 +50,14 @@ export default function Header() {
             </NavLink>
         </nav>
         <div className="header-spacer"/>
+        <button
+            className="badge"
+            onClick={async () => { await refreshStats(); }}
+            title="Rafraîchir les données publiques (races, combats)"
+            style={{marginRight: 8}}
+        >
+            Rafraichir stats
+        </button>
         <input
             ref={rapportInput}
             type="file"

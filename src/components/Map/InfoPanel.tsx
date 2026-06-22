@@ -17,7 +17,7 @@ type Props = {
 };
 
 export default function InfoPanel({ selected }: Props) {
-  const { rapport, global, notes, addNote, deleteNote, allTags } = useReport();
+  const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats } = useReport();
   const [noteText, setNoteText] = useState('');
   const [noteColor, setNoteColor] = useState('#ffcc00');
   const [noteTag, setNoteTag] = useState('');
@@ -69,9 +69,11 @@ export default function InfoPanel({ selected }: Props) {
   }, [selected, notes]);
 
   const cellCombats = useMemo(() => {
-    if (!selected || !rapport?.combats?.length) return [];
-    return combatsAtPosition(rapport.combats, selected);
-  }, [selected, rapport]);
+    if (!selected) return [];
+    const rapportCombats = rapport?.combats ? combatsAtPosition(rapport.combats, selected) : [];
+    const publicCombatsAt = publicCombats ? combatsAtPosition(publicCombats, selected) : [];
+    return [...rapportCombats, ...publicCombatsAt];
+  }, [selected, rapport, publicCombats]);
 
   const handleAddNote = (e: React.FormEvent) => {
     e.preventDefault();
