@@ -3,7 +3,7 @@ import {useReport} from '../context/ReportContext';
 import SearchableSelect from "../components/utils/SearchableSelect";
 import {formatTechName, toRoman} from "../utils/global";
 
-type Assign = { code: string; amount: number };
+type Assign = { code: string; amount: number; percent: number };
 
 export default function RechercheTechnologique() {
     const {global, rapport} = useReport();
@@ -68,6 +68,10 @@ export default function RechercheTechnologique() {
         }
     }, [assigns, manualBudget, tour]); // This effect runs only when `assigns` or `manualBudget` changes.
 
+    function updateAssign(assign: Pick<Assign, "code" | "percent">) {
+        const amount = assign.percent * onePercentAmount;
+        setAssigns(prev => prev.map(a => a.code === assign.code ? {...a, ...assign, amount} : a));
+    }
 
     const atteignables = rapport?.technologiesAtteignables;
 
@@ -114,16 +118,10 @@ export default function RechercheTechnologique() {
         const seuil = t?.recherche ?? 0;
         // pourcentage
         const percent = Math.ceil((seuil / budget) * 100);
-        const amount = percent * budget / 100;
+        const amount = Math.floor(percent * budget / 100);
 
-        setAssigns(prev => [...prev, {code, amount}]);
+        setAssigns(prev => [...prev, {code, amount, percent}]);
         setSelectedCode('');
-    }
-
-    function setAmount(code: string, val: number) {
-        setAssigns(prev => prev.map(a => a.code === code ? {
-            ...a, amount: Math.max(0, Number.isFinite(val) ? val : 0)
-        } : a));
     }
 
     function remove(code: string) {
@@ -133,29 +131,29 @@ export default function RechercheTechnologique() {
     const onePercentAmount = budget > 0 ? Math.floor(budget / 100) : 0;
 
     function increasePercent(code: string) {
-        if (totalAllocated >= budget && onePercentAmount > 0) return;
+        if (totalAllocated >= budget && onePercentAmount > 0) {
+            return;
+        }
 
-        const assign = assigns.find(a => a.code === code);
+        const index = assigns.findIndex(a => a.code === code);
+        const assign = assigns[index]
         if (!assign) return;
+        assign.percent += 1;
+        updateAssign(assign);
 
-        const currentPercent = Math.floor(assign.amount / budget * 100);
-        let newAmount = (currentPercent+1) * budget / 100;
-
-        setAmount(code, newAmount);
     }
 
     function decreasePercent(code: string) {
-        const assign = assigns.find(a => a.code === code);
-        if (!assign) return;
-        const currentPercent = Math.floor(assign.amount / budget * 100);
-        const newAmount = (currentPercent-1) * budget / 100;
-        setAmount(code, newAmount); // setAmount handles Math.max(0, ...)
+        const index = assigns.findIndex(a => a.code === code);
+        if (index < 0) return;
+        const assign = assigns[index]
+        assign.percent -= 1;
+        updateAssign(assign);
     }
 
     const rows = assigns.map(a => {
         const t = (global?.technologies ?? []).find(tt => tt.code === a.code);
-        const amount = a.amount || 0;
-        const percent = +((amount / budget)*100).toFixed(1);
+        const percent = a.percent;
         const rowPct = budget > 0 ? Math.min(100, percent) : 0;
         return {a, t, rowPct};
     });
@@ -284,7 +282,6 @@ export default function RechercheTechnologique() {
                             min={0}
                             readOnly={true}
                             value={a.amount}
-                            onChange={e => setAmount(a.code, parseFloat(e.target.value || '0'))}
                             style={{width: 120, textAlign: 'right'}}
                         />
                     </td>

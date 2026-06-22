@@ -77,10 +77,10 @@ export function parsePublicCombatsHtml(html: string): CombatEvent[] {
 
     try {
         if (out.length > 0) {
-            console.info(`[parsePublicCombats] parsed ${out.length} public combat(s)`);
-            console.debug(out.slice(0, 10));
+            // console.info(`[parsePublicCombats] parsed ${out.length} public combat(s)`);
+            // console.debug(out.slice(0, 10));
         } else {
-            console.debug('[parsePublicCombats] no public combats found');
+            // console.debug('[parsePublicCombats] no public combats found');
         }
     } catch (e) { }
 

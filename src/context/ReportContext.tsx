@@ -147,7 +147,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
                 try {
                     const parsed = parsePublicCombatsHtml(combatsTxt);
                     try {
-                        console.info(`[ReportContext] refreshStats -> parsed ${parsed.length} public combats`);
+                        // console.info(`[ReportContext] refreshStats -> parsed ${parsed.length} public combats`);
                         if (parsed.length > 0) console.debug(parsed.slice(0, 5));
                     } catch (e) { /* ignore logging errors */ }
                     setPublicCombats(parsed);
@@ -199,7 +199,9 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         for (const s of systems) {
             if (!s || !s.nom) continue;
             if (normalizeName(s.nom) === n) {
-                try { console.info(`[ReportContext] resolved public combat '${name}' -> ${s.pos.x}-${s.pos.y}`); } catch (e) {}
+                try {
+                    // console.info(`[ReportContext] resolved public combat '${name}' -> ${s.pos.x}-${s.pos.y}`);
+                } catch (e) {}
                 return {...ev, pos: {x: s.pos.x, y: s.pos.y}};
             }
         }
@@ -215,8 +217,8 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
                 if (!alive) return;
                 const parsed = parsePublicCombatsHtml(txt || '');
                 try {
-                    console.info(`[ReportContext] fetched combats.htm -> parsed ${parsed.length} public combats`);
-                    if (parsed.length > 0) console.debug(parsed.slice(0, 5));
+                    // console.info(`[ReportContext] fetched combats.htm -> parsed ${parsed.length} public combats`);
+                    // if (parsed.length > 0) console.debug(parsed.slice(0, 5));
                 } catch (e) { /* ignore logging errors */ }
                 // try to resolve positions if global already present
                 const resolved = (global && global.systemes && global.systemes.length > 0)
