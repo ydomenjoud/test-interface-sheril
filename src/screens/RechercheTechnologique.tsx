@@ -106,6 +106,27 @@ export default function RechercheTechnologique() {
     }, [rapport]);
 
     const budget = manualBudget !== null ? manualBudget : calculatedBudget;
+    const onePercentAmount = budget > 0 ? Math.floor(budget / 100) : 0;
+
+    const lastBudget = useRef(budget);
+    useEffect(() => {
+        if (lastBudget.current !== budget) {
+            lastBudget.current = budget;
+            setAssigns(prev => prev.map(a => {
+                // on récupère le seuil de la tech
+                const t = (global?.technologies ?? []).find(tt => tt.code === a.code);
+                const seuil = t?.recherche ?? 0;
+                // pourcentage
+                const percent = Math.ceil((seuil / budget) * 100);
+                const amount = Math.floor(percent * budget / 100);
+                return ({
+                    ...a,
+                    percent,
+                    amount,
+                })
+            }));
+        }
+    }, [budget, onePercentAmount, global?.technologies]);
 
     const totalAllocated = assigns.reduce((s, a) => s + (a.amount || 0), 0);
     const totalPercent = budget > 0 ? Math.min(100, Math.ceil((totalAllocated / budget) * 100)) : 0;
@@ -127,8 +148,6 @@ export default function RechercheTechnologique() {
     function remove(code: string) {
         setAssigns(prev => prev.filter(a => a.code !== code));
     }
-
-    const onePercentAmount = budget > 0 ? Math.floor(budget / 100) : 0;
 
     function increasePercent(code: string) {
         if (totalAllocated >= budget && onePercentAmount > 0) {
