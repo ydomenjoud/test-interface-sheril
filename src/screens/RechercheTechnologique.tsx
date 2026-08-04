@@ -110,17 +110,21 @@ export default function RechercheTechnologique() {
     const totalAllocated = assigns.reduce((s, a) => s + (a.amount || 0), 0);
     const totalPercent = budget > 0 ? Math.min(100, Math.ceil((totalAllocated / budget) * 100)) : 0;
 
-    function addAssign() {
-        const code = selectedCode || availableTechs?.[0]?.code;
-        if (!code) return;
-        if (assigns.some(a => a.code === code)) return;
+    function calculateAssign(code: string) {
         const t = (global?.technologies ?? []).find(tt => tt.code === code);
         const seuil = t?.recherche ?? 0;
         // pourcentage
         const percent = Math.ceil((seuil / budget) * 100);
         const amount = Math.floor(percent * budget / 100);
 
-        setAssigns(prev => [...prev, {code, amount, percent}]);
+        return {code, amount, percent};
+    }
+
+    function addAssign() {
+        const code = selectedCode || availableTechs?.[0]?.code;
+        if (!code) return;
+        if (assigns.some(a => a.code === code)) return;
+        setAssigns(prev => [...prev,calculateAssign(code)]);
         setSelectedCode('');
     }
 
@@ -129,6 +133,16 @@ export default function RechercheTechnologique() {
     }
 
     const onePercentAmount = budget > 0 ? Math.floor(budget / 100) : 0;
+
+    function recalculateAssignments() {
+        const newAssigns = assigns.map(a => {
+            const {code} = a;
+            const data = calculateAssign(code);
+            return { ...a, ...data };
+        });
+        setAssigns(newAssigns);
+    }
+
 
     function increasePercent(code: string) {
         if (totalAllocated >= budget && onePercentAmount > 0) {
@@ -223,7 +237,21 @@ export default function RechercheTechnologique() {
             <div className="badge" style={{background: '#235', color: '#ddd'}}>
                 1% = <b className="cur">{Math.floor(budget / 100)}</b>
             </div>
-            <div style={{display: 'flex', justifyContent: 'flex-end', flex: 12}}>
+            <div style={{display: 'flex', justifyContent: 'flex-end', flex: 12, gap: 8}}>
+               <button
+                   onClick={recalculateAssignments}
+                   disabled={assigns.length === 0 || budget <= 0}
+                   style={{
+                       backgroundColor: '#27ae60',
+                       color: 'white',
+                       border: 'none',
+                       padding: '8px 16px',
+                       borderRadius: 4,
+                       cursor: 'pointer'
+                   }}
+               >
+                   Recalculer selon budget
+               </button>
                <button
                    onClick={copyShareCode}
                    disabled={rows.length === 0}
