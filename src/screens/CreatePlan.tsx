@@ -392,7 +392,6 @@ export default function CreatePlan() {
         }
     })
     //  prix + 5*minerai + 50*marchandises + 200*(oxole|tixium|lixiam)
-    console.log(marchList);
     const marchandisesRare = marchList
         .filter(m => /(oxole|lixiam|tixium)/.test(m.nom))
         .reduce((acc, m) => acc + m.nb, 0);
