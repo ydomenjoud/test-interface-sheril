@@ -87,7 +87,7 @@ h1, h2, h3, h4, h5, h6 {
 a {
     color: #b8b8b8;
 }
- 
+
 .app-nav a.active {
     background: #71deff;
     color: #114488;
@@ -313,4 +313,15 @@ a {
 .position {
     color: var(--accent);
     font-weight: bold;
+}
+
+.cur {
+    color: gold;
+}
+
+.cur::after {
+    content: "\00A2";
+    padding-left: 1px;
+    color: gold;
+    text-shadow: 2px 1px 6px #ddbcbc;
 }

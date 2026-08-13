@@ -391,6 +391,13 @@ export default function CreatePlan() {
             caractArmes.degat_sol += qty * degat_sol;
         }
     })
+    //  prix + 5*minerai + 50*marchandises + 200*(oxole|tixium|lixiam)
+    console.log(marchList);
+    const marchandisesRare = marchList
+        .filter(m => /(oxole|lixiam|tixium)/.test(m.nom))
+        .reduce((acc, m) => acc + m.nb, 0);
+    const marchandisesPasRare = marchList.reduce((acc, m) => acc + m.nb, 0) - marchandisesRare;
+    const prixMdc = totals.totalPrix + 5*totals.totalMinerai + 50*marchandisesPasRare + 200*marchandisesRare;
 
     return (
         <div style={{padding: 12, overflow: 'auto', height: '100%', display: 'flex', flexDirection: 'column'}}>
@@ -586,7 +593,10 @@ export default function CreatePlan() {
           Minerai: <b>{totals.totalMinerai}</b>
         </div>
         <div className="badge" style={{background: '#123', color: '#ddd'}}>
-          Prix: <b>{totals.totalPrix.toFixed(1)}</b>
+          Prix: <b className="cur">{totals.totalPrix.toFixed(1)}</b>
+        </div>
+        <div className="badge" style={{background: '#123'}}>
+          Prix MDC: <b className="cur">{prixMdc.toFixed(1)}</b>
         </div>
       </div>
 
