@@ -39,6 +39,7 @@ export type Technologie = {
     recherche: number; description?: string; parents: string[]; caracteristiques: TechCaracteristique[]; marchandises?: TechMarchandise[];
     specification?: TechSpecification;
     arme?: TechArme;
+    publique?: boolean;
 };
 
 // Composants d'un plan de vaisseau

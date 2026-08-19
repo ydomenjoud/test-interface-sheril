@@ -8,6 +8,7 @@ export function parseDataXml(text: string): GlobalData {
         const base = t.getAttribute('base') || '';
         const code = t.getAttribute('code') || '';
         const niv = Number(t.getAttribute('niv') || 0);
+        const publique = (Number(t.getAttribute('publique') || 0 ) === 1);
         const nom = t.getAttribute('nom') || '';
         const type = Number(t.getAttribute('type') || 0) as 0 | 1;
         const recherche = Number(t.getAttribute('recherche') || 0);
@@ -44,6 +45,7 @@ export function parseDataXml(text: string): GlobalData {
         } : undefined;
 
         techs.push({
+            publique,
             base, code, niv, nom, type, recherche, description, parents, caracteristiques, marchandises, specification, arme
         });
     });

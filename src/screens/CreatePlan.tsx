@@ -29,7 +29,7 @@ export default function CreatePlan() {
 
         if (onlyKnown && rapport) {
             const connues = new Set(rapport.technologiesConnues);
-            list = list.filter(t => connues.has(t.code));
+            list = list.filter(t => connues.has(t.code) || t.publique);
         }
 
         setCompTechs(list);
