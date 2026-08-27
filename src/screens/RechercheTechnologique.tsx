@@ -301,7 +301,7 @@ export default function RechercheTechnologique() {
                 </thead>
                 <tbody>
                 {rows.map(({a, t, rowPct}) => (<tr key={a.code}>
-                    <td>{t?.nom ?? a.code} {toRoman((t?.niv || 0))}</td>
+                    <td>{t ? formatTechName(t) : a.code}</td>
                     <td dangerouslySetInnerHTML={{__html: t?.description || ''}}></td>
                     <td style={{textAlign: 'right'}}>{t?.recherche ?? '—'}</td>
                     <td style={{textAlign: 'right'}}>

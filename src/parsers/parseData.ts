@@ -28,6 +28,7 @@ export function parseDataXml(text: string): GlobalData {
         // Spécification (case/min/prix/type) si présente
         const specEl = t.querySelector('specification');
         const specification = specEl ? {
+            pc: specEl.getAttribute('pc') != null ? Number(specEl.getAttribute('pc')) || 0 : undefined,
             case: specEl.getAttribute('case') != null ? Number(specEl.getAttribute('case')) || 0 : undefined,
             min: specEl.getAttribute('min') != null ? Number(specEl.getAttribute('min')) || 0 : undefined,
             prix: specEl.getAttribute('prix') != null ? Number(specEl.getAttribute('prix')) || 0 : undefined,

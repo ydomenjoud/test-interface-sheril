@@ -45,6 +45,9 @@ export default function Header() {
             <NavLink to="/plans" className={({isActive}) => (isActive ? 'active' : '')}>
                 Plans
             </NavLink>
+            <NavLink to="/planification" className={({isActive}) => (isActive ? 'active' : '')}>
+                Planification
+            </NavLink>
             <NavLink to="/recherche" className={({isActive}) => (isActive ? 'active' : '')}>
                 Recherche
             </NavLink>

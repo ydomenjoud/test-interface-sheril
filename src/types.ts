@@ -28,6 +28,7 @@ export type TechArme = { degat_bouclier: number; degat_coque: number; degat_sol:
 
 // Spécification d'une technologie (utile pour les composants de vaisseaux)
 export type TechSpecification = {
+    pc?: number;   // emprise en cases dans le plan
     case?: number;   // emprise en cases dans le plan
     min?: number;    // coût minerai unitaire
     prix?: number;   // coût argent unitaire
@@ -95,6 +96,7 @@ export interface SystemBase {
     pos: XY;
     typeEtoile: number;
     nbPla: number;
+    pdc?: number;
     proprietaires: number[]; // PROPRIO list
     politique?: number;
     entretien?: number;
@@ -106,11 +108,18 @@ export interface SystemBase {
     popMax?: number;
 }
 
+export interface MarchandiseData {
+    code: number;
+    stock: number;
+    prod: number;
+}
+
 export interface SystemeJoueur extends SystemBase {
     type: 'joueur';
     planetes: Planete[];
     revenuEstime: number;
     scan: number;
+    marchandises?: MarchandiseData[];
 }
 
 export interface SystemeDetecte extends SystemBase {

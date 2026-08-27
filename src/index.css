@@ -51,3 +51,101 @@ code {
     color: gold;
     text-shadow: 2px 1px 6px #ddbcbc;
 }
+
+
+.m::before {
+    content: "";
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 0.3em;
+    vertical-align: -0.15em;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 1px;
+    box-sizing: border-box;
+    border-radius: 5px;
+}
+/* 0: Produits alimentaires */
+.m.m0::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-produits-alimentaires");
+}
+
+/* 1: Dechets */
+.m.m1::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-dechets");
+}
+
+/* 2: Articles de luxe */
+.m.m2::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-articles-de-luxe");
+}
+
+/* 3: Holofilms et hololivres */
+.m.m3::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-holofilms-hololivres");
+}
+
+/* 4: Systèmes de guidage */
+.m.m4::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-systemes-de-guidage");
+}
+
+/* 5: Médicaments */
+.m.m5::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-medicaments");
+}
+
+/* 6: Logiciels */
+.m.m6::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-logiciels");
+}
+
+/* 7: Robots */
+.m.m7::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-robots");
+}
+
+/* 8: Composants électroniques */
+.m.m8::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-composants-electroniques");
+}
+
+/* 9: Armement et explosifs */
+.m.m9::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-armement-explosifs");
+}
+
+/* 10: Unité energétique */
+.m.m10::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-unite-energetique");
+}
+
+/* 11: Pièces industrielles */
+.m.m11::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-pieces-industrielles");
+}
+
+/* 12: Métaux précieux */
+.m.m12::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-metaux-precieux");
+}
+
+/* 13: Tixium */
+.m.m13::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-tixium");
+}
+
+/* 14: Lixiam */
+.m.m14::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-lixiam");
+}
+
+/* 15: Oxole */
+.m.m15::before {
+    background-image: url("../public/img/goods_sprite.svg#icon-oxole");
+}
+
+

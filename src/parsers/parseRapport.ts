@@ -1,4 +1,4 @@
-import {Alliance, FlotteDetectee, FlotteJoueur, Rapport, SystemeDetecte, SystemeJoueur, PlanVaisseau} from '../types';
+import {Alliance, FlotteDetectee, FlotteJoueur, Rapport, SystemeDetecte, SystemeJoueur, PlanVaisseau, MarchandiseData} from '../types';
 import {isPos, parsePosString} from '../utils/position';
 import {parseCombatMessages, RawMessage} from './parseCombatMessages';
 
@@ -171,12 +171,33 @@ export function parseRapportXml(text: string): Rapport {
     // Systèmes du joueur (lowercase only)
     const systemesJoueur: SystemeJoueur[] = [];
     const sysNodes = qAll(joueurNode, ['systemes > s',]);
+
+    // Pré-parser les postes commerciaux pour les injecter dans les systèmes plus tard
+    const marchandiseMap: Map<string, MarchandiseData[]> = new Map();
+    const posteNodes = qAll(joueurNode, ['postes_commerciaux > p']);
+    posteNodes.forEach(pNode => {
+        const pProprio = getAttrNum(pNode, ['proprio']);
+        if (pProprio === joueur.numero) {
+            const pPos = getAttr(pNode, ['pos']);
+            if (pPos) {
+                const marchs: MarchandiseData[] = qAll(pNode, ['m']).map(mNode => ({
+                    code: getAttrNum(mNode, ['code']),
+                    stock: getAttrNum(mNode, ['nb']),
+                    prod: getAttrNum(mNode, ['prod'])
+                }));
+                marchandiseMap.set(pPos, marchs);
+            }
+        }
+    });
+
     sysNodes.forEach((s) => {
-        const pos = parsePosString(getAttr(s, ['pos']) || '0_1_1');
+        const posStr = getAttr(s, ['pos']) || '0_1_1';
+        const pos = parsePosString(posStr);
         const nom = getAttr(s, ['nom']) || 'Système';
         const rawStar = getAttrNum(s, ['typeEtoile', 'typeetoile', 'type']);
         const typeEtoile = (rawStar ?? 0);
         const nbPla = getAttrNum(s, ['nbpla', 'nombrepla']) ?? 0;
+        const pdc = getAttrNum(s, ['pdc']) ?? 0;
 
         const proprietaires: Set<number> = new Set();
 
@@ -269,6 +290,7 @@ export function parseRapportXml(text: string): Rapport {
             type: 'joueur',
             nom,
             pos,
+            pdc,
             pop: populationActuelle,
             popMax: populationMax,
             typeEtoile,
@@ -283,6 +305,7 @@ export function parseRapportXml(text: string): Rapport {
             bcont: getAttrNum(s, ['bcont']),
             besp: getAttrNum(s, ['besp']),
             btech: getAttrNum(s, ['btech']),
+            marchandises: marchandiseMap.get(posStr)
         });
     });
 

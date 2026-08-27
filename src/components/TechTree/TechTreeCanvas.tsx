@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Technologie } from '../../types';
+import { formatTechName } from '../../utils/global';
 
 type Props = {
   techs: Technologie[];
@@ -22,21 +23,6 @@ type NodeRect = {
   known: boolean;
   stroke?: string; // couleur de bordure (orange pour parents, bleu pour enfants)
 };
-
-function toRoman(n: number): string {
-  const romans = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
-  if (n <= 0) return romans[0];
-  if (n >= romans.length) return romans[romans.length - 1];
-  return romans[n];
-}
-function romanFromNiv(niv?: number): string {
-  const lvl = Math.max(1, Math.min(10, ((niv ?? 0) + 1)));
-  return toRoman(lvl);
-}
-function formatTechName(t?: Technologie): string {
-  if (!t) return '';
-  return `${t.nom} ${romanFromNiv(t.niv)}`;
-}
 
 export default function TechTreeCanvas({
   techs,

@@ -2,21 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useReport } from '../context/ReportContext';
 import TechTreeCanvas from '../components/TechTree/TechTreeCanvas';
 import { Technologie } from '../types';
-
-function toRoman(n: number): string {
-  const romans = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
-  if (n <= 0) return romans[0];
-  if (n >= romans.length) return romans[romans.length - 1];
-  return romans[n];
-}
-function romanFromNiv(niv?: number): string {
-  const lvl = Math.max(1, Math.min(10, ((niv ?? 0) + 1)));
-  return toRoman(lvl);
-}
-function formatTechName(t?: Technologie): string {
-  if (!t) return '';
-  return `${t.nom} ${romanFromNiv(t.niv)}`;
-}
+import { formatTechName } from '../utils/global';
 
 export default function ArbreTechnologies() {
   const { global, rapport } = useReport();
