@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useReport} from '../context/ReportContext';
 import SearchableSelect from "../components/utils/SearchableSelect";
-import {formatTechName, toRoman} from "../utils/global";
+import {formatTechName } from "../utils/global";
 
 type Assign = { code: string; amount: number; percent: number };
 

@@ -75,6 +75,7 @@ export type Planete = {
     proprietaire?: number;
     pdc: number; // points de construction
     minerai?: number;
+    prodMinerai?: number;
     batiments: { techCode: string; count: number }[];
     populations: {
         raceId: number;

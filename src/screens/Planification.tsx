@@ -150,14 +150,6 @@ export default function Planification() {
         });
     };
 
-    const exportQueue = (systemKey: string) => {
-        const queue = queues[systemKey] || [];
-
-        const bp = "btoa(";
-        navigator.clipboard.writeText(bp)
-            .then(() => alert("Blueprint copié !"))
-            .catch(err => console.error("Erreur copie blueprint", err));
-    };
 
     const importQueue = (systemKey: string, bp: string) => {
         if (!bp) return;
@@ -275,19 +267,29 @@ export default function Planification() {
 
     const getSystemResources = (s: SystemeJoueur) => {
         let totalPdc = s.pdc || 0;
-        let totalMinerai = 0;
+        let totalStockMinerai = 0;
+        let totalProdMinerai = 0;
         s.planetes.forEach(p => {
             if(p.proprietaire && p.proprietaire === rapport?.joueur?.numero) {
-                totalMinerai += p.minerai || 0;
+                totalStockMinerai += p.minerai || 0;
+                totalProdMinerai += p.prodMinerai || 0;
             }
         });
 
         const initialMarchandises: Record<number, number> = {};
+        const detailMarchandises: Record<number, { stock: number; prod: number }> = {};
         s.marchandises?.forEach(m => {
-            initialMarchandises[m.code] = m.stock;
+            initialMarchandises[m.code] = (m.stock || 0) + (m.prod || 0);
+            detailMarchandises[m.code] = { stock: m.stock || 0, prod: m.prod || 0 };
         });
 
-        return { pc: totalPdc, minerai: totalMinerai, initialMarchandises };
+        return {
+            pc: totalPdc,
+            minerai: totalStockMinerai + totalProdMinerai,
+            initialMinerai: { stock: totalStockMinerai, prod: totalProdMinerai },
+            initialMarchandises,
+            detailMarchandises
+        };
     };
 
     const getItemData = (item: PlannedItem) => {
@@ -427,21 +429,26 @@ export default function Planification() {
                                 </td>
 
                                 <td style={{ padding: 8, textAlign: 'center' }}>
-                                    <div style={{ fontSize: '0.8em', color: '#888' }}>{initial.pc}</div>
+                                    <div style={{ fontSize: '0.8em', color: '#888' }} title="Points de Construction (Production par tour)">{initial.pc}</div>
                                     <div style={{ color: finalPc < 0 ? '#f55' : (finalPc < initial.pc ? '#5f5' : '#aaa'), fontWeight: finalPc < initial.pc ? 'bold' : 'normal' }}>{finalPc}</div>
                                 </td>
 
                                 <td style={{ padding: 8, textAlign: 'center' }}>
-                                    <div style={{ fontSize: '0.8em', color: '#888' }}>{initial.minerai}</div>
+                                    <div style={{ fontSize: '0.8em', color: '#888' }} title="Stock + Production">
+                                        {initial.initialMinerai.stock} {initial.initialMinerai.prod > 0 ? `( +${initial.initialMinerai.prod} )` : ''}
+                                    </div>
                                     <div style={{ color: finalMinerai < 0 ? '#f55' : (finalMinerai < initial.minerai ? '#5f5' : '#aaa'), fontWeight: finalMinerai < initial.minerai ? 'bold' : 'normal' }}>{finalMinerai}</div>
                                 </td>
 
                                 {marchandisesCols.map(m => {
                                     const initVal = initial.initialMarchandises[m.code] || 0;
+                                    const detail = initial.detailMarchandises[m.code] || { stock: 0, prod: 0 };
                                     const val = finalMarchandises[m.code] || 0;
                                     return (
                                         <td key={m.code} style={{ padding: 8, textAlign: 'center' }}>
-                                            <div style={{ fontSize: '0.8em', color: '#888' }}>{initVal}</div>
+                                            <div style={{ fontSize: '0.8em', color: '#888' }} title="Stock + Production">
+                                                {detail.stock} {detail.prod > 0 ? `( +${detail.prod} )` : ''}
+                                            </div>
                                             <div style={{ color: val < 0 ? '#f55' : (val < initVal ? '#5f5' : '#aaa'), fontWeight: val < initVal ? 'bold' : 'normal' }}>{val}</div>
                                         </td>
                                     );
