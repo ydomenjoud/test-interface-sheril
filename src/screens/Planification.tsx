@@ -220,7 +220,6 @@ export default function Planification() {
         });
 
         if (entries.length === 0) {
-            alert("Rien à exporter.");
             return;
         }
 
