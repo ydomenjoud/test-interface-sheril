@@ -9,6 +9,7 @@ import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
 export default function Carte() {
   const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText, allTags, selectedTags, setSelectedTags } = useReport();
   const [selected, setSelected] = useState<XY | undefined>(undefined);
+  const [showFleetsFor, setShowFleetsFor] = useState<XY | undefined>(undefined);
   const [selectedOwners, setSelectedOwners] = useState<(number)[]>([]);
   const [showCombatBadges, setShowCombatBadges] = useState(true);
   const [showOwnerBadges, setShowOwnerBadges] = useState(true);
@@ -121,7 +122,16 @@ export default function Carte() {
         )}
         <div style={{ position: 'relative', width: '100%', height: '100%', display: global ? 'block' : 'none' }}>
           <CanvasMap
-            onSelect={(xy) => setSelected(xy)}
+            onSelect={(xy, ctrl) => {
+              setSelected(xy);
+              if (ctrl) {
+                setShowFleetsFor(xy);
+              } else {
+                setShowFleetsFor(undefined);
+              }
+            }}
+            selected={selected}
+            showFleetsFor={showFleetsFor}
             selectedOwners={selectedOwners}
             showCombatBadges={showCombatBadges}
             showOwnerBadges={showOwnerBadges}

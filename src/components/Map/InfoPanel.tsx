@@ -1,6 +1,7 @@
 import React, {useMemo, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
 import {CombatEvent, FlotteBase, FlotteDetectee, FlotteJoueur, XY, Note} from '../../types';
+import { getTorusDistance } from '../../utils/position';
 import {
   combatsAtPosition,
   combatKindLabel,
@@ -22,8 +23,11 @@ export default function InfoPanel({ selected }: Props) {
   const [noteColor, setNoteColor] = useState('#ffcc00');
   const [noteTag, setNoteTag] = useState('');
 
+  const [sortField, setSortField] = useState<'dist' | 'num'>('dist');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
   const atPos = useMemo(() => {
-    if (!selected) return { systems: [], fleets: [] as any[] };
+    if (!selected) return { systems: [], fleets: [] as any[], playerFleets: [] as any[] };
     const systems: any[] = [];
     const seen = new Set<string>();
 
@@ -54,8 +58,23 @@ export default function InfoPanel({ selected }: Props) {
       ...rapport.flottesDetectees.filter(f => f.pos.x === selected.x && f.pos.y === selected.y),
     ] : [];
 
-    return { systems, fleets };
-  }, [selected, rapport, global]);
+    let playerFleets = rapport ? rapport.flottesJoueur.map(f => {
+      const dist = getTorusDistance(f.pos, selected);
+      return { ...f, dist, reachable: dist <= f.vitesse };
+    }) : [];
+
+    // Tri
+    playerFleets.sort((a, b) => {
+      let valA = a[sortField];
+      let valB = b[sortField];
+
+      if (valA === valB) return 0;
+      const res = valA < valB ? -1 : 1;
+      return sortOrder === 'asc' ? res : -res;
+    });
+
+    return { systems, fleets, playerFleets };
+  }, [selected, rapport, global, sortField, sortOrder]);
 
   const system = useMemo(() => {
     return atPos.systems[0];
@@ -165,11 +184,59 @@ export default function InfoPanel({ selected }: Props) {
             );
           })}
           {atPos.fleets.length === 0 && (
-            <tr><td colSpan={3} style={{ textAlign: 'center', padding: 8, color: '#aaa' }}>Aucune flotte ici.</td></tr>
+            <tr><td colSpan={4} style={{ textAlign: 'center', padding: 8, color: '#aaa' }}>Aucune flotte ici.</td></tr>
           )}
           </tbody>
         </table>
       </div>
+
+      {atPos.playerFleets.length > 0 && (
+        <div className="info-block">
+          <h4>Mes flottes</h4>
+          <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+            <tr>
+              <th
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => {
+                  if (sortField === 'num') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                  else { setSortField('num'); setSortOrder('asc'); }
+                }}
+              >
+                Nom {sortField === 'num' && (sortOrder === 'asc' ? '▲' : '▼')}
+              </th>
+              <th
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => {
+                  if (sortField === 'dist') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                  else { setSortField('dist'); setSortOrder('asc'); }
+                }}
+              >
+                Distance {sortField === 'dist' && (sortOrder === 'asc' ? '▲' : '▼')}
+              </th>
+              <th>Vitesse</th>
+              <th>AS / AP</th>
+              <th>Position</th>
+            </tr>
+            </thead>
+            <tbody>
+            {atPos.playerFleets.map((f: any, i: number) => {
+              const isHere = f.pos.x === selected.x && f.pos.y === selected.y;
+              const rowStyle = !f.reachable && !isHere ? { opacity: 0.5, color: '#ffa500' } : {};
+              return (
+                <tr key={`player-flt-${i}`} style={rowStyle}>
+                  <td>{f.nom} ({f.num+1})</td>
+                  <td style={{ textAlign: 'right' }}>{isHere ? '—' : f.dist}</td>
+                  <td style={{ textAlign: 'right' }}>{f.vitesse}</td>
+                  <td style={{ textAlign: 'right' }}>{f.as ?? 0} / {f.ap ?? 0}</td>
+                  <td style={{ textAlign: 'right' }}><Position pos={f.pos} /></td>
+                </tr>
+              );
+            })}
+            </tbody>
+          </table>
+        </div>
+      )}
       <div className="info-block">
         <h4>Combats</h4>
         <p className="combat-legend">

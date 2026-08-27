@@ -41,3 +41,11 @@ export function torusDelta(center: number, offset: number, max: number): number 
   while (v > max) v -= max;
   return v;
 }
+
+export function getTorusDistance(p1: XY, p2: XY): number {
+    const dx = Math.abs(p1.x - p2.x);
+    const dy = Math.abs(p1.y - p2.y);
+    const adx = Math.min(dx, BOUNDS.maxX - dx);
+    const ady = Math.min(dy, BOUNDS.maxY - dy);
+    return Math.max(adx, ady);
+}

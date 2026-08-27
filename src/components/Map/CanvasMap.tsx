@@ -1,6 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
-import {BOUNDS, torusDelta, wrapX, wrapY} from '../../utils/position';
+import {BOUNDS, getTorusDistance, torusDelta, wrapX, wrapY} from '../../utils/position';
 import {getSectorNumber, isSectorLabelCell, sectorBackgroundColor, sectorLabelColor} from '../../utils/sectors';
 import {countCombatsByKind} from '../../parsers/parseCombatMessages';
 import {drawCombatMarkers} from '../../utils/combatMarkers';
@@ -24,7 +24,9 @@ const RACE_BADGE_COLORS: Record<number, string> = {
 };
 
 type Props = {
-    onSelect: (xy: XY) => void;
+    onSelect: (xy: XY, ctrl: boolean) => void;
+    selected?: XY;
+    showFleetsFor?: XY; // Position pour laquelle afficher les flèches de portée
     selectedOwners?: number[]; // liste des commandants sélectionnés pour filtrage visuel
     showCombatBadges: boolean;
     showOwnerBadges: boolean;
@@ -58,7 +60,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#f80c0c';
 }
 
-export default function CanvasMap({onSelect, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges}: Props) {
+export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges}: Props) {
     const {rapport, global, cellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -69,7 +71,7 @@ export default function CanvasMap({onSelect, selectedOwners, showCombatBadges, s
     }, [center]);
 
     // Gestion du drag
-    const dragRef = useRef({dragging: false, lastX: 0, lastY: 0, accX: 0, accY: 0});
+    const dragRef = useRef({dragging: false, lastX: 0, lastY: 0, accX: 0, accY: 0, moved: false});
 
     // Redraw quand le canvas change de taille (évite l'étirement non proportionnel)
     const [canvasSizeVersion, setCanvasSizeVersion] = useState(0);
@@ -659,9 +661,77 @@ export default function CanvasMap({onSelect, selectedOwners, showCombatBadges, s
                 }
             }
             try { if (combatLogCount > 0) console.info(`[CanvasMap] logged ${combatLogCount} combat positions`); } catch (e) { }
+
+            // FLÈCHES DE DÉPLACEMENT (mes flottes vers showFleetsFor)
+            if (showFleetsFor) {
+                const playerFleets = rapport?.flottesJoueur.filter(f => {
+                    return !(f.pos.x === showFleetsFor.x && f.pos.y === showFleetsFor.y);
+                }) || [];
+
+                if (playerFleets.length > 0) {
+                    ctx.save();
+                    ctx.lineWidth = 1;
+
+                    playerFleets.forEach(f => {
+                        const dist = getTorusDistance(f.pos, showFleetsFor);
+                        const reachable = dist <= f.vitesse;
+
+                        // Couleur : vert/jaune clair si atteignable, orange clair sinon
+                        ctx.strokeStyle = reachable ? '#ccff00' : '#ffa500';
+                        ctx.fillStyle = reachable ? '#ccff0000' : '#ffa500';
+                        ctx.setLineDash([5, 5]);
+
+                        // On calcule le delta le plus court sur le tore
+                        let dx = showFleetsFor.x - f.pos.x;
+                        if (Math.abs(dx) > BOUNDS.maxX / 2) {
+                            dx = dx > 0 ? dx - BOUNDS.maxX : dx + BOUNDS.maxX;
+                        }
+                        let dy = showFleetsFor.y - f.pos.y;
+                        if (Math.abs(dy) > BOUNDS.maxY / 2) {
+                            dy = dy > 0 ? dy - BOUNDS.maxY : dy + BOUNDS.maxY;
+                        }
+
+                        const getScreenPos = (pos: XY) => {
+                            // Distance signée par rapport au centre, tenant compte du tore
+                            let offX = pos.x - center.x;
+                            if (offX > BOUNDS.maxX / 2) offX -= BOUNDS.maxX;
+                            if (offX < -BOUNDS.maxX / 2) offX += BOUNDS.maxX;
+
+                            let offY = pos.y - center.y;
+                            if (offY > BOUNDS.maxY / 2) offY -= BOUNDS.maxY;
+                            if (offY < -BOUNDS.maxY / 2) offY += BOUNDS.maxY;
+
+                            return {
+                                x: (halfCols + offY) * cellSize + cellSize / 2,
+                                y: (halfRows + offX) * cellSize + cellSize / 2
+                            };
+                        };
+
+                        const start = getScreenPos(f.pos);
+                        const end = getScreenPos(showFleetsFor);
+
+                        ctx.beginPath();
+                        ctx.moveTo(start.x, start.y);
+                        ctx.lineTo(end.x, end.y);
+                        ctx.stroke();
+
+                        // Petite flèche au bout
+                        const angle = Math.atan2(end.y - start.y, end.x - start.x);
+                        ctx.setLineDash([]);
+                        ctx.beginPath();
+                        ctx.moveTo(end.x, end.y);
+                        ctx.lineTo(end.x - 10 * Math.cos(angle - Math.PI / 6), end.y - 10 * Math.sin(angle - Math.PI / 6));
+                        ctx.lineTo(end.x - 10 * Math.cos(angle + Math.PI / 6), end.y - 10 * Math.sin(angle + Math.PI / 6));
+                        ctx.closePath();
+                        ctx.fill();
+                    });
+                    ctx.restore();
+                }
+            }
+
             cCombat.restore();
         }
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, selected, showFleetsFor]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
@@ -687,6 +757,10 @@ export default function CanvasMap({onSelect, selectedOwners, showCombatBadges, s
     }, [center, setCenter]);
 
     const handleClick = (evt: React.MouseEvent<HTMLCanvasElement>) => {
+        if (dragRef.current.moved) {
+            dragRef.current.moved = false;
+            return;
+        }
         const rect = (evt.target as HTMLCanvasElement).getBoundingClientRect();
         const cx = evt.clientX - rect.left;
         const cy = evt.clientY - rect.top;
@@ -703,7 +777,7 @@ export default function CanvasMap({onSelect, selectedOwners, showCombatBadges, s
         const x = torusDelta(center.x, row - halfRows, BOUNDS.maxX);
         const y = torusDelta(center.y, col - halfCols, BOUNDS.maxY);
 
-        onSelect({x, y});
+        onSelect({x, y}, evt.ctrlKey);
     };
 
     const handleMouseDown = useCallback((evt: React.MouseEvent<HTMLCanvasElement>) => {
@@ -713,6 +787,7 @@ export default function CanvasMap({onSelect, selectedOwners, showCombatBadges, s
         dragRef.current.lastY = evt.clientY;
         dragRef.current.accX = 0;
         dragRef.current.accY = 0;
+        dragRef.current.moved = false;
         evt.preventDefault();
 
         const onMove = (e: MouseEvent) => {
@@ -723,6 +798,10 @@ export default function CanvasMap({onSelect, selectedOwners, showCombatBadges, s
             dragRef.current.lastY = e.clientY;
             dragRef.current.accX += dx;
             dragRef.current.accY += dy;
+
+            if (dx !== 0 || dy !== 0) {
+                dragRef.current.moved = true;
+            }
 
             let stepY = 0; // variation sur l'axe Y de la carte (colonnes)
             let stepX = 0; // variation sur l'axe X de la carte (lignes)
