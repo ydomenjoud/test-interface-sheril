@@ -222,7 +222,7 @@ export function parseRapportXml(text: string): Rapport {
 
             const num = getAttrNum(p, ['num']) ?? 0;
             const pdc = getAttrNum(p, ['pdc']) ?? 0;
-            const prodMinerai = getAttrNum(p, ['prod']) ?? 0;
+            const prodMinerai = getAttrNum(p, ['revenumin']) ?? 0;
             const minerai = getAttrNum(p, ['stockmin']) ?? getAttrNum(p, ['minerai']);
 
             const batiments: { techCode: string; count: number }[] = [];
