@@ -2,12 +2,13 @@
 import {Technologie} from "../types";
 
 export function toRoman(n: number): string {
-    n = n+1;
     const romans = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
-    if (n <= 0) return romans[0];
-    if (n >= romans.length) return romans[romans.length - 1];
-    return romans[n];
+    const idx = n + 1;
+    if (idx <= 0) return romans[0];
+    if (idx >= romans.length) return romans[romans.length - 1];
+    return romans[idx];
 }
+
 export function romanFromNiv(niv?: number): string {
     // niv 0 => 1 => I, niv 4 => 5 => V ; cap à X
     const lvl = Math.max(0, Math.min(10, ((niv ?? 0))));
@@ -16,6 +17,53 @@ export function romanFromNiv(niv?: number): string {
 export function formatTechName(t?: Technologie): string {
     if (!t) return '';
     return `${t.nom} ${romanFromNiv(t.niv)}`;
+}
+
+export function formatPlannedItems(items: { type: 'building' | 'ship', code: string, quantity: number }[], technologies: Technologie[]) {
+    const buildingStats: Record<string, Record<number, number>> = {};
+    const shipStats: Record<string, number> = {};
+
+    items.forEach(item => {
+        if (item.type === 'building') {
+            const tech = technologies.find(t => t.code === item.code);
+            if (tech) {
+                if (!buildingStats[tech.nom]) buildingStats[tech.nom] = {};
+                buildingStats[tech.nom][tech.niv] = (buildingStats[tech.nom][tech.niv] || 0) + item.quantity;
+            }
+        } else {
+            shipStats[item.code] = (shipStats[item.code] || 0) + item.quantity;
+        }
+    });
+
+    const buildings = Object.keys(buildingStats).sort().map(name => ({
+        name,
+        types: Object.entries(buildingStats[name])
+            .sort((a, b) => Number(a[0]) - Number(b[0]))
+            .map(([niv, qty]) => ({ niv: Number(niv), qty }))
+    }));
+
+    const ships = Object.entries(shipStats)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([name, qty]) => ({ name, qty }));
+
+    const totalBuildings = buildings.reduce((acc, b) => acc + b.types.reduce((sum, t) => sum + t.qty, 0), 0);
+    const totalShips = ships.reduce((acc, s) => acc + s.qty, 0);
+
+    const formattedBuildings = buildings.map(b => {
+        const typesStr = b.types.map(t => `${t.qty} type ${toRoman(t.niv)}`).join(', ');
+        return `${b.name} : ${typesStr}`;
+    });
+
+    const formattedShips = ships.map(s => `${s.name} : ${s.qty}`);
+
+    return {
+        buildings,
+        ships,
+        totalBuildings,
+        totalShips,
+        formattedBuildings,
+        formattedShips
+    };
 }
 
 export function encodeBluePrint(entries:  {code: string, qty: number}[]) {

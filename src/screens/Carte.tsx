@@ -60,7 +60,7 @@ export default function Carte() {
             Données globales en chargement…
           </div>
         )}
-        <div style={{ marginLeft: 20 }}>
+        <div style={{ marginLeft: 20 }} className="hideOnMobile">
           Astuce: utilisez les flèches pour naviguer, maintenez Ctrl pour se déplacer par 5.
         </div>
         {/* Filtre multi-sélection des commandants */}

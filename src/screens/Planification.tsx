@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {useReport} from '../context/ReportContext';
 import {SystemeJoueur} from '../types';
-import {formatTechName} from '../utils/global';
+import {formatPlannedItems, formatTechName} from '../utils/global';
 import SearchableSelect from '../components/utils/SearchableSelect';
 
 type PlannedItem = {
@@ -16,8 +16,34 @@ type SystemQueue = Record<string, PlannedItem[]>; // Key = x_y
 
 export default function Planification() {
     const { global, rapport } = useReport();
-    const [sortBy, setSortBy] = useState<'nom' | 'pos' | 'pdc'>('nom');
+    const [sortBy, setSortBy] = useState<'nom' | 'pos' | 'pdc' | 'nbConstructions' | ''>('nom');
     const [orderedSystems, setOrderedSystems] = useState<SystemeJoueur[]>([]);
+    const [summaryExpanded, setSummaryExpanded] = useState(() => {
+        const saved = localStorage.getItem('planification_summary_expanded');
+        return saved !== null ? JSON.parse(saved) : true;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('planification_summary_expanded', JSON.stringify(summaryExpanded));
+    }, [summaryExpanded]);
+    const [summaryTab, setSummaryTab] = useState<'ship' | 'building'>('building');
+    const systems = useMemo(() => rapport?.systemesJoueur || [], [rapport]);
+
+    const [collapsedSystems, setCollapsedSystems] = useState<Record<string, boolean>>(() => {
+        const saved = localStorage.getItem('planification_collapsed');
+        return saved ? JSON.parse(saved) : { _isDefault: true };
+    });
+
+    useEffect(() => {
+        if (collapsedSystems._isDefault && systems.length > 0) {
+            const newState: Record<string, boolean> = {};
+            systems.forEach(s => {
+                newState[`${s.pos.x}_${s.pos.y}`] = true;
+            });
+            setCollapsedSystems(newState);
+        }
+    }, [systems, collapsedSystems._isDefault]);
+
     const [queues, setQueues] = useState<SystemQueue>(() => {
         const saved = localStorage.getItem('planification_queues');
         return saved ? JSON.parse(saved) : {};
@@ -27,7 +53,9 @@ export default function Planification() {
         localStorage.setItem('planification_queues', JSON.stringify(queues));
     }, [queues]);
 
-    const systems = rapport?.systemesJoueur || [];
+    useEffect(() => {
+        localStorage.setItem('planification_collapsed', JSON.stringify(collapsedSystems));
+    }, [collapsedSystems]);
 
     // Catalogues
     const knownTechs = useMemo(() => new Set(rapport?.technologiesConnues || []), [rapport]);
@@ -229,6 +257,13 @@ export default function Planification() {
     }
     const blueprint = buildBluePrint() || '';
 
+    const summaryData = useMemo(() => {
+        return formatPlannedItems(
+            Object.values(queues).flat(),
+            global?.technologies || []
+        );
+    }, [queues, global]);
+
     const copyBluePrint = () => {
         navigator.clipboard.writeText(blueprint)
             .then(() => alert("Blueprint global copié !"))
@@ -264,6 +299,21 @@ export default function Planification() {
                 )
             };
         });
+    };
+
+    const toggleCollapse = (key: string) => {
+        setCollapsedSystems(prev => ({
+            ...prev,
+            [key]: !prev[key]
+        }));
+    };
+
+    const setAllCollapse = (collapsed: boolean) => {
+        const newState: Record<string, boolean> = {};
+        systems.forEach(s => {
+            newState[`${s.pos.x}_${s.pos.y}`] = collapsed;
+        });
+        setCollapsedSystems(newState);
     };
 
     const getSystemResources = (s: SystemeJoueur) => {
@@ -331,6 +381,8 @@ export default function Planification() {
     };
 
     useEffect(() => {
+        if (sortBy === '') return;
+
         const sorted = [...systems];
         if (sortBy === 'nom') {
             sorted.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
@@ -354,24 +406,47 @@ export default function Planification() {
                 };
                 return getRemainingPdc(b) - getRemainingPdc(a); // Décroissant
             });
+        } else if (sortBy === 'nbConstructions') {
+            sorted.sort((a, b) => {
+                const getNbConstructions = (s: SystemeJoueur) => {
+                    const key = `${s.pos.x}_${s.pos.y}`;
+                    const queue = queues[key] || [];
+                    return queue.reduce((sum, item) => sum + item.quantity, 0);
+                };
+                return getNbConstructions(b) - getNbConstructions(a); // Décroissant
+            });
         }
         setOrderedSystems(sorted);
+        setSortBy('');
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [systems, sortBy, buildings, plans, global]);
+    }, [sortBy]);
+
+    // Initialisation et mise à jour quand les systèmes changent (ex: chargement rapport)
+    useEffect(() => {
+        if (orderedSystems.length === 0 && systems.length > 0) {
+            const sorted = [...systems].sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+            setOrderedSystems(sorted);
+        }
+    }, [systems, orderedSystems.length]);
 
     if (!rapport) return <div style={{ padding: 20 }}>Veuillez charger un rapport XML.</div>;
 
     return (
-        <div style={{ padding: 20, color: '#eee', backgroundColor: '#111', minHeight: '100%', overflowX: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: 20, color: '#eee', backgroundColor: '#111', overflowX: 'auto' }}>
+            <div className="half">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
                     <h2>Planification Globale</h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <label htmlFor="sortBy" style={{ fontSize: '0.9em', color: '#aaa' }}>Trier par :</label>
                         <select
                             id="sortBy"
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value as any)}
+                            value={sortBy === 'nom' || sortBy === 'pos' || sortBy === 'pdc' || sortBy === 'nbConstructions' ? '' : sortBy}
+                            onChange={(e) => {
+                                const val = e.target.value as any;
+                                if (val) {
+                                    setSortBy(val);
+                                }
+                            }}
                             style={{
                                 backgroundColor: '#222',
                                 color: '#eee',
@@ -381,10 +456,26 @@ export default function Planification() {
                                 cursor: 'pointer'
                             }}
                         >
+                            <option value="">--choisir--</option>
                             <option value="nom">Nom</option>
                             <option value="pos">Position</option>
                             <option value="pdc">PDC restant</option>
+                            <option value="nbConstructions">Nombre de constructions</option>
                         </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                            onClick={() => setAllCollapse(true)}
+                            style={{ fontSize: '0.8em', padding: '4px 8px', cursor: 'pointer', backgroundColor: '#333', color: '#eee', border: '1px solid #555', borderRadius: 4 }}
+                        >
+                            Tout replier
+                        </button>
+                        <button
+                            onClick={() => setAllCollapse(false)}
+                            style={{ fontSize: '0.8em', padding: '4px 8px', cursor: 'pointer', backgroundColor: '#333', color: '#eee', border: '1px solid #555', borderRadius: 4 }}
+                        >
+                            Tout déplier
+                        </button>
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
@@ -429,7 +520,7 @@ export default function Planification() {
                         <th style={{ textAlign: 'center', padding: 8 }}>Min</th>
                         {marchandisesCols.map(m => (
                             <th key={m.code} style={{ textAlign: 'center', padding: 8 }} title={m.nom} className={'m m'+m.code}>
-                                {m.nom.substring(0, 3)}.
+                                <span className="hideOnMobile">{m.nom.substring(0, 3)}.</span>
                             </th>
                         ))}
                     </tr>
@@ -462,21 +553,61 @@ export default function Planification() {
                         });
 
                         const ownedPlanets = s.planetes.filter(p => p.proprietaire === rapport?.joueur?.numero);
+                        const isCollapsed = collapsedSystems[key];
+
+                        if (isCollapsed) {
+                            return (
+                                <tr key={key} style={{ borderBottom: '1px solid #444', backgroundColor: finalPc > 0 ? '' : '#333' }}>
+                                    <td style={{ padding: 8 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <button
+                                                onClick={() => toggleCollapse(key)}
+                                                style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: 0, fontSize: '1.2em' }}
+                                            >
+                                                ▶
+                                            </button>
+                                            <span style={{ fontSize: '0.8em', color: '#888' }}>[{s.pos.x.toString().padStart(2, '0')}-{s.pos.y.toString().padStart(2, '0')}]</span>
+                                            <span style={{ fontWeight: 'bold' }} className="hideOnMobile">{s.nom}</span>
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: 8, textAlign: 'center' }}>
+                                        <span style={{ color: finalPc < 0 ? '#f55' : (finalPc < initial.pc ? '#5f5' : '#aaa') }}>{finalPc}</span>
+                                    </td>
+                                    <td style={{ padding: 8, textAlign: 'center' }}>
+                                        <span style={{ color: finalMinerai < 0 ? '#f55' : (finalMinerai < initial.minerai ? '#5f5' : '#aaa') }}>{finalMinerai}</span>
+                                    </td>
+                                    <td colSpan={marchandisesCols.length} style={{ padding: 8 }}>
+                                        <div style={{ fontSize: '0.85em', color: '#bbb', overflowX: 'auto', whiteSpace: 'nowrap', maxWidth: 0, minWidth: '100%' }}>
+                                            {queue.length > 0 ? (
+                                                (() => {
+                                                    const formatted = formatPlannedItems(queue, global?.technologies || []);
+                                                    const all = [...formatted.formattedBuildings, ...formatted.formattedShips];
+                                                    return all.join(', ');
+                                                })()
+                                            ) : (
+                                                <span style={{ fontStyle: 'italic', color: '#555' }}>Rien</span>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        }
 
                         return (
-                            <>
-                            <tr key={key} style={{verticalAlign: 'top' }}>
+                            <React.Fragment key={key}>
+                            <tr style={{verticalAlign: 'top', backgroundColor: finalPc>0 ? '' : '#333' }}>
                                 <td style={{ padding: 8 }}>
-                                    <div style={{ fontWeight: 'bold' }}>{s.nom}</div>
-                                    <div style={{ fontSize: '0.8em', color: '#888' }}>
-                                        ({s.pos.x}, {s.pos.y}) &nbsp;
-                                        {/*<button*/}
-                                        {/*    onClick={() => exportQueue(key)}*/}
-                                        {/*    style={{ fontSize: '0.7em', padding: '2px 4px', cursor: 'pointer' }}*/}
-                                        {/*    title="Copier le blueprint de ce système"*/}
-                                        {/*>*/}
-                                        {/*    Export BP*/}
-                                        {/*</button>*/}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <button
+                                            onClick={() => toggleCollapse(key)}
+                                            style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: 0, fontSize: '1.2em' }}
+                                        >
+                                            ▼
+                                        </button>
+                                        <div style={{ fontSize: '0.8em', color: '#888' }}>
+                                            [{s.pos.x.toString().padStart(2, '0')}-{s.pos.y.toString().padStart(2, '0')}] &nbsp;
+                                        </div>
+                                        <div style={{ fontWeight: 'bold' }}>{s.nom}</div>
                                     </div>
                                 </td>
 
@@ -507,7 +638,7 @@ export default function Planification() {
                                 })}
 
                             </tr>
-                            <tr style={{  borderBottom: '2px solid #6F6' }}>
+                            <tr style={{  borderBottom: '2px solid #6F6', backgroundColor: finalPc>0 ? '' : '#333' }}>
                                 <td style={{ padding: 8 }} colSpan={19}>
                                     <div style={{ marginBottom: 10 }}>
                                         <SearchableSelect
@@ -601,11 +732,105 @@ export default function Planification() {
                                     </div>
                                 </td>
                             </tr>
-                            </>
+                            </React.Fragment>
                         );
                     })}
                 </tbody>
             </table>
+
+            {/* Summary Widget */}
+            <div style={{
+                position: 'fixed',
+                bottom: 20,
+                right: 20,
+                width: summaryExpanded ? 350 : 120,
+                backgroundColor: '#222',
+                border: '1px solid #444',
+                borderRadius: 8,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                zIndex: 1000,
+                display: 'flex',
+                flexDirection: 'column',
+                maxHeight: '80vh',
+                transition: 'width 0.3s ease'
+            }}>
+                <div
+                    onClick={() => setSummaryExpanded(!summaryExpanded)}
+                    style={{
+                        padding: '8px 12px',
+                        backgroundColor: '#333',
+                        borderBottom: summaryExpanded ? '1px solid #444' : 'none',
+                        borderRadius: summaryExpanded ? '8px 8px 0 0' : 8,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontWeight: 'bold',
+                        fontSize: '0.9em'
+                    }}
+                >
+                    <span>Récapitulatif</span>
+                    <span>{summaryExpanded ? '▼' : '▲'}</span>
+                </div>
+
+                {summaryExpanded && (
+                    <>
+                        <div style={{ display: 'flex', borderBottom: '1px solid #444' }}>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setSummaryTab('building'); }}
+                                style={{
+                                    flex: 1,
+                                    padding: '8px',
+                                    backgroundColor: summaryTab === 'building' ? '#444' : 'transparent',
+                                    color: summaryTab === 'building' ? '#fff' : '#aaa',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85em'
+                                }}
+                            >
+                                Bâtiments ({summaryData.totalBuildings})
+                            </button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setSummaryTab('ship'); }}
+                                style={{
+                                    flex: 1,
+                                    padding: '8px',
+                                    backgroundColor: summaryTab === 'ship' ? '#444' : 'transparent',
+                                    color: summaryTab === 'ship' ? '#fff' : '#aaa',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85em'
+                                }}
+                            >
+                                Vaisseaux ({summaryData.totalShips})
+                            </button>
+                        </div>
+                        <div style={{ padding: 12, overflowY: 'auto', fontSize: '0.9em' }}>
+                            {summaryTab === 'building' ? (
+                                summaryData.formattedBuildings.length > 0 ? (
+                                    summaryData.formattedBuildings.map((str, i) => (
+                                        <div key={i} style={{ marginBottom: 6 }}>
+                                            <span style={{ color: '#aaa', fontWeight: 'bold' }}>{str.split(' : ')[0]}</span> : {str.split(' : ')[1]}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div style={{ color: '#666', fontStyle: 'italic' }}>Aucun bâtiment planifié</div>
+                                )
+                            ) : (
+                                summaryData.formattedShips.length > 0 ? (
+                                    summaryData.formattedShips.map((str, i) => (
+                                        <div key={i} style={{ marginBottom: 6 }}>
+                                            <span style={{ color: '#aaa', fontWeight: 'bold' }}>{str.split(' : ')[0]}</span> : {str.split(' : ')[1]}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div style={{ color: '#666', fontStyle: 'italic' }}>Aucun vaisseau planifié</div>
+                                )
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
         </div>
     );
 }

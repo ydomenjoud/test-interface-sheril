@@ -325,3 +325,49 @@ a {
     color: gold;
     text-shadow: 2px 1px 6px #ddbcbc;
 }
+
+.half {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+nav.app-nav {
+    display: block;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    gap: 12px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #222;
+}
+.file-label svg {
+    display: none;
+}
+@media (max-width: 1080px) {
+    .hideOnMobile {
+        display: none;
+    }
+    .half {
+        flex-direction: column;
+    }
+    .file-input {
+        display: none;
+    }
+
+    /* Style du label transformé en bouton */
+    .file-label {
+        display: inline-block;
+        padding: 8px 16px;
+        background-color: #007bff;
+        color: white;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+    .file-label svg {
+        display: block;
+    }
+
+    .file-label:hover {
+        background-color: #0056b3;
+    }
+}

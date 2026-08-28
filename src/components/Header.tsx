@@ -12,7 +12,7 @@ export default function Header() {
             <Commandant num={rapport?.joueur.numero}/>
         </div>
         <button
-            className="badge"
+            className="badge hideOnMobile"
             onClick={() => {
                 if (rapport?.joueur.capitale) setCenter(rapport.joueur.capitale);
             }}
@@ -23,9 +23,6 @@ export default function Header() {
         </button>
         <nav
             className="app-nav"
-            style={{
-                display: 'flex', gap: 12, padding: '8px 12px', borderBottom: '1px solid #222', flexWrap: 'wrap',
-            }}
         >
             <NavLink to="/" end className={({isActive}) => (isActive ? 'active' : '')}>
                 Carte
@@ -54,27 +51,49 @@ export default function Header() {
         </nav>
         <div className="header-spacer"/>
         <button
-            className="badge"
-            onClick={async () => { await refreshStats(); }}
+            className="badge hideOnMobile"
+            onClick={async () => {
+                await refreshStats();
+            }}
             title="Rafraîchir les données publiques (races, combats)"
             style={{marginRight: 8}}
         >
             Rafraichir stats
         </button>
-        <input
-            ref={rapportInput}
-            type="file"
-            accept=".xml"
-            onChange={async (e) => {
-                const f = e.currentTarget?.files?.[0];
-                // On capture la ref AVANT l'await pour éviter tout souci avec l'event
-                const inputEl = rapportInput.current;
-                if (f) {
-                    await loadRapportFile(f);
-                }
-                if (inputEl) inputEl.value = '';
-            }}
-            title="Charger rapport.xml"
-        />
-    </header>);
+        <label className="file-label">
+            <svg
+                className="file-icon"
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                        >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+            <input
+                ref={rapportInput}
+                className="file-input"
+                type="file"
+                accept=".xml"
+                onChange={async (e) => {
+                    const f = e.currentTarget?.files?.[0];
+                    // On capture la ref AVANT l'await pour éviter tout souci avec l'event
+                    const inputEl = rapportInput.current;
+                    if (f) {
+                        await loadRapportFile(f);
+                    }
+                    if (inputEl) inputEl.value = '';
+                }}
+                title="Charger rapport.xml"
+            />
+        </label>
+    </header>
+);
 }
