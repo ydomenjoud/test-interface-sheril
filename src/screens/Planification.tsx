@@ -16,6 +16,8 @@ type SystemQueue = Record<string, PlannedItem[]>; // Key = x_y
 
 export default function Planification() {
     const { global, rapport } = useReport();
+    const [sortBy, setSortBy] = useState<'nom' | 'pos' | 'pdc'>('nom');
+    const [orderedSystems, setOrderedSystems] = useState<SystemeJoueur[]>([]);
     const [queues, setQueues] = useState<SystemQueue>(() => {
         const saved = localStorage.getItem('planification_queues');
         return saved ? JSON.parse(saved) : {};
@@ -328,12 +330,63 @@ export default function Planification() {
         }
     };
 
+    useEffect(() => {
+        const sorted = [...systems];
+        if (sortBy === 'nom') {
+            sorted.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+        } else if (sortBy === 'pos') {
+            sorted.sort((a, b) => {
+                if (a.pos.x !== b.pos.x) return a.pos.x - b.pos.x;
+                return a.pos.y - b.pos.y;
+            });
+        } else if (sortBy === 'pdc') {
+            sorted.sort((a, b) => {
+                const getRemainingPdc = (s: SystemeJoueur) => {
+                    const initial = getSystemResources(s);
+                    const key = `${s.pos.x}_${s.pos.y}`;
+                    const queue = queues[key] || [];
+                    let remPc = initial.pc;
+                    queue.forEach(item => {
+                        const data = getItemData(item);
+                        remPc -= data.pc * item.quantity;
+                    });
+                    return remPc;
+                };
+                return getRemainingPdc(b) - getRemainingPdc(a); // Décroissant
+            });
+        }
+        setOrderedSystems(sorted);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [systems, sortBy, buildings, plans, global]);
+
     if (!rapport) return <div style={{ padding: 20 }}>Veuillez charger un rapport XML.</div>;
 
     return (
         <div style={{ padding: 20, color: '#eee', backgroundColor: '#111', minHeight: '100%', overflowX: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h2>Planification Globale</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                    <h2>Planification Globale</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <label htmlFor="sortBy" style={{ fontSize: '0.9em', color: '#aaa' }}>Trier par :</label>
+                        <select
+                            id="sortBy"
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value as any)}
+                            style={{
+                                backgroundColor: '#222',
+                                color: '#eee',
+                                border: '1px solid #444',
+                                borderRadius: 4,
+                                padding: '4px 8px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <option value="nom">Nom</option>
+                            <option value="pos">Position</option>
+                            <option value="pdc">PDC restant</option>
+                        </select>
+                    </div>
+                </div>
                 <div style={{ display: 'flex', gap: 10 }}>
                     <textarea
                         style={{width: '100%', backgroundColor: 'white', padding: '10px', color: '#000'}}
@@ -382,7 +435,7 @@ export default function Planification() {
                     </tr>
                 </thead>
                 <tbody>
-                    {systems.map(s => {
+                    {orderedSystems.map(s => {
                         const key = `${s.pos.x}_${s.pos.y}`;
                         const initial = getSystemResources(s);
                         const queue = queues[key] || [];
