@@ -27,6 +27,7 @@ type Props = {
     onSelect: (xy: XY, ctrl: boolean) => void;
     selected?: XY;
     showFleetsFor?: XY; // Position pour laquelle afficher les flèches de portée
+    showSystems: boolean;
     selectedOwners?: number[]; // liste des commandants sélectionnés pour filtrage visuel
     showCombatBadges: boolean;
     showOwnerBadges: boolean;
@@ -64,7 +65,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#f80c0c';
 }
 
-export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showStabilityZones, stabilitySystemPos}: Props) {
+export default function CanvasMap({onSelect, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showStabilityZones, stabilitySystemPos}: Props) {
     const {rapport, global, cellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -421,31 +422,33 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOw
             return selectedOwners.includes(owner);
         };
 
-        systems.forEach(s => {
-            // Filtrage par tags si sélectionné
-            if (selectedTags.length > 0) {
-                const posKey = `${s.pos.x}_${s.pos.y}`;
-                const cellNotes = notes[posKey] || [];
-                const hasMatchingTag = cellNotes.some(n => n.tag && selectedTags.includes(n.tag));
-                if (!hasMatchingTag) return;
-            }
-
-            let dx = ((s.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
-            let dy = ((s.pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
-
-            // Gérer le wrapping si le viewport est plus grand que la galaxie
-            while (dx < cols) {
-                let currentDy = dy;
-                while (currentDy < rows) {
-                    const px = dx * cellSize;
-                    const py = currentDy * cellSize;
-
-                    renderSystem(s, px, py);
-                    currentDy += BOUNDS.maxX;
+        if (showSystems) {
+            systems.forEach(s => {
+                // Filtrage par tags si sélectionné
+                if (selectedTags.length > 0) {
+                    const posKey = `${s.pos.x}_${s.pos.y}`;
+                    const cellNotes = notes[posKey] || [];
+                    const hasMatchingTag = cellNotes.some(n => n.tag && selectedTags.includes(n.tag));
+                    if (!hasMatchingTag) return;
                 }
-                dx += BOUNDS.maxY;
-            }
-        });
+
+                let dx = ((s.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+                let dy = ((s.pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+
+                // Gérer le wrapping si le viewport est plus grand que la galaxie
+                while (dx < cols) {
+                    let currentDy = dy;
+                    while (currentDy < rows) {
+                        const px = dx * cellSize;
+                        const py = currentDy * cellSize;
+
+                        renderSystem(s, px, py);
+                        currentDy += BOUNDS.maxX;
+                    }
+                    dx += BOUNDS.maxY;
+                }
+            });
+        }
 
         function renderSystem(s: any, px: number, py: number) {
             // Couleur(s) en fonction de la possession
@@ -788,7 +791,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOw
 
             cCombat.restore();
         }
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, selected, showFleetsFor, showStabilityZones, stabilitySystemPos]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {

@@ -14,6 +14,10 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_selected_owners');
     return saved ? JSON.parse(saved) : [];
   });
+  const [showSystems, setShowSystems] = useState(() => {
+    const saved = localStorage.getItem('carte_show_systems');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
   const [showCombatBadges, setShowCombatBadges] = useState(() => {
     const saved = localStorage.getItem('carte_show_combat_badges');
     return saved !== null ? JSON.parse(saved) : true;
@@ -54,6 +58,10 @@ export default function Carte() {
   useEffect(() => {
     localStorage.setItem('carte_filters_expanded', JSON.stringify(filtersExpanded));
   }, [filtersExpanded]);
+
+  useEffect(() => {
+    localStorage.setItem('carte_show_systems', JSON.stringify(showSystems));
+  }, [showSystems]);
 
   useEffect(() => {
     localStorage.setItem('carte_selected_owners', JSON.stringify(selectedOwners));
@@ -169,6 +177,7 @@ export default function Carte() {
             }}
             selected={selected}
             showFleetsFor={showFleetsFor}
+            showSystems={showSystems}
             selectedOwners={selectedOwners}
             showCombatBadges={showCombatBadges}
             showOwnerBadges={showOwnerBadges}
@@ -242,6 +251,14 @@ export default function Carte() {
                       )}
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #444', paddingTop: 8 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={showSystems}
+                              onChange={(e) => setShowSystems(e.target.checked)}
+                            />
+                            Afficher systèmes
+                          </label>
                           <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
