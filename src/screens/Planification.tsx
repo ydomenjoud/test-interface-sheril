@@ -27,6 +27,21 @@ export default function Planification() {
         localStorage.setItem('planification_summary_expanded', JSON.stringify(summaryExpanded));
     }, [summaryExpanded]);
     const [summaryTab, setSummaryTab] = useState<'ship' | 'building'>('building');
+    const [highlightedItems, setHighlightedItems] = useState<Record<string, boolean>>({});
+
+    useEffect(() => {
+        const timers: NodeJS.Timeout[] = [];
+        Object.keys(highlightedItems).forEach(id => {
+            if (highlightedItems[id]) {
+                const timer = setTimeout(() => {
+                    setHighlightedItems(prev => ({ ...prev, [id]: false }));
+                }, 1000);
+                timers.push(timer);
+            }
+        });
+        return () => timers.forEach(t => clearTimeout(t));
+    }, [highlightedItems]);
+
     const systems = useMemo(() => rapport?.systemesJoueur || [], [rapport]);
 
     const [collapsedSystems, setCollapsedSystems] = useState<Record<string, boolean>>(() => {
@@ -103,11 +118,17 @@ export default function Planification() {
     const setQuantity = (systemKey: string, itemId: string, val: number) => {
         setQueues(prev => {
             const q = prev[systemKey] || [];
+            if (val <= 0) {
+                return {
+                    ...prev,
+                    [systemKey]: q.filter(item => item.id !== itemId)
+                };
+            }
             return {
                 ...prev,
                 [systemKey]: q.map(item =>
-                    item.id === itemId ? { ...item, quantity: Math.max(0, val) } : item
-                ).filter(item => item.quantity > 0)
+                    item.id === itemId ? { ...item, quantity: val } : item
+                )
             };
         });
     };
@@ -159,11 +180,16 @@ export default function Planification() {
 
             if (maxPossible === Infinity || maxPossible < 0) maxPossible = 0;
 
+            if (maxPossible === 0) {
+                setHighlightedItems(prev => ({ ...prev, [itemId]: true }));
+                return prev;
+            }
+
             return {
                 ...prev,
                 [systemKey]: queue.map((item, idx) =>
                     idx === itemIndex ? { ...item, quantity: maxPossible } : item
-                ).filter(item => item.quantity > 0)
+                )
             };
         });
     };
@@ -437,7 +463,6 @@ export default function Planification() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
                     <h2>Planification Globale</h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <label htmlFor="sortBy" style={{ fontSize: '0.9em', color: '#aaa' }}>Trier par :</label>
                         <select
                             id="sortBy"
                             value={sortBy === 'nom' || sortBy === 'pos' || sortBy === 'pdc' || sortBy === 'nbConstructions' ? '' : sortBy}
@@ -456,26 +481,12 @@ export default function Planification() {
                                 cursor: 'pointer'
                             }}
                         >
-                            <option value="">--choisir--</option>
+                            <option value="">-- Trier par --</option>
                             <option value="nom">Nom</option>
                             <option value="pos">Position</option>
                             <option value="pdc">PDC restant</option>
                             <option value="nbConstructions">Nombre de constructions</option>
                         </select>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <button
-                            onClick={() => setAllCollapse(true)}
-                            style={{ fontSize: '0.8em', padding: '4px 8px', cursor: 'pointer', backgroundColor: '#333', color: '#eee', border: '1px solid #555', borderRadius: 4 }}
-                        >
-                            Tout replier
-                        </button>
-                        <button
-                            onClick={() => setAllCollapse(false)}
-                            style={{ fontSize: '0.8em', padding: '4px 8px', cursor: 'pointer', backgroundColor: '#333', color: '#eee', border: '1px solid #555', borderRadius: 4 }}
-                        >
-                            Tout déplier
-                        </button>
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
@@ -512,6 +523,51 @@ export default function Planification() {
                 </div>
             </div>
 
+            <div style={{ display: 'flex', gap: 3 }}>
+                <button
+                    onClick={() => setAllCollapse(false)}
+                    style={{
+                        padding: '4px 8px',
+                        cursor: 'pointer',
+                        backgroundColor: '#333',
+                        color: '#eee',
+                        border: '1px solid #555',
+                        borderRadius: 4,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: '32px'
+                    }}
+                    title="Tout déplier"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="4 9 12 1 20 9"></polyline>
+                        <polyline points="4 15 12 23 20 15"></polyline>
+                    </svg>
+                </button>
+                <button
+                    onClick={() => setAllCollapse(true)}
+                    style={{
+                        padding: '4px 8px',
+                        cursor: 'pointer',
+                        backgroundColor: '#333',
+                        color: '#eee',
+                        border: '1px solid #555',
+                        borderRadius: 4,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: '32px'
+                    }}
+                    title="Tout replier"
+                >
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="4 2.5 12 10.5 20 2.5"></polyline>
+                    <polyline points="4 21.5 12 13.5 20 21.5"></polyline>
+                </svg>
+
+                </button>
+        </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 20 }}>
                 <thead>
                     <tr style={{ borderBottom: '2px solid #444', color: '#aaa', fontSize: '0.9em' }}>
@@ -664,13 +720,26 @@ export default function Planification() {
                                         const hasNextLevel = tech ? global?.technologies.some(t => t.type === 0 && t.base === tech.base && t.niv === tech.niv + 1 && (knownTechs.has(t.code) || t.publique)) : false;
                                         const hasPrevLevel = tech ? global?.technologies.some(t => t.type === 0 && t.base === tech.base && t.niv === tech.niv - 1 && (knownTechs.has(t.code) || t.publique)) : false;
 
+                                        const isHighlighted = highlightedItems[item.id];
+
                                         return (
-                                            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, backgroundColor: '#222', padding: '2px 8px', borderRadius: 4, width: '300px', flexDirection: 'column' }}>
+                                            <div key={item.id} style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8,
+                                                marginBottom: 4,
+                                                backgroundColor: isHighlighted ? '#a22' : '#222',
+                                                padding: '2px 8px',
+                                                borderRadius: 4,
+                                                width: '300px',
+                                                flexDirection: 'column',
+                                                transition: 'background-color 0.5s ease'
+                                            }}>
                                                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4, flexDirection: 'row', width:'100%', }}>
                                                     <div style={{width:'100%', justifyContent: 'space-between', flexDirection: 'row', display: "flex"}}>
                                                         <span style={{ fontSize: '0.9em' }}>{item.data.name}</span>
                                                         {item.type === 'building' && (
-                                                            <div style={{ display: 'flex', gap: 2 }}>
+                                                            <div style={{ display: 'flex', gap: 3 }}>
                                                                 <button
                                                                     disabled={!hasPrevLevel}
                                                                     onClick={() => changeBuildingLevel(key, item.id, -1)}
