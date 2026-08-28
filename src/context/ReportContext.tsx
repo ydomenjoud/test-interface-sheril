@@ -137,15 +137,18 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
 
     const refreshStats = useCallback(async () => {
         try {
-            const fetchWithTimeout = async (url: string, fallbackUrl: string) => {
+            const fetchWithTimeout = async (url: string, fallbackUrl?: string, ms = 5000) => {
                 try {
-                    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+                    const response = await fetch(url, { signal: AbortSignal.timeout(ms) });
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     return await response.text();
-                } catch {
-                    // En cas de timeout ou d'erreur réseau, on charge le fichier local
+                } catch (error) {
+                    // Si aucun fallback n'est fourni, on retourne une chaîne vide
+                    if (!fallbackUrl) return '';
+
                     try {
-                        const fallbackResponse = await fetch(fallbackUrl);
+                        const fallbackResponse = await fetch(fallbackUrl, { signal: AbortSignal.timeout(ms) });
+                        if (!fallbackResponse.ok) return '';
                         return await fallbackResponse.text();
                     } catch {
                         return '';
@@ -154,13 +157,15 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
             };
 
             const [dataTxt, combatsTxt] = await Promise.all([
-                fetchWithTimeout(`https://sheril.pbem-france.net/stats/data.xml`, 'https://ydomenjoud.github.io/test-interface-sheril/examples/data.xml'),
-                fetch('https://sheril.pbem-france.net/stats/combats.htm').then(r => r.text()).catch(() => ''),
+                fetchWithTimeout(
+                    `https://sheril.pbem-france.neta/stats/data.xml`,
+                    'https://ydomenjoud.github.io/test-interface-sheril/examples/data.xml'
+                ),
+                fetchWithTimeout('https://sheril.pbem-france.net/stats/combats.htm'),
             ]);
             if (dataTxt) {
                 try {
                     const data = parseDataXml(dataTxt);
-                    console.log(data);
                     setGlobal(data);
                     const style = document.createElement("style");
                     style.innerHTML = data.races
@@ -176,7 +181,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
                     const parsed = parsePublicCombatsHtml(combatsTxt);
                     try {
                         // console.info(`[ReportContext] refreshStats -> parsed ${parsed.length} public combats`);
-                        if (parsed.length > 0) console.debug(parsed.slice(0, 5));
+                        // if (parsed.length > 0) console.debug(parsed.slice(0, 5));
                     } catch (e) { /* ignore logging errors */ }
                     setPublicCombats(parsed);
                 } catch {

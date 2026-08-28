@@ -51,8 +51,8 @@ export default function CreatePlan() {
         for (const [k, v] of Object.entries(dict)) {
             const lower = (v || '').toLowerCase();
             if (lower === 'propulsion') propulsion = Number(k);
-            else if (lower === 'portée détection' || lower === 'portee detection' || lower === 'détection') detection = Number(k);
-            else if (lower === 'module de construction' || lower === 'construction') construction = Number(k);
+            else if (lower === 'portée') detection = Number(k);
+            else if (lower === 'potentiel navire usine') construction = Number(k);
         }
         return {propulsion, detection, construction};
     }, [global]);
@@ -115,35 +115,11 @@ export default function CreatePlan() {
         if (!code) return;
         const qty = Math.max(1, Math.floor(selectedQty || 1));
 
-        const tech = techByCode.get(code);
-        const isConstruction = tech?.caracteristiques?.some(c => c.code === techCharCodes.construction);
-
         setEntries(prev => {
-            // Si c'est un module de construction, on vérifie s'il y en a déjà un ailleurs
-            if (isConstruction) {
-                const hasOtherConstruction = prev.some(e => {
-                    const t = techByCode.get(e.code);
-                    return t?.caracteristiques?.some(c => c.code === techCharCodes.construction);
-                });
-                if (hasOtherConstruction) {
-                    alert("Un seul module de construction est autorisé par vaisseau.");
-                    return prev;
-                }
-                if (qty > 1) {
-                    alert("Un seul module de construction est autorisé par vaisseau.");
-                    return [...prev, {code, qty: 1}];
-                }
-            }
-
             const idx = prev.findIndex(e => e.code === code);
             if (idx >= 0) {
                 const copy = prev.slice();
-                let newQty = copy[idx].qty + qty;
-                if (isConstruction && newQty > 1) {
-                    alert("Un seul module de construction est autorisé par vaisseau.");
-                    newQty = 1;
-                }
-                copy[idx] = {...copy[idx], qty: newQty};
+                copy[idx] = {...copy[idx], qty: copy[idx].qty + qty};
                 return copy;
             }
             return [...prev, {code, qty}];
@@ -154,13 +130,7 @@ export default function CreatePlan() {
     }
 
     function setQty(code: string, qty: number) {
-        const tech = techByCode.get(code);
-        const isConstruction = tech?.caracteristiques?.some(c => c.code === techCharCodes.construction);
         let finalQty = Math.max(0, Math.floor(qty || 0));
-        if (isConstruction && finalQty > 1) {
-            alert("Un seul module de construction est autorisé par vaisseau.");
-            finalQty = 1;
-        }
         setEntries(prev => prev.map(e => e.code === code ? {...e, qty: finalQty} : e));
     }
 
@@ -191,26 +161,15 @@ export default function CreatePlan() {
 
             if (existingNextIdx !== -1) {
                 // Fusionner avec l'existant
-                let newQty = newEntries[existingNextIdx].qty + currentQty;
-                const isConstruction = nextLevelTech?.caracteristiques?.some(c => c.code === techCharCodes.construction);
-                if (isConstruction && newQty > 1) {
-                    alert("Un seul module de construction est autorisé par vaisseau.");
-                    newQty = 1;
-                }
                 newEntries[existingNextIdx] = {
                     ...newEntries[existingNextIdx],
-                    qty: newQty
+                    qty: newEntries[existingNextIdx].qty + currentQty
                 };
                 // Supprimer l'ancien
                 newEntries.splice(idx, 1);
             } else {
                 // Remplacer par le nouveau
-                const isConstruction = nextLevelTech?.caracteristiques?.some(c => c.code === techCharCodes.construction);
-                const finalQty = (isConstruction && currentQty > 1) ? 1 : currentQty;
-                if (isConstruction && currentQty > 1) {
-                    alert("Un seul module de construction est autorisé par vaisseau.");
-                }
-                newEntries[idx] = {code: nextLevelTech.code, qty: finalQty};
+                newEntries[idx] = {code: nextLevelTech.code, qty: currentQty};
             }
 
             return newEntries;
@@ -240,26 +199,15 @@ export default function CreatePlan() {
 
             if (existingPrevIdx !== -1) {
                 // Fusionner avec l'existant
-                let newQty = newEntries[existingPrevIdx].qty + currentQty;
-                const isConstruction = prevLevelTech?.caracteristiques?.some(c => c.code === techCharCodes.construction);
-                if (isConstruction && newQty > 1) {
-                    alert("Un seul module de construction est autorisé par vaisseau.");
-                    newQty = 1;
-                }
                 newEntries[existingPrevIdx] = {
                     ...newEntries[existingPrevIdx],
-                    qty: newQty
+                    qty: newEntries[existingPrevIdx].qty + currentQty
                 };
                 // Supprimer l'ancien
                 newEntries.splice(idx, 1);
             } else {
                 // Remplacer par le nouveau
-                const isConstruction = prevLevelTech?.caracteristiques?.some(c => c.code === techCharCodes.construction);
-                const finalQty = (isConstruction && currentQty > 1) ? 1 : currentQty;
-                if (isConstruction && currentQty > 1) {
-                    alert("Un seul module de construction est autorisé par vaisseau.");
-                }
-                newEntries[idx] = {code: prevLevelTech.code, qty: finalQty};
+                newEntries[idx] = {code: prevLevelTech.code, qty: currentQty};
             }
 
             return newEntries;
@@ -275,13 +223,21 @@ export default function CreatePlan() {
         const charTotals = new Map<number, number>();
         let propulsionMax = 0;
         let detectionMax = 0;
-        let hasConstructionModule = false;
-        let multipleConstructionError = false;
-        const missingTechs: string[] = [];
+        let missingTechs: string[] = [];
+        let errors: string[] = [];
+
+        let countAbsorbeur = 0;
+        let countBouclier = 0;
+        let countReacteur = 0;
+        let countConstruction = 0;
 
         for (const e of entries) {
             const t = techByCode.get(e.code);
             if (!t || e.qty <= 0) continue;
+
+            if (t.base === 'absorb') countAbsorbeur += e.qty;
+            if (t.base === 'bouclier') countBouclier += e.qty;
+            if (t.base === 'moteur') countReacteur += e.qty;
 
             if (rapport && !rapport.technologiesConnues.includes(e.code)) {
                 missingTechs.push(`${t.nom} (type ${toRoman(t.niv)})`);
@@ -304,8 +260,7 @@ export default function CreatePlan() {
                     if (char.value > detectionMax) detectionMax = char.value;
                 } else {
                     if (char.code === techCharCodes.construction) {
-                        if (hasConstructionModule || e.qty > 1) multipleConstructionError = true;
-                        hasConstructionModule = true;
+                        countConstruction += e.qty;
                     }
                     charTotals.set(char.code, (charTotals.get(char.code) || 0) + char.value * e.qty);
                 }
@@ -316,6 +271,11 @@ export default function CreatePlan() {
                 marchTotals.set(m.code, (marchTotals.get(m.code) || 0) + m.nb * e.qty);
             }
         }
+
+        if (countAbsorbeur > 1) errors.push(`Trop d'absorbeurs (${countAbsorbeur}/1)`);
+        if (countBouclier > 10) errors.push(`Trop de boucliers (${countBouclier}/10)`);
+        if (countReacteur > 1) errors.push(`Trop de réacteurs (${countReacteur}/1)`);
+        if (countConstruction > 1) errors.push(`Trop de modules de construction (${countConstruction}/1)`);
 
         // Taille / vitesse selon règles
         let taille = undefined as number | undefined;
@@ -335,7 +295,7 @@ export default function CreatePlan() {
         return {
             totalCase, totalMinerai, totalPrix, marchTotals, charTotals,
             taille, baseSpeed, propulsionMax, detectionMax, vitesse,
-            multipleConstructionError,
+            errors,
             missingTechs
         };
     }, [entries, techByCode, global, techCharCodes, rapport]);
@@ -598,7 +558,16 @@ export default function CreatePlan() {
           Prix MDC: <b className="cur">{prixMdc.toFixed(1)}</b>
         </div>
       </div>
-
+        {totals.errors.length > 0 && (
+            <div style={{marginTop: 10, paddingTop: 0, backgroundColor: '#DDD', borderRadius: '10px', padding: '20px'}}>
+                <h4 style={{display: 'flex', alignItems: 'center', gap: 10, color: '#c62828', margin: 5}}>Erreurs</h4>
+                <ul style={{color: '#c62828', paddingLeft: 20, margin: 0}}>
+                    {totals.errors.map((err, i) => (
+                        <li key={i}>{err}</li>
+                    ))}
+                </ul>
+            </div>
+        )}
     <div className={"split4"}>
       <div style={{marginTop: 12}}>
         <h4>Marchandises totales</h4>
@@ -617,11 +586,6 @@ export default function CreatePlan() {
 
       <div style={{marginTop: 12}}>
         <h4>Caractéristiques générales</h4>
-          {totals.multipleConstructionError && (
-              <div style={{color: '#ff4444', marginBottom: 8, fontWeight: 'bold'}}>
-            ⚠ Erreur : Un seul module de construction est autorisé par vaisseau.
-          </div>
-          )}
           {charList.length === 0 ? (
               <div style={{color: '#aaa'}}>Aucune caractéristique particulière.</div>
           ) : (
