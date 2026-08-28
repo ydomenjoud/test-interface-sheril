@@ -1,4 +1,4 @@
-import {GlobalData, Marchandise, Commandant, Race, Technologie, PlanVaisseau, VaisseauTailleRule, SystemData} from '../types';
+import {GlobalData, Marchandise, Commandant, Race, Technologie, PlanVaisseau, VaisseauTailleRule, SystemData, ModificateurStabilite} from '../types';
 import {parsePosString} from '../utils/position';
 
 export function parseDataXml(text: string): GlobalData {
@@ -147,6 +147,15 @@ export function parseDataXml(text: string): GlobalData {
     });
     tailleVaisseaux.sort((a, b) => a.minCase - b.minCase);
 
+    // Modificateurs de stabilité
+    const modificateursStabilite: ModificateurStabilite[] = [];
+    doc.querySelectorAll('data > modificateur_stabilite > m')?.forEach(m => {
+        const distance = Number(m.getAttribute('distance') ?? 0);
+        const modif = Number(m.getAttribute('modif') ?? 0);
+        modificateursStabilite.push({ distance, modif });
+    });
+    modificateursStabilite.sort((a, b) => a.distance - b.distance);
+
     const systemes: SystemData[] = [];
     doc.querySelectorAll('data > systemes > s')?.forEach(s => {
         const nom = s.getAttribute('nom') || '';
@@ -162,6 +171,7 @@ export function parseDataXml(text: string): GlobalData {
     return {
         politiques,
         technologies: techs, commandants, races, marchandises, caracteristiquesBatiment, caracteristiquesComposant, plansPublic, tailleVaisseaux,
+        modificateursStabilite,
         systemes,
     };
 }

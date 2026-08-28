@@ -540,7 +540,7 @@ export default function Planification() {
                     }}
                     title="Tout déplier"
                 >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="4 9 12 1 20 9"></polyline>
                         <polyline points="4 15 12 23 20 15"></polyline>
                     </svg>
@@ -561,7 +561,7 @@ export default function Planification() {
                     }}
                     title="Tout replier"
                 >
-               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="4 2.5 12 10.5 20 2.5"></polyline>
                     <polyline points="4 21.5 12 13.5 20 21.5"></polyline>
                 </svg>

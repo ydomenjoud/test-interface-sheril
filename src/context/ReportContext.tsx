@@ -34,12 +34,23 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
     const [rapport, setRapport] = useState<Rapport | undefined>(undefined);
     const [global, setGlobal] = useState<GlobalData | undefined>(undefined);
     const [cellSize, setCellSize] = useState<number>(32);
-    const [center, setCenter] = useState<XY | undefined>({x: 20, y: 20});
+    const [center, setCenter] = useState<XY | undefined>(undefined);
     const [viewportCols, setViewportCols] = useState<number>(0);
     const [viewportRows, setViewportRows] = useState<number>(0);
     const [notes, setNotes] = useState<Record<string, Note[]>>({});
-    const [selectedTags, setSelectedTags] = useState<string[]>([]);
+    const [selectedTags, setSelectedTags] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('carte_selected_tags');
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    });
     const [publicCombats, setPublicCombats] = useState<CombatEvent[]>([]);
+
+    useEffect(() => {
+        localStorage.setItem('carte_selected_tags', JSON.stringify(selectedTags));
+    }, [selectedTags]);
 
     const allTags = useMemo(() => {
         const tags = new Set<string>();
@@ -101,14 +112,14 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         // Parse and apply the report
         const r = parseRapportXml(text);
         setRapport(r);
-        if (!center && r.joueur.capitale) setCenter(r.joueur.capitale);
+        if (r.joueur?.capitale) setCenter(r.joueur.capitale);
         // Persist the raw XML so it can be reloaded automatically later
         try {
             localStorage.setItem('rapportXml', text);
         } catch {
             // Storage might be unavailable (private mode/quota). Ignore silently.
         }
-    }, [center]);
+    }, []);
 
     const addDetectedSystemsFromText = useCallback((text: string) => {
         const { systems, errors } = parseManualDetectedSystems(text);
@@ -126,13 +137,30 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
 
     const refreshStats = useCallback(async () => {
         try {
+            const fetchWithTimeout = async (url: string, fallbackUrl: string) => {
+                try {
+                    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return await response.text();
+                } catch {
+                    // En cas de timeout ou d'erreur réseau, on charge le fichier local
+                    try {
+                        const fallbackResponse = await fetch(fallbackUrl);
+                        return await fallbackResponse.text();
+                    } catch {
+                        return '';
+                    }
+                }
+            };
+
             const [dataTxt, combatsTxt] = await Promise.all([
-                fetch(`https://sheril.pbem-france.net/stats/data.xml`).then(r => r.text()).catch(() => ''),
+                fetchWithTimeout(`https://sheril.pbem-france.net/stats/data.xml`, 'https://ydomenjoud.github.io/test-interface-sheril/examples/data.xml'),
                 fetch('https://sheril.pbem-france.net/stats/combats.htm').then(r => r.text()).catch(() => ''),
             ]);
             if (dataTxt) {
                 try {
                     const data = parseDataXml(dataTxt);
+                    console.log(data);
                     setGlobal(data);
                     const style = document.createElement("style");
                     style.innerHTML = data.races
@@ -252,7 +280,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
                 // mettre à jour les détectés avec le cache courant
                 const mergedDetected = mergeDetectedWithOwned(r);
                 setRapport({ ...r, systemesDetectes: mergedDetected });
-                if (!center && r.joueur.capitale) setCenter(r.joueur.capitale);
+                if (r.joueur?.capitale) setCenter(r.joueur.capitale);
             }
         } catch {
             // Si localStorage n'est pas accessible ou contenu invalide, ignorer

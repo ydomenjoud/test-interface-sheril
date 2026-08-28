@@ -70,6 +70,11 @@ export type VaisseauTailleRule = {
     vitesse: number;
 };
 
+export type ModificateurStabilite = {
+    distance: number;
+    modif: number;
+};
+
 export type Planete = {
     num: number;
     proprietaire?: number;
@@ -220,5 +225,6 @@ export type GlobalData = {
     caracteristiquesComposant: Record<number, string>;
     plansPublic: PlanVaisseau[];
     tailleVaisseaux: VaisseauTailleRule[];
+    modificateursStabilite: ModificateurStabilite[];
     systemes: SystemData[];
 };

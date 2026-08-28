@@ -31,6 +31,10 @@ type Props = {
     showCombatBadges: boolean;
     showOwnerBadges: boolean;
     showFleetBadges: boolean;
+    showSystemRadar: boolean;
+    showFleetRadar: boolean;
+    showStabilityZones: boolean;
+    stabilitySystemPos?: string;
 };
 
 export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[]) {
@@ -60,7 +64,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#f80c0c';
 }
 
-export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges}: Props) {
+export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showStabilityZones, stabilitySystemPos}: Props) {
     const {rapport, global, cellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -177,7 +181,8 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOw
 
     useEffect(() => {
         const cvs = canvasRef.current;
-        if (!cvs || !center) return;
+        if (!cvs) return;
+        const currentCenter = center || {x: 20, y: 20};
         const dpr = window.devicePixelRatio || 1;
         const width = Math.round(cvs.clientWidth * dpr);
         const height = Math.round(cvs.clientHeight * dpr);
@@ -201,14 +206,14 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOw
         // informer le contexte pour la minimap
         setViewportDims(cols, rows);
 
-        const topX = wrapX(center.x - halfRows);
-        const leftY = wrapY(center.y - halfCols);
+        const topX = wrapX(currentCenter.x - halfRows);
+        const leftY = wrapY(currentCenter.y - halfCols);
 
         // fond des secteurs 10×10 (16 secteurs sur la carte 40×40)
         for (let r = 0; r < rows; r++) {
-            const xCoord = torusDelta(center.x, r - halfRows, BOUNDS.maxX);
+            const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
             for (let c = 0; c < cols; c++) {
-                const yCoord = torusDelta(center.y, c - halfCols, BOUNDS.maxY);
+                const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
                 const sectorBg = sectorBackgroundColor(xCoord, yCoord);
                 if (sectorBg) {
                     ctx.fillStyle = sectorBg;
@@ -231,7 +236,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOw
 
         // grille + en-têtes
         for (let r = 0; r <= rows; r++) {
-            const xCoord = torusDelta(center.x, r - halfRows, BOUNDS.maxX);
+            const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
             const yPos = r * cellSize;
             if ((xCoord - 1) % 20 === 0) ctx.strokeStyle = '#123b66'; else if ((xCoord - 1) % 5 === 0) ctx.strokeStyle = '#661212'; else ctx.strokeStyle = '#444';
             ctx.beginPath();
@@ -245,7 +250,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOw
         }
 
         for (let c = 0; c <= cols; c++) {
-            const yCoord = torusDelta(center.y, c - halfCols, BOUNDS.maxY);
+            const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
             const xPos = c * cellSize;
             if ((yCoord - 1) % 20 === 0) ctx.strokeStyle = '#123b66'; else if ((yCoord - 1) % 5 === 0) ctx.strokeStyle = '#661212'; else ctx.strokeStyle = '#444';
             ctx.beginPath();
@@ -261,14 +266,18 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOw
         // ZONES DE DÉTECTION (scan) – systèmes et flottes du joueur
         // On calcule d’abord l’ensemble des cases détectées pour éviter tout empilement de couleurs.
         const scanners: { pos: XY; scan: number }[] = [];
-        systems.forEach(s => {
-            const sc = Number((s as any).scan || 0);
-            if (sc > 0) scanners.push({ pos: s.pos, scan: sc });
-        });
-        fleets.forEach(f => {
-            const sc = Number((f as any).scan || 0);
-            if (sc > 0) scanners.push({ pos: f.pos, scan: sc });
-        });
+        if (showSystemRadar) {
+            systems.forEach(s => {
+                const sc = Number((s as any).scan || 0);
+                if (sc > 0) scanners.push({ pos: s.pos, scan: sc });
+            });
+        }
+        if (showFleetRadar) {
+            fleets.forEach(f => {
+                const sc = Number((f as any).scan || 0);
+                if (sc > 0) scanners.push({ pos: f.pos, scan: sc });
+            });
+        }
 
         // Déduplication des cases détectées (distance de Tchebyshev)
         const detected = new Set<string>();
@@ -351,6 +360,55 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOw
 
         cScan.restore();
 
+        // STABILITY ZONES
+        if (showStabilityZones && stabilitySystemPos && global?.modificateursStabilite) {
+            const [sx, sy] = stabilitySystemPos.split('_').map(Number);
+            const stabilityMods = [...global.modificateursStabilite].sort((a, b) => a.distance - b.distance);
+
+            stabilityMods.forEach((mod) => {
+                if (mod.distance < 1) return; // Skip distance 0 as it pollutes display
+                if (mod.distance >= 1000000) return; // Skip the "rest of galaxy" entry if it exists with huge value
+
+                // Chebyshev distance r means a square of side (2r + 1)
+                const r = mod.distance;
+                
+                // For each level, we draw the outer boundary
+                // We wrap the rendering as we do for notes and systems
+                let dx = ((sy - r - leftY + BOUNDS.maxY * 2) % BOUNDS.maxY);
+                let dy = ((sx - r - topX + BOUNDS.maxX * 2) % BOUNDS.maxX);
+
+                ctx.save();
+                ctx.lineWidth = 2;
+                if (mod.modif > 0) {
+                    ctx.strokeStyle = `rgba(0, 255, 0, ${0.3 + (mod.modif / 10)})`;
+                } else if (mod.modif < 0) {
+                    ctx.strokeStyle = `rgba(255, 0, 0, ${0.3 + (Math.abs(mod.modif) / 10)})`;
+                } else {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                }
+
+                while (dx < cols) {
+                    let currentDy = dy;
+                    while (currentDy < rows) {
+                        const px = dx * cellSize;
+                        const py = currentDy * cellSize;
+                        const size = (2 * r + 1) * cellSize;
+                        
+                        ctx.strokeRect(px + 1, py + 1, size - 2, size - 2);
+
+                        // Draw label for the modifier
+                        ctx.fillStyle = ctx.strokeStyle;
+                        ctx.font = 'bold 10px sans-serif';
+                        ctx.fillText(`${mod.modif >= 0 ? '+' : ''}${mod.modif}`, px + 9, py + 12);
+
+                        currentDy += BOUNDS.maxX;
+                    }
+                    dx += BOUNDS.maxY;
+                }
+                ctx.restore();
+            });
+        }
+
         // Fonction utilitaire: déterminer si un élément correspond à la sélection
         const isSystemSelected = (owners?: number[]) => {
             if (!selectedOwners || selectedOwners.length === 0) return true;
@@ -363,7 +421,6 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOw
             return selectedOwners.includes(owner);
         };
 
-        // systems
         systems.forEach(s => {
             // Filtrage par tags si sélectionné
             if (selectedTags.length > 0) {
@@ -648,9 +705,9 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOw
             cCombat.save();
             let combatLogCount = 0;
             for (let r = 0; r < rows; r++) {
-                const xCoord = torusDelta(center.x, r - halfRows, BOUNDS.maxX);
+                const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
                 for (let c = 0; c < cols; c++) {
-                    const yCoord = torusDelta(center.y, c - halfCols, BOUNDS.maxY);
+                    const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
                     const counts = countCombatsByKind(combats, {x: xCoord, y: yCoord});
                     if (counts.spatial <= 0 && counts.planetary <= 0) continue;
                     if (combatLogCount < 50) {
@@ -693,11 +750,11 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOw
 
                         const getScreenPos = (pos: XY) => {
                             // Distance signée par rapport au centre, tenant compte du tore
-                            let offX = pos.x - center.x;
+                            let offX = pos.x - currentCenter.x;
                             if (offX > BOUNDS.maxX / 2) offX -= BOUNDS.maxX;
                             if (offX < -BOUNDS.maxX / 2) offX += BOUNDS.maxX;
 
-                            let offY = pos.y - center.y;
+                            let offY = pos.y - currentCenter.y;
                             if (offY > BOUNDS.maxY / 2) offY -= BOUNDS.maxY;
                             if (offY < -BOUNDS.maxY / 2) offY += BOUNDS.maxY;
 
@@ -731,7 +788,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, selectedOw
 
             cCombat.restore();
         }
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, selected, showFleetsFor]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, selected, showFleetsFor, showStabilityZones, stabilitySystemPos]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {

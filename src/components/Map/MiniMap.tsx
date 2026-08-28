@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { useReport } from '../../context/ReportContext';
 import { BOUNDS, wrapX, wrapY } from '../../utils/position';
 import {colorForOwnership} from "./CanvasMap";
@@ -18,6 +18,7 @@ function torusDelta(a: number, b: number, max: number): number {
 
 export default function MiniMap({ onCenter }: Props) {
   const { rapport, center, viewportCols, viewportRows } = useReport();
+  const currentCenter = useMemo(() => center || {x: 20, y: 20}, [center]);
   const ref = useRef<HTMLCanvasElement>(null);
   const playerId = rapport?.joueur?.numero || 0;
 
@@ -41,9 +42,8 @@ export default function MiniMap({ onCenter }: Props) {
     const midY = cvs.clientHeight / 2; // vertical (lignes/X)
 
     const drawPointRel = (x: number, y: number, color: string) => {
-      if (!center) return;
-      const dRow = torusDelta(center.x, x, BOUNDS.maxX); // déplacement en lignes
-      const dCol = torusDelta(center.y, y, BOUNDS.maxY); // déplacement en colonnes
+      const dRow = torusDelta(currentCenter.x, x, BOUNDS.maxX); // déplacement en lignes
+      const dCol = torusDelta(currentCenter.y, y, BOUNDS.maxY); // déplacement en colonnes
       const px = midX + (dCol / BOUNDS.maxY) * cvs.clientWidth;
       const py = midY + (dRow / BOUNDS.maxX) * cvs.clientHeight;
       ctx.fillStyle = color;
@@ -64,14 +64,14 @@ export default function MiniMap({ onCenter }: Props) {
     ));
 
     // Rectangle du viewport, centré au milieu de la minimap
-    if (center && viewportCols > 0 && viewportRows > 0) {
+    if (viewportCols > 0 && viewportRows > 0) {
       const rectW = Math.min(1, viewportCols / BOUNDS.maxY) * cvs.clientWidth;
       const rectH = Math.min(1, viewportRows / BOUNDS.maxX) * cvs.clientHeight;
       ctx.strokeStyle = '#71deff';
       ctx.lineWidth = 2;
       ctx.strokeRect(midX - rectW / 2, midY - rectH / 2, rectW, rectH);
     }
-  }, [rapport, playerId, center, viewportCols, viewportRows]);
+  }, [rapport, playerId, currentCenter, viewportCols, viewportRows]);
 
   return (
     <canvas
@@ -89,11 +89,9 @@ export default function MiniMap({ onCenter }: Props) {
         const dCols = Math.round(((clickXpx - midX) / rect.width) * BOUNDS.maxY);
 
         // Nouveau centre sur le tore
-        if (center) {
-          const nx = wrapX(center.x + dRows);
-          const ny = wrapY(center.y + dCols);
-          onCenter(nx, ny);
-        }
+        const nx = wrapX(currentCenter.x + dRows);
+        const ny = wrapY(currentCenter.y + dCols);
+        onCenter(nx, ny);
       }}
     />
   );
