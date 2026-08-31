@@ -38,6 +38,10 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_fleet_radar');
     return saved !== null ? JSON.parse(saved) : true;
   });
+  const [showSectors, setShowSectors] = useState(() => {
+    const saved = localStorage.getItem('carte_show_sectors');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
   const [colorMode, setColorMode] = useState<'status' | 'player'>(() => {
     const saved = localStorage.getItem('carte_color_mode');
     return saved !== null ? (saved as 'status' | 'player') : 'status';
@@ -90,6 +94,10 @@ export default function Carte() {
   useEffect(() => {
     localStorage.setItem('carte_show_fleet_radar', JSON.stringify(showFleetRadar));
   }, [showFleetRadar]);
+
+  useEffect(() => {
+    localStorage.setItem('carte_show_sectors', JSON.stringify(showSectors));
+  }, [showSectors]);
 
   useEffect(() => {
     localStorage.setItem('carte_color_mode', colorMode);
@@ -192,6 +200,7 @@ export default function Carte() {
             showFleetBadges={showFleetBadges}
             showSystemRadar={showSystemRadar}
             showFleetRadar={showFleetRadar}
+            showSectors={showSectors}
             colorMode={colorMode}
             showStabilityZones={showStabilityZones}
             stabilitySystemPos={stabilitySystemPos}
@@ -267,6 +276,14 @@ export default function Carte() {
                               onChange={(e) => setShowSystems(e.target.checked)}
                             />
                             Afficher systèmes
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={showSectors}
+                              onChange={(e) => setShowSectors(e.target.checked)}
+                            />
+                            Afficher secteurs
                           </label>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
                               <span style={{ fontSize: '0.85em', color: '#aaa' }}>Mode de couleur</span>

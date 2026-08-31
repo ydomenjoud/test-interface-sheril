@@ -34,6 +34,7 @@ type Props = {
     showFleetBadges: boolean;
     showSystemRadar: boolean;
     showFleetRadar: boolean;
+    showSectors: boolean;
     colorMode?: 'status' | 'player';
     showStabilityZones: boolean;
     stabilitySystemPos?: string;
@@ -71,7 +72,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#f80c0c';
 }
 
-export default function CanvasMap({onSelect, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, colorMode = 'status', showStabilityZones, stabilitySystemPos}: Props) {
+export default function CanvasMap({onSelect, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, colorMode = 'status', showStabilityZones, stabilitySystemPos}: Props) {
     const {rapport, global, cellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -226,7 +227,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
                     ctx.fillStyle = sectorBg;
                     ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
                 }
-                if (isSectorLabelCell(xCoord, yCoord)) {
+                if (showSectors && isSectorLabelCell(xCoord, yCoord)) {
                     const labelSize = Math.max(12, Math.floor(cellSize * 1.4));
                     ctx.fillStyle = sectorLabelColor();
                     ctx.font = `600 ${labelSize}px sans-serif`;
@@ -797,7 +798,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
 
             cCombat.restore();
         }
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {

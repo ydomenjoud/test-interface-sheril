@@ -8,7 +8,7 @@ export const SECTOR_COUNT = 16;
 const SECTOR_LABEL_OFFSET = Math.floor((SECTOR_SIZE - 1) / 2);
 
 /** Damier : moitié noire (fond de base), moitié teinte chaude (évite le bleu des scans). */
-const SECTOR_FILL_TINTED = 'rgba(115, 88, 42, 0.38)';
+const SECTOR_FILL_TINTED = 'rgba(115, 88, 42, 0.28)';
 
 function localCoord(coord: number): number {
   return ((coord - 1) % GALAXY_SIZE + GALAXY_SIZE) % GALAXY_SIZE;
