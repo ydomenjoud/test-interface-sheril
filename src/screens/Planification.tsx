@@ -14,6 +14,8 @@ type PlannedItem = {
 
 type SystemQueue = Record<string, PlannedItem[]>; // Key = x_y
 
+const construireBluePrintSeparator = '%#!%';
+
 export default function Planification() {
     const { global, rapport } = useReport();
     const [sortBy, setSortBy] = useState<'nom' | 'pos' | 'pdc' | 'nbConstructions' | ''>('nom');
@@ -211,7 +213,7 @@ export default function Planification() {
         if (!bp) return;
         try {
             const decoded = atob(bp);
-            const items = decoded.split('%');
+            const items = decoded.split(construireBluePrintSeparator);
             const newEntriesBySystem: Record<string, PlannedItem[]> = {};
 
             items.forEach(item => {
@@ -279,7 +281,7 @@ export default function Planification() {
             return;
         }
 
-        return btoa(entries.map(e => `${e.systemPos}:${e.qty}:${e.code}:${e.planetNum}`).join('%#§%'));
+        return btoa(entries.map(e => `${e.systemPos}:${e.qty}:${e.code}:${e.planetNum}`).join(construireBluePrintSeparator));
     }
     const blueprint = buildBluePrint() || '';
 
