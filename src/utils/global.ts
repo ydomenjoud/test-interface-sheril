@@ -133,11 +133,11 @@ export function formatPlannedItems(items: { type: 'building' | 'ship', code: str
     };
 
     const formattedBuildings = buildings.map(b => {
-        const typesStr = b.types.map(t => `${t.qty} type ${toRoman(t.niv)} ${formatCost(t.unitCost)}`).join(', ');
+        const typesStr = b.types.map(t => `${t.qty} type ${toRoman(t.niv)}`).join(', ');
         return `${b.name} : ${typesStr}`;
     });
 
-    const formattedShips = ships.map(s => `${s.name} : ${s.qty} ${formatCost(s.unitCost)}`);
+    const formattedShips = ships.map(s => `${s.name} : ${s.qty}`);
 
     return {
         buildings,
