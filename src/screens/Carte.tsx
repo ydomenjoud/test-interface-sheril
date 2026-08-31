@@ -38,6 +38,10 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_fleet_radar');
     return saved !== null ? JSON.parse(saved) : true;
   });
+  const [showMiniMap, setShowMiniMap] = useState(() => {
+    const saved = localStorage.getItem('carte_show_minimap');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
   const [showSectors, setShowSectors] = useState(() => {
     const saved = localStorage.getItem('carte_show_sectors');
     return saved !== null ? JSON.parse(saved) : false;
@@ -94,6 +98,10 @@ export default function Carte() {
   useEffect(() => {
     localStorage.setItem('carte_show_fleet_radar', JSON.stringify(showFleetRadar));
   }, [showFleetRadar]);
+
+  useEffect(() => {
+    localStorage.setItem('carte_show_minimap', JSON.stringify(showMiniMap));
+  }, [showMiniMap]);
 
   useEffect(() => {
     localStorage.setItem('carte_show_sectors', JSON.stringify(showSectors));
@@ -205,7 +213,7 @@ export default function Carte() {
             showStabilityZones={showStabilityZones}
             stabilitySystemPos={stabilitySystemPos}
           />
-          <MiniMap onCenter={(x, y) => setCenter({ x, y })} colorMode={colorMode} />
+          {showMiniMap && <MiniMap onCenter={(x, y) => setCenter({ x, y })} colorMode={colorMode} />}
 
           {/* Filtres Popup en bas à droite */}
           <div style={{
@@ -284,6 +292,14 @@ export default function Carte() {
                               onChange={(e) => setShowSectors(e.target.checked)}
                             />
                             Afficher secteurs
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={showMiniMap}
+                              onChange={(e) => setShowMiniMap(e.target.checked)}
+                            />
+                            Afficher minimap
                           </label>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
                               <span style={{ fontSize: '0.85em', color: '#aaa' }}>Mode de couleur</span>
