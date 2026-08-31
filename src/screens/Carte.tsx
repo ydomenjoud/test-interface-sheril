@@ -42,6 +42,10 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_minimap');
     return saved !== null ? JSON.parse(saved) : true;
   });
+  const [showInfluence, setShowInfluence] = useState(() => {
+    const saved = localStorage.getItem('carte_show_influence');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
   const [showSectors, setShowSectors] = useState(() => {
     const saved = localStorage.getItem('carte_show_sectors');
     return saved !== null ? JSON.parse(saved) : false;
@@ -102,6 +106,10 @@ export default function Carte() {
   useEffect(() => {
     localStorage.setItem('carte_show_minimap', JSON.stringify(showMiniMap));
   }, [showMiniMap]);
+
+  useEffect(() => {
+    localStorage.setItem('carte_show_influence', JSON.stringify(showInfluence));
+  }, [showInfluence]);
 
   useEffect(() => {
     localStorage.setItem('carte_show_sectors', JSON.stringify(showSectors));
@@ -209,6 +217,7 @@ export default function Carte() {
             showSystemRadar={showSystemRadar}
             showFleetRadar={showFleetRadar}
             showSectors={showSectors}
+            showInfluence={showInfluence}
             colorMode={colorMode}
             showStabilityZones={showStabilityZones}
             stabilitySystemPos={stabilitySystemPos}
@@ -292,6 +301,14 @@ export default function Carte() {
                               onChange={(e) => setShowSectors(e.target.checked)}
                             />
                             Afficher secteurs
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={showInfluence}
+                              onChange={(e) => setShowInfluence(e.target.checked)}
+                            />
+                            Afficher influence
                           </label>
                           <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
                             <input

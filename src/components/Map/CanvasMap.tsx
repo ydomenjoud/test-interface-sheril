@@ -35,6 +35,7 @@ type Props = {
     showSystemRadar: boolean;
     showFleetRadar: boolean;
     showSectors: boolean;
+    showInfluence: boolean;
     colorMode?: 'status' | 'player';
     showStabilityZones: boolean;
     stabilitySystemPos?: string;
@@ -72,8 +73,8 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#f80c0c';
 }
 
-export default function CanvasMap({onSelect, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, colorMode = 'status', showStabilityZones, stabilitySystemPos}: Props) {
-    const {rapport, global, cellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats} = useReport();
+export default function CanvasMap({onSelect, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos}: Props) {
+    const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Ref sur le center pour des mises à jour synchrones dans le drag
@@ -217,15 +218,123 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
         const topX = wrapX(currentCenter.x - halfRows);
         const leftY = wrapY(currentCenter.y - halfCols);
 
+        // Préparation des influenceurs pour la couche d'influence
+        const influencers: { owner: number, pos: XY }[] = [];
+        if (showInfluence) {
+            // On récupère tous les commandants qui ont au moins un système ou une flotte
+            const influencerMap = new Map<number, XY[]>();
+            systems.forEach(s => {
+                if (s.owners) {
+                    (s.owners as number[]).forEach(o => {
+                        if (o === 0) return;
+                        if (!influencerMap.has(o)) influencerMap.set(o, []);
+                        influencerMap.get(o)!.push(s.pos);
+                    });
+                }
+            });
+            fleets.forEach(f => {
+                const o = (f as any).owner;
+                if (o && o !== 0) {
+                    if (!influencerMap.has(o)) influencerMap.set(o, []);
+                    influencerMap.get(o)!.push(f.pos);
+                }
+            });
+
+            // Pour chaque commandant, on garde toutes ses positions (systèmes et flottes)
+            // On utilisera la distance minimale à n'importe lequel de ses points.
+            influencerMap.forEach((positions, owner) => {
+                positions.forEach(pos => {
+                    influencers.push({ owner, pos });
+                });
+            });
+        }
+
+        // Calcul de la grille d'influence pour pouvoir tracer les bordures
+        const influenceGrid: number[][] = [];
+        if (showInfluence && influencers.length > 0) {
+            for (let r = 0; r <= rows; r++) {
+                influenceGrid[r] = [];
+                const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
+                for (let c = 0; c <= cols; c++) {
+                    const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
+                    
+                    let minDist = Infinity;
+                    let closestOwner = -1;
+                    let countAtMin = 0;
+
+                    const ownerDistances = new Map<number, number>();
+                    influencers.forEach(inf => {
+                        const d = getTorusDistance({x: xCoord, y: yCoord}, inf.pos);
+                        const currentBest = ownerDistances.get(inf.owner) ?? Infinity;
+                        if (d < currentBest) {
+                            ownerDistances.set(inf.owner, d);
+                        }
+                    });
+
+                    ownerDistances.forEach((d, owner) => {
+                        if (d < minDist) {
+                            minDist = d;
+                            closestOwner = owner;
+                            countAtMin = 1;
+                        } else if (d === minDist) {
+                            countAtMin++;
+                        }
+                    });
+
+                    influenceGrid[r][c] = (closestOwner !== -1 && countAtMin === 1) ? closestOwner : -1;
+                }
+            }
+        }
+
         // fond des secteurs 10×10 (16 secteurs sur la carte 40×40)
         for (let r = 0; r < rows; r++) {
             const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
             for (let c = 0; c < cols; c++) {
                 const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
+
                 const sectorBg = showSectors ? sectorBackgroundColor(xCoord, yCoord) : null;
                 if (sectorBg) {
                     ctx.fillStyle = sectorBg;
                     ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+                }
+
+                // Couche Influence - dessinée après le damier pour plus de clarté
+                if (showInfluence && influenceGrid[r] && influenceGrid[r][c] !== -1) {
+                    const closestOwner = influenceGrid[r][c];
+                    const baseColor = getColorForPlayer(closestOwner);
+                    // On convertit HSL en HSLA un peu plus marqué
+                    ctx.fillStyle = baseColor.replace(')', ', 0.18)').replace('hsl', 'hsla');
+                    ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+                }
+
+                // Bordures d'influence
+                if (showInfluence && influenceGrid[r]) {
+                    const currentOwner = influenceGrid[r][c];
+                    ctx.lineWidth = 1;
+                    
+                    // Bordure droite
+                    if (c < cols) {
+                        const rightOwner = influenceGrid[r][c+1];
+                        if (currentOwner !== rightOwner) {
+                            ctx.strokeStyle = currentOwner !== -1 ? getColorForPlayer(currentOwner).replace('hsl', 'hsla').replace(')', ', 0.6)') : getColorForPlayer(rightOwner).replace('hsl', 'hsla').replace(')', ', 0.6)');
+                            ctx.beginPath();
+                            ctx.moveTo((c + 1) * cellSize, r * cellSize);
+                            ctx.lineTo((c + 1) * cellSize, (r + 1) * cellSize);
+                            ctx.stroke();
+                        }
+                    }
+                    
+                    // Bordure basse
+                    if (r < rows) {
+                        const bottomOwner = influenceGrid[r+1][c];
+                        if (currentOwner !== bottomOwner) {
+                            ctx.strokeStyle = currentOwner !== -1 ? getColorForPlayer(currentOwner).replace('hsl', 'hsla').replace(')', ', 0.6)') : getColorForPlayer(bottomOwner).replace('hsl', 'hsla').replace(')', ', 0.6)');
+                            ctx.beginPath();
+                            ctx.moveTo(c * cellSize, (r + 1) * cellSize);
+                            ctx.lineTo((c + 1) * cellSize, (r + 1) * cellSize);
+                            ctx.stroke();
+                        }
+                    }
                 }
                 if (showSectors && isSectorLabelCell(xCoord, yCoord)) {
                     const labelSize = Math.max(12, Math.floor(cellSize * 1.4));
@@ -798,7 +907,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
 
             cCombat.restore();
         }
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
@@ -912,12 +1021,22 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
         window.addEventListener('mouseup', onUp);
     }, [cellSize, setCenter]);
 
+    const handleWheel = useCallback((evt: React.WheelEvent<HTMLCanvasElement>) => {
+        const zoomSpeed = 0.1;
+        const delta = evt.deltaY > 0 ? -1 : 1;
+        const newSize = Math.max(8, Math.min(128, Math.round(cellSize * (1 + delta * zoomSpeed))));
+        if (newSize !== cellSize) {
+            setCellSize(newSize);
+        }
+    }, [cellSize, setCellSize]);
+
     return (<div className="canvas-host">
             <canvas
                 ref={canvasRef}
                 style={{width: '100%', height: '100vh'}}
                 onClick={handleClick}
                 onMouseDown={handleMouseDown}
+                onWheel={handleWheel}
             />
         </div>);
 }
