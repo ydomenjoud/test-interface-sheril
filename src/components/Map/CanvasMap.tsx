@@ -5,7 +5,7 @@ import {getSectorNumber, isSectorLabelCell, sectorBackgroundColor, sectorLabelCo
 import {countCombatsByKind} from '../../parsers/parseCombatMessages';
 import {drawCombatMarkers} from '../../utils/combatMarkers';
 import {Alliance, XY} from '../../types';
-import {lightenHexColor} from "../../utils/global";
+import {lightenHexColor, getColorForPlayer} from "../../utils/global";
 
 const OWNER_BADGE_COLORS: Record<number, string> = {
     1: '#0066CC',
@@ -34,11 +34,12 @@ type Props = {
     showFleetBadges: boolean;
     showSystemRadar: boolean;
     showFleetRadar: boolean;
+    colorMode?: 'status' | 'player';
     showStabilityZones: boolean;
     stabilitySystemPos?: string;
 };
 
-export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[]) {
+export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[], colorMode: 'status' | 'player' = 'status') {
     if (owners && owners?.length === 1 && owners[0] === 0) return 'grey';
     if (!owners || owners.length === 0) return '#999';
 
@@ -47,7 +48,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
         const withoutNeutral = owners.filter(o => o !== 0);
         // si tous pareil, on renvoit la couleur,
         const colors: Set<string> = new Set(withoutNeutral
-            .map(o => colorForOwnership(currentPlayerId, [o], alliances, pna))
+            .map(o => colorForOwnership(currentPlayerId, [o], alliances, pna, colorMode))
             .filter((s): s is string => !!s)
         );
         if(colors.size === 1) {
@@ -60,12 +61,17 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
 
     const owner = owners[0];
     if (currentPlayerId && owners.includes(currentPlayerId)) return '#09ca31';
+
+    if (colorMode === 'player') {
+        return getColorForPlayer(owner);
+    }
+
     if (alliances && alliances.some(a => a.commandants.includes(owner))) return '#224eff';
     if (pna && pna.includes(owner)) return 'yellow';
     return '#f80c0c';
 }
 
-export default function CanvasMap({onSelect, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showStabilityZones, stabilitySystemPos}: Props) {
+export default function CanvasMap({onSelect, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, colorMode = 'status', showStabilityZones, stabilitySystemPos}: Props) {
     const {rapport, global, cellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -372,7 +378,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
 
                 // Chebyshev distance r means a square of side (2r + 1)
                 const r = mod.distance;
-                
+
                 // For each level, we draw the outer boundary
                 // We wrap the rendering as we do for notes and systems
                 let dx = ((sy - r - leftY + BOUNDS.maxY * 2) % BOUNDS.maxY);
@@ -394,7 +400,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
                         const px = dx * cellSize;
                         const py = currentDy * cellSize;
                         const size = (2 * r + 1) * cellSize;
-                        
+
                         ctx.strokeRect(px + 1, py + 1, size - 2, size - 2);
 
                         // Draw label for the modifier
@@ -454,7 +460,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
             // Couleur(s) en fonction de la possession
             const owners = s.owners as number[] | undefined;
             const isGlobalOnly = s.isGlobalOnly;
-            let col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna);
+            let col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode);
             if (isGlobalOnly) col = '#333'; // Plus sombre pour les systèmes non détectés
 
             // Taille du disque en fonction du nombre de planètes:
@@ -499,7 +505,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
                 }
                 const total = weights.reduce((a, b) => a + b, 0);
                 // Préparer les couleurs par propriétaire
-                const colors = multiOwners.map(o => colorForOwnership(currentPlayerId, [o], rapport?.joueur.alliances, rapport?.joueur.pna));
+                const colors = multiOwners.map(o => colorForOwnership(currentPlayerId, [o], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode));
 
                 // Dessiner les parts: une par owner, angle proportionnel au poids
                 let angle = -Math.PI / 2; // démarrage en haut, pour stabilité visuelle
@@ -619,7 +625,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
                 c2d.filter = 'grayscale(1)';
             }
 
-            const ownerColor = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna) || '#000000';
+            const ownerColor = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode) || '#000000';
             const badgeColor = '#ffffff';
             const textColor = '#000000';
             const strokeColor = ownerColor;
@@ -683,7 +689,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
 
             // HALO de sélection pour les flottes (autour du badge circulaire)
             if (isFleetSelected((f as any).owner)) {
-                const col = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna);
+                const col = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode);
                 const haloColor = col || '#000000';
                 const lineW = 2;
                 const blur = Math.max(10, Math.floor(lineW * 1.5));
@@ -791,7 +797,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
 
             cCombat.restore();
         }
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {

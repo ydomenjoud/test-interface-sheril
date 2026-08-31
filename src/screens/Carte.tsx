@@ -38,6 +38,10 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_fleet_radar');
     return saved !== null ? JSON.parse(saved) : true;
   });
+  const [colorMode, setColorMode] = useState<'status' | 'player'>(() => {
+    const saved = localStorage.getItem('carte_color_mode');
+    return saved !== null ? (saved as 'status' | 'player') : 'status';
+  });
   const [showStabilityZones, setShowStabilityZones] = useState(() => {
     const saved = localStorage.getItem('carte_show_stability_zones');
     return saved !== null ? JSON.parse(saved) : false;
@@ -86,6 +90,10 @@ export default function Carte() {
   useEffect(() => {
     localStorage.setItem('carte_show_fleet_radar', JSON.stringify(showFleetRadar));
   }, [showFleetRadar]);
+
+  useEffect(() => {
+    localStorage.setItem('carte_color_mode', colorMode);
+  }, [colorMode]);
 
   useEffect(() => {
     localStorage.setItem('carte_show_stability_zones', JSON.stringify(showStabilityZones));
@@ -184,10 +192,11 @@ export default function Carte() {
             showFleetBadges={showFleetBadges}
             showSystemRadar={showSystemRadar}
             showFleetRadar={showFleetRadar}
+            colorMode={colorMode}
             showStabilityZones={showStabilityZones}
             stabilitySystemPos={stabilitySystemPos}
           />
-          <MiniMap onCenter={(x, y) => setCenter({ x, y })} />
+          <MiniMap onCenter={(x, y) => setCenter({ x, y })} colorMode={colorMode} />
 
           {/* Filtres Popup en bas à droite */}
           <div style={{
@@ -259,6 +268,41 @@ export default function Carte() {
                             />
                             Afficher systèmes
                           </label>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                              <span style={{ fontSize: '0.85em', color: '#aaa' }}>Mode de couleur</span>
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                  <button
+                                      onClick={() => setColorMode('status')}
+                                      style={{
+                                          flex: 1,
+                                          fontSize: '0.8em',
+                                          padding: '4px 2px',
+                                          cursor: 'pointer',
+                                          backgroundColor: colorMode === 'status' ? '#555' : '#333',
+                                          color: '#eee',
+                                          border: '1px solid #666',
+                                          borderRadius: 4
+                                      }}
+                                  >
+                                      Alliés/Ennemis
+                                  </button>
+                                  <button
+                                      onClick={() => setColorMode('player')}
+                                      style={{
+                                          flex: 1,
+                                          fontSize: '0.8em',
+                                          padding: '4px 2px',
+                                          cursor: 'pointer',
+                                          backgroundColor: colorMode === 'player' ? '#555' : '#333',
+                                          color: '#eee',
+                                          border: '1px solid #666',
+                                          borderRadius: 4
+                                      }}
+                                  >
+                                      Par Joueur
+                                  </button>
+                              </div>
+                          </div>
                           <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
                             <input
                               type="checkbox"

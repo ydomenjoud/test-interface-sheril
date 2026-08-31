@@ -5,6 +5,7 @@ import {colorForOwnership} from "./CanvasMap";
 
 type Props = {
   onCenter: (x: number, y: number) => void;
+  colorMode?: 'status' | 'player';
 };
 
 function torusDelta(a: number, b: number, max: number): number {
@@ -16,7 +17,7 @@ function torusDelta(a: number, b: number, max: number): number {
   return d;
 }
 
-export default function MiniMap({ onCenter }: Props) {
+export default function MiniMap({ onCenter, colorMode = 'status' }: Props) {
   const { rapport, center, viewportCols, viewportRows } = useReport();
   const currentCenter = useMemo(() => center || {x: 20, y: 20}, [center]);
   const ref = useRef<HTMLCanvasElement>(null);
@@ -51,16 +52,16 @@ export default function MiniMap({ onCenter }: Props) {
     };
 
     rapport?.systemesJoueur.forEach(s => drawPointRel(s.pos.x, s.pos.y,
-        colorForOwnership(playerId, [playerId], [], [])
+        colorForOwnership(playerId, [playerId], [], [], colorMode)
     ));
     rapport?.systemesDetectes.forEach(s => drawPointRel(s.pos.x, s.pos.y,
-        colorForOwnership(playerId, s.proprietaires, rapport?.joueur.alliances, rapport?.joueur.pna)
+        colorForOwnership(playerId, s.proprietaires, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode)
     ));
     rapport?.flottesJoueur.forEach(f => drawPointRel(f.pos.x, f.pos.y,
-        colorForOwnership(playerId, [playerId], rapport?.joueur.alliances, rapport?.joueur.pna)
+        colorForOwnership(playerId, [playerId], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode)
     ));
     rapport?.flottesDetectees.forEach(f => drawPointRel(f.pos.x, f.pos.y,
-        colorForOwnership(playerId, [f.proprio || 0], rapport?.joueur.alliances, rapport?.joueur.pna)
+        colorForOwnership(playerId, [f.proprio || 0], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode)
     ));
 
     // Rectangle du viewport, centré au milieu de la minimap
@@ -71,7 +72,7 @@ export default function MiniMap({ onCenter }: Props) {
       ctx.lineWidth = 2;
       ctx.strokeRect(midX - rectW / 2, midY - rectH / 2, rectW, rectH);
     }
-  }, [rapport, playerId, currentCenter, viewportCols, viewportRows]);
+  }, [rapport, playerId, currentCenter, viewportCols, viewportRows, colorMode]);
 
   return (
     <canvas

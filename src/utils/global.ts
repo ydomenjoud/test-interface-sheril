@@ -186,3 +186,26 @@ export function lightenHexColor(hex: string, percent: number) {
 
     return newColor;
 }
+
+/**
+ * Génère une couleur déterministe à partir d'un identifiant (numéro du commandant).
+ * Utilise le HSL pour assurer une bonne répartition des couleurs.
+ * @param {number} playerId - L'identifiant du joueur.
+ * @returns {string} Un code couleur hexadécimal.
+ */
+export function getColorForPlayer(playerId: number): string {
+    if (playerId === 0) return '#777777'; // Neutre
+
+    const GOLDEN_ANGLE = 137.5077;
+    const hue = Math.floor((playerId * GOLDEN_ANGLE) % 360);
+
+    // Saturation élevée pour faire ressortir la couleur sur fond noir
+    const saturation = 85;
+
+    // Alterne la luminosité selon la parité de l'ID :
+    // Un ID impair sera très lumineux (65%), un ID pair sera moyen (45%).
+    // Cela sépare immédiatement l'ID 1 (65%) et l'ID 6 (45%) visuellement.
+    const lightness = playerId % 2 === 0 ? 45 : 65;
+
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}
