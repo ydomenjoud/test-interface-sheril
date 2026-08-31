@@ -19,42 +19,125 @@ export function formatTechName(t?: Technologie): string {
     return `${t.nom} ${romanFromNiv(t.niv)}`;
 }
 
-export function formatPlannedItems(items: { type: 'building' | 'ship', code: string, quantity: number }[], technologies: Technologie[]) {
-    const buildingStats: Record<string, Record<number, number>> = {};
-    const shipStats: Record<string, number> = {};
+export function formatPlannedItems(items: { type: 'building' | 'ship', code: string, quantity: number }[], technologies: Technologie[], plansVaisseaux?: any[]) {
+    const buildingStats: Record<string, { nivs: Record<number, { qty: number, unitCost: any }>, totalCost: any }> = {};
+    const shipStats: Record<string, { qty: number, unitCost: any, totalCost: any }> = {};
+
+    const getBuildingCost = (code: string) => {
+        const tech = technologies.find(t => t.code === code);
+        if (!tech) return null;
+        return {
+            pdc: tech.specification?.case || tech.specification?.pc || 0,
+            minerai: tech.specification?.min || 0,
+            prix: tech.specification?.prix || 0,
+            marchandises: tech.marchandises || []
+        };
+    };
+
+    const getShipCost = (name: string) => {
+        const p = plansVaisseaux?.find(x => x.nom === name);
+        if (!p) return null;
+        const merchCosts: { code: number; nb: number }[] = [];
+        p.composants.forEach((c: any) => {
+            const tech = technologies.find(t => t.code === c.code);
+            if (tech?.marchandises) {
+                tech.marchandises.forEach(m => {
+                    const existing = merchCosts.find(x => x.code === m.code);
+                    if (existing) {
+                        existing.nb += m.nb * c.nb;
+                    } else {
+                        merchCosts.push({ code: m.code, nb: m.nb * c.nb });
+                    }
+                });
+            }
+        });
+        return {
+            pdc: p.pc || 0,
+            minerai: p.minerai || 0,
+            prix: p.prix || 0,
+            marchandises: merchCosts
+        };
+    };
+
+    const addCosts = (target: any, source: any, qty: number) => {
+        target.pdc += source.pdc * qty;
+        target.minerai += source.minerai * qty;
+        target.prix += (source.prix || 0) * qty;
+        source.marchandises.forEach((m: any) => {
+            const existing = target.marchandises.find((x: any) => x.code === m.code);
+            if (existing) {
+                existing.nb += m.nb * qty;
+            } else {
+                target.marchandises.push({ code: m.code, nb: m.nb * qty });
+            }
+        });
+    };
+
+    const totalGlobalCost = { pdc: 0, minerai: 0, prix: 0, marchandises: [] as { code: number, nb: number }[] };
 
     items.forEach(item => {
         if (item.type === 'building') {
             const tech = technologies.find(t => t.code === item.code);
             if (tech) {
-                if (!buildingStats[tech.nom]) buildingStats[tech.nom] = {};
-                buildingStats[tech.nom][tech.niv] = (buildingStats[tech.nom][tech.niv] || 0) + item.quantity;
+                const cost = getBuildingCost(item.code);
+                if (!buildingStats[tech.nom]) {
+                    buildingStats[tech.nom] = { nivs: {}, totalCost: { pdc: 0, minerai: 0, prix: 0, marchandises: [] } };
+                }
+                if (!buildingStats[tech.nom].nivs[tech.niv]) {
+                    buildingStats[tech.nom].nivs[tech.niv] = { qty: 0, unitCost: cost };
+                }
+                buildingStats[tech.nom].nivs[tech.niv].qty += item.quantity;
+                addCosts(buildingStats[tech.nom].totalCost, cost, item.quantity);
+                addCosts(totalGlobalCost, cost, item.quantity);
             }
         } else {
-            shipStats[item.code] = (shipStats[item.code] || 0) + item.quantity;
+            const cost = getShipCost(item.code);
+            if (!shipStats[item.code]) {
+                shipStats[item.code] = { qty: 0, unitCost: cost, totalCost: { pdc: 0, minerai: 0, prix: 0, marchandises: [] } };
+            }
+            shipStats[item.code].qty += item.quantity;
+            if (cost) {
+                addCosts(shipStats[item.code].totalCost, cost, item.quantity);
+                addCosts(totalGlobalCost, cost, item.quantity);
+            }
         }
     });
 
     const buildings = Object.keys(buildingStats).sort().map(name => ({
         name,
-        types: Object.entries(buildingStats[name])
+        types: Object.entries(buildingStats[name].nivs)
             .sort((a, b) => Number(a[0]) - Number(b[0]))
-            .map(([niv, qty]) => ({ niv: Number(niv), qty }))
+            .map(([niv, data]) => ({ niv: Number(niv), qty: data.qty, unitCost: data.unitCost })),
+        totalCost: buildingStats[name].totalCost
     }));
 
     const ships = Object.entries(shipStats)
         .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([name, qty]) => ({ name, qty }));
+        .map(([name, data]) => ({ name, qty: data.qty, unitCost: data.unitCost, totalCost: data.totalCost }));
 
     const totalBuildings = buildings.reduce((acc, b) => acc + b.types.reduce((sum, t) => sum + t.qty, 0), 0);
     const totalShips = ships.reduce((acc, s) => acc + s.qty, 0);
 
+    const formatCost = (cost: any) => {
+        if (!cost) return '';
+        const parts = [];
+        if (cost.prix > 0) parts.push(`${cost.prix.toLocaleString()} ce`);
+        if (cost.pdc > 0) parts.push(`${cost.pdc} pdc`);
+        if (cost.minerai > 0) parts.push(`${cost.minerai} min`);
+        if (cost.marchandises && cost.marchandises.length > 0) {
+            cost.marchandises.forEach((m: any) => {
+                parts.push(`${m.nb} m${m.code}`);
+            });
+        }
+        return parts.length > 0 ? `(${parts.join(', ')})` : '';
+    };
+
     const formattedBuildings = buildings.map(b => {
-        const typesStr = b.types.map(t => `${t.qty} type ${toRoman(t.niv)}`).join(', ');
+        const typesStr = b.types.map(t => `${t.qty} type ${toRoman(t.niv)} ${formatCost(t.unitCost)}`).join(', ');
         return `${b.name} : ${typesStr}`;
     });
 
-    const formattedShips = ships.map(s => `${s.name} : ${s.qty}`);
+    const formattedShips = ships.map(s => `${s.name} : ${s.qty} ${formatCost(s.unitCost)}`);
 
     return {
         buildings,
@@ -62,7 +145,8 @@ export function formatPlannedItems(items: { type: 'building' | 'ship', code: str
         totalBuildings,
         totalShips,
         formattedBuildings,
-        formattedShips
+        formattedShips,
+        totalGlobalCost
     };
 }
 

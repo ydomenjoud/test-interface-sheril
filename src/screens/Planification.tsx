@@ -28,7 +28,7 @@ export default function Planification() {
     useEffect(() => {
         localStorage.setItem('planification_summary_expanded', JSON.stringify(summaryExpanded));
     }, [summaryExpanded]);
-    const [summaryTab, setSummaryTab] = useState<'ship' | 'building'>('building');
+    const [summaryTab, setSummaryTab] = useState<'ship' | 'building' | 'cost'>('building');
     const [highlightedItems, setHighlightedItems] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
@@ -288,9 +288,10 @@ export default function Planification() {
     const summaryData = useMemo(() => {
         return formatPlannedItems(
             Object.values(queues).flat(),
-            global?.technologies || []
+            global?.technologies || [],
+            rapport?.plansVaisseaux || []
         );
-    }, [queues, global]);
+    }, [queues, global, rapport]);
 
     const copyBluePrint = () => {
         navigator.clipboard.writeText(blueprint)
@@ -816,7 +817,7 @@ export default function Planification() {
                 position: 'fixed',
                 bottom: 20,
                 right: 20,
-                width: summaryExpanded ? 350 : 120,
+                width: summaryExpanded ? 400 : 120,
                 backgroundColor: '#222',
                 border: '1px solid #444',
                 borderRadius: 8,
@@ -877,6 +878,20 @@ export default function Planification() {
                             >
                                 Vaisseaux ({summaryData.totalShips})
                             </button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setSummaryTab('cost'); }}
+                                style={{
+                                    flex: 1.2,
+                                    padding: '8px',
+                                    backgroundColor: summaryTab === 'cost' ? '#444' : 'transparent',
+                                    color: summaryTab === 'cost' ? '#fff' : '#aaa',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85em'
+                                }}
+                            >
+                                Coûts: <span className="cur">{summaryData.totalGlobalCost.prix.toLocaleString()}</span>
+                            </button>
                         </div>
                         <div style={{ padding: 12, overflowY: 'auto', fontSize: '0.9em' }}>
                             {summaryTab === 'building' ? (
@@ -889,7 +904,7 @@ export default function Planification() {
                                 ) : (
                                     <div style={{ color: '#666', fontStyle: 'italic' }}>Aucun bâtiment planifié</div>
                                 )
-                            ) : (
+                            ) : summaryTab === 'ship' ? (
                                 summaryData.formattedShips.length > 0 ? (
                                     summaryData.formattedShips.map((str, i) => (
                                         <div key={i} style={{ marginBottom: 6 }}>
@@ -899,6 +914,33 @@ export default function Planification() {
                                 ) : (
                                     <div style={{ color: '#666', fontStyle: 'italic' }}>Aucun vaisseau planifié</div>
                                 )
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: 4 }}>
+                                        <span>Centaures</span>
+                                        <span style={{ fontWeight: 'bold' }} className="cur">{summaryData.totalGlobalCost.prix.toLocaleString()}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: 4 }}>
+                                        <span>PDC</span>
+                                        <span style={{ fontWeight: 'bold', color: '#55f' }}>{summaryData.totalGlobalCost.pdc.toLocaleString()}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: 4 }}>
+                                        <span>Minerai</span>
+                                        <span style={{ fontWeight: 'bold', color: '#5f5' }}>{summaryData.totalGlobalCost.minerai.toLocaleString()}</span>
+                                    </div>
+                                    {summaryData.totalGlobalCost.marchandises.sort((a: any, b: any) => a.code - b.code).map((m: any) => {
+                                        const mData = global?.marchandises.find(x => x.code === m.code);
+                                        return (
+                                            <div key={m.code} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: 4 }}>
+                                                <span className={'m m'+mData?.code}>{mData?.nom || `Marchandise ${m.code}`}</span>
+                                                <span style={{ fontWeight: 'bold', color: '#fa0' }}>{m.nb.toLocaleString()}</span>
+                                            </div>
+                                        );
+                                    })}
+                                    {summaryData.totalGlobalCost.marchandises.length === 0 && summaryData.totalGlobalCost.prix === 0 && summaryData.totalGlobalCost.pdc === 0 && summaryData.totalGlobalCost.minerai === 0 && (
+                                        <div style={{ color: '#666', fontStyle: 'italic' }}>Aucun coût à afficher</div>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </>
