@@ -118,19 +118,6 @@ export function formatPlannedItems(items: { type: 'building' | 'ship', code: str
     const totalBuildings = buildings.reduce((acc, b) => acc + b.types.reduce((sum, t) => sum + t.qty, 0), 0);
     const totalShips = ships.reduce((acc, s) => acc + s.qty, 0);
 
-    const formatCost = (cost: any) => {
-        if (!cost) return '';
-        const parts = [];
-        if (cost.prix > 0) parts.push(`${cost.prix.toLocaleString()} ce`);
-        if (cost.pdc > 0) parts.push(`${cost.pdc} pdc`);
-        if (cost.minerai > 0) parts.push(`${cost.minerai} min`);
-        if (cost.marchandises && cost.marchandises.length > 0) {
-            cost.marchandises.forEach((m: any) => {
-                parts.push(`${m.nb} m${m.code}`);
-            });
-        }
-        return parts.length > 0 ? `(${parts.join(', ')})` : '';
-    };
 
     const formattedBuildings = buildings.map(b => {
         const typesStr = b.types.map(t => `${t.qty} type ${toRoman(t.niv)}`).join(', ');
