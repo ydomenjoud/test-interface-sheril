@@ -149,3 +149,23 @@ code {
 }
 
 
+.planification_table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: 20px;
+}
+
+.planification_table thead th {
+    position: sticky;
+    top: 0;
+    background-color: #111;
+    border-bottom: 2px solid #444;
+    z-index: 10;
+    padding: 8px;
+}
+
+
+.planification_table tbody td:nth-child(2n+3), .planification_table thead th:nth-child(2n+3)  {
+    background-color: #00221b;
+}

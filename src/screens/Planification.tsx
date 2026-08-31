@@ -279,7 +279,7 @@ export default function Planification() {
             return;
         }
 
-        return btoa(entries.map(e => `${e.systemPos}:${e.qty}:${e.code}:${e.planetNum}`).join('%'));
+        return btoa(entries.map(e => `${e.systemPos}:${e.qty}:${e.code}:${e.planetNum}`).join('%#§%'));
     }
     const blueprint = buildBluePrint() || '';
 
@@ -458,7 +458,7 @@ export default function Planification() {
     if (!rapport) return <div style={{ padding: 20 }}>Veuillez charger un rapport XML.</div>;
 
     return (
-        <div style={{ padding: 20, color: '#eee', backgroundColor: '#111', overflowX: 'auto' }}>
+        <div style={{ padding: 20, color: '#eee', backgroundColor: '#111', overflowX: 'auto', overflowY: 'auto', height: '100%' }}>
             <div className="half">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
                     <h2>Planification Globale</h2>
@@ -568,14 +568,14 @@ export default function Planification() {
 
                 </button>
         </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 20 }}>
+            <table className="planification_table">
                 <thead>
-                    <tr style={{ borderBottom: '2px solid #444', color: '#aaa', fontSize: '0.9em' }}>
-                        <th style={{ textAlign: 'left', padding: 8 }}>Système</th>
-                        <th style={{ textAlign: 'center', padding: 8 }}>PDC</th>
-                        <th style={{ textAlign: 'center', padding: 8 }}>Min</th>
+                    <tr style={{ color: '#aaa', fontSize: '0.9em' }}>
+                        <th style={{ textAlign: 'left' }}>Système</th>
+                        <th style={{ textAlign: 'center' }}>PDC</th>
+                        <th style={{ textAlign: 'center' }}>Min</th>
                         {marchandisesCols.map(m => (
-                            <th key={m.code} style={{ textAlign: 'center', padding: 8 }} title={m.nom} className={'m m'+m.code}>
+                            <th key={m.code} style={{ textAlign: 'center' }} title={m.nom} className={'m m'+m.code}>
                                 <span className="hideOnMobile">{m.nom.substring(0, 3)}.</span>
                             </th>
                         ))}
@@ -608,6 +608,8 @@ export default function Planification() {
                             return { ...item, data };
                         });
 
+                        const hasShortage = finalPc < 0 || finalMinerai < 0 || Object.values(finalMarchandises).some(v => v < 0);
+
                         const ownedPlanets = s.planetes.filter(p => p.proprietaire === rapport?.joueur?.numero);
                         const isCollapsed = collapsedSystems[key];
 
@@ -618,7 +620,7 @@ export default function Planification() {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                             <button
                                                 onClick={() => toggleCollapse(key)}
-                                                style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: 0, fontSize: '1.2em' }}
+                                                style={{ background: 'none', border: 'none', color: hasShortage ? '#f55' : '#aaa', cursor: 'pointer', padding: 0, fontSize: '1.2em' }}
                                             >
                                                 ▶
                                             </button>
@@ -656,7 +658,7 @@ export default function Planification() {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <button
                                             onClick={() => toggleCollapse(key)}
-                                            style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: 0, fontSize: '1.2em' }}
+                                            style={{ background: 'none', border: 'none', color: hasShortage ? '#f55' : '#aaa', cursor: 'pointer', padding: 0, fontSize: '1.2em' }}
                                         >
                                             ▼
                                         </button>
