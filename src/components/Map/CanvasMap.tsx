@@ -221,26 +221,20 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
         // Préparation des influenceurs pour la couche d'influence
         const influencers: { owner: number, pos: XY }[] = [];
         if (showInfluence) {
-            // On récupère tous les commandants qui ont au moins un système ou une flotte
+            // On ne prend QUE les systèmes des joueurs (pas les flottes, pas les systèmes neutres)
             const influencerMap = new Map<number, XY[]>();
             systems.forEach(s => {
                 if (s.owners) {
                     (s.owners as number[]).forEach(o => {
-                        if (o === 0) return;
-                        if (!influencerMap.has(o)) influencerMap.set(o, []);
-                        influencerMap.get(o)!.push(s.pos);
+                        const ownerId = Number(o);
+                        if (ownerId === 0) return; // Exclure les systèmes neutres
+                        if (!influencerMap.has(ownerId)) influencerMap.set(ownerId, []);
+                        influencerMap.get(ownerId)!.push(s.pos);
                     });
                 }
             });
-            fleets.forEach(f => {
-                const o = (f as any).owner;
-                if (o && o !== 0) {
-                    if (!influencerMap.has(o)) influencerMap.set(o, []);
-                    influencerMap.get(o)!.push(f.pos);
-                }
-            });
 
-            // Pour chaque commandant, on garde toutes ses positions (systèmes et flottes)
+            // Pour chaque commandant, on garde toutes ses positions (systèmes uniquement)
             // On utilisera la distance minimale à n'importe lequel de ses points.
             influencerMap.forEach((positions, owner) => {
                 positions.forEach(pos => {
@@ -260,7 +254,6 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
                     
                     let minDist = Infinity;
                     let closestOwner = -1;
-                    let countAtMin = 0;
 
                     const ownerDistances = new Map<number, number>();
                     influencers.forEach(inf => {
@@ -275,13 +268,15 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
                         if (d < minDist) {
                             minDist = d;
                             closestOwner = owner;
-                            countAtMin = 1;
                         } else if (d === minDist) {
-                            countAtMin++;
+                            // En cas d'égalité, le joueur local a la priorité
+                            if (owner === currentPlayerId) {
+                                closestOwner = owner;
+                            }
                         }
                     });
 
-                    influenceGrid[r][c] = (closestOwner !== -1 && countAtMin === 1) ? closestOwner : -1;
+                    influenceGrid[r][c] = closestOwner;
                 }
             }
         }
