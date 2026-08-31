@@ -222,7 +222,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
             const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
             for (let c = 0; c < cols; c++) {
                 const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
-                const sectorBg = sectorBackgroundColor(xCoord, yCoord);
+                const sectorBg = showSectors ? sectorBackgroundColor(xCoord, yCoord) : null;
                 if (sectorBg) {
                     ctx.fillStyle = sectorBg;
                     ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
