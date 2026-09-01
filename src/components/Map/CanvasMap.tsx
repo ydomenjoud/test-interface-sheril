@@ -288,6 +288,9 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
             for (let c = 0; c < cols; c++) {
                 const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
 
+                // Ne pas dessiner le contenu dans les en-têtes (ligne 0 et colonne 0 du canvas)
+                if (r === 0 || c === 0) continue;
+
                 const sectorBg = showSectors ? sectorBackgroundColor(xCoord, yCoord) : null;
                 if (sectorBg) {
                     ctx.fillStyle = sectorBg;
@@ -361,9 +364,15 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
             ctx.lineTo(cols * cellSize, yPos);
             ctx.stroke();
 
+            // Fond opaque pour l'en-tête de ligne
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, yPos, cellSize, cellSize);
+
             ctx.fillStyle = '#ccc';
-            ctx.font = '12px sans-serif';
-            ctx.fillText(String(xCoord), 4, yPos + 12);
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(xCoord), cellSize / 2, yPos + cellSize / 2);
         }
 
         for (let c = 0; c <= cols; c++) {
@@ -375,9 +384,15 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
             ctx.lineTo(xPos, rows * cellSize);
             ctx.stroke();
 
+            // Fond opaque pour l'en-tête de colonne
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(xPos, 0, cellSize, cellSize);
+
             ctx.fillStyle = '#ccc';
-            ctx.font = '12px sans-serif';
-            ctx.fillText(String(yCoord), xPos + 4, 12);
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(yCoord), xPos + cellSize / 2, cellSize / 2);
         }
 
         // ZONES DE DÉTECTION (scan) – systèmes et flottes du joueur
@@ -412,9 +427,13 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
                     const cyIdxBase = ((tx - topX + BOUNDS.maxX) % BOUNDS.maxX);
 
                     let cxIdx = cxIdxBase;
-                    while (cxIdx < cols) {
+            while (cxIdx < cols) {
                         let cyIdx = cyIdxBase;
                         while (cyIdx < rows) {
+                            if (cxIdx === 0 || cyIdx === 0) {
+                                cyIdx += BOUNDS.maxX;
+                                continue;
+                            }
                             detected.add(`${cxIdx},${cyIdx}`);
                             cyIdx += BOUNDS.maxX;
                         }
@@ -454,8 +473,16 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
             let dy = ((nx - topX + BOUNDS.maxX) % BOUNDS.maxX);
 
             while (dx < cols) {
+                if (dx === 0) {
+                    dx += BOUNDS.maxY;
+                    continue;
+                }
                 let currentDy = dy;
                 while (currentDy < rows) {
+                    if (currentDy === 0) {
+                        currentDy += BOUNDS.maxX;
+                        continue;
+                    }
                     const px = dx * cellSize;
                     const py = currentDy * cellSize;
                     const noteList = notes[noteKey];
@@ -505,8 +532,16 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
                 }
 
                 while (dx < cols) {
+                    if (dx === 0) {
+                        dx += BOUNDS.maxY;
+                        continue;
+                    }
                     let currentDy = dy;
                     while (currentDy < rows) {
+                        if (currentDy === 0) {
+                            currentDy += BOUNDS.maxX;
+                            continue;
+                        }
                         const px = dx * cellSize;
                         const py = currentDy * cellSize;
                         const size = (2 * r + 1) * cellSize;
@@ -553,8 +588,16 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
 
                 // Gérer le wrapping si le viewport est plus grand que la galaxie
                 while (dx < cols) {
+                    if (dx === 0) {
+                        dx += BOUNDS.maxY;
+                        continue;
+                    }
                     let currentDy = dy;
                     while (currentDy < rows) {
+                        if (currentDy === 0) {
+                            currentDy += BOUNDS.maxX;
+                            continue;
+                        }
                         const px = dx * cellSize;
                         const py = currentDy * cellSize;
 
@@ -712,8 +755,16 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
                 let dy = ((f.pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
 
                 while (dx < cols) {
+                    if (dx === 0) {
+                        dx += BOUNDS.maxY;
+                        continue;
+                    }
                     let currentDy = dy;
                     while (currentDy < rows) {
+                        if (currentDy === 0) {
+                            currentDy += BOUNDS.maxX;
+                            continue;
+                        }
                         const px = dx * cellSize;
                         const py = currentDy * cellSize;
 
@@ -775,6 +826,12 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
                         const headLen = Math.max(6, Math.floor(cellSize * 0.25));
                         const angle = Math.atan2(y2 - y1, x2 - x1);
                         c.save();
+
+                        // Clip pour éviter de dessiner sur les en-têtes (colonne 0 et ligne 0)
+                        c.beginPath();
+                        c.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
+                        c.clip();
+
                         c.strokeStyle = '#ff9800';
                         c.fillStyle = '#ff9800';
                         c.lineWidth = 2;
@@ -824,8 +881,10 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
             cCombat.save();
             let combatLogCount = 0;
             for (let r = 0; r < rows; r++) {
+                if (r === 0) continue;
                 const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
                 for (let c = 0; c < cols; c++) {
+                    if (c === 0) continue;
                     const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
                     const counts = countCombatsByKind(combats, {x: xCoord, y: yCoord});
                     if (counts.spatial <= 0 && counts.planetary <= 0) continue;
@@ -846,6 +905,12 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
 
                 if (playerFleets.length > 0) {
                     ctx.save();
+
+                    // Clip pour éviter de dessiner sur les en-têtes (colonne 0 et ligne 0)
+                    ctx.beginPath();
+                    ctx.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
+                    ctx.clip();
+
                     ctx.lineWidth = 1;
 
                     playerFleets.forEach(f => {
