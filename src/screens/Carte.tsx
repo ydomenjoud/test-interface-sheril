@@ -50,6 +50,10 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_sectors');
     return saved !== null ? JSON.parse(saved) : false;
   });
+  const [influenceOpacity, setInfluenceOpacity] = useState(() => {
+    const saved = localStorage.getItem('carte_influence_opacity');
+    return saved !== null ? JSON.parse(saved) : 0.18;
+  });
   const [colorMode, setColorMode] = useState<'status' | 'player'>(() => {
     const saved = localStorage.getItem('carte_color_mode');
     return saved !== null ? (saved as 'status' | 'player') : 'status';
@@ -114,6 +118,10 @@ export default function Carte() {
   useEffect(() => {
     localStorage.setItem('carte_show_sectors', JSON.stringify(showSectors));
   }, [showSectors]);
+
+  useEffect(() => {
+    localStorage.setItem('carte_influence_opacity', JSON.stringify(influenceOpacity));
+  }, [influenceOpacity]);
 
   useEffect(() => {
     localStorage.setItem('carte_color_mode', colorMode);
@@ -218,6 +226,7 @@ export default function Carte() {
             showFleetRadar={showFleetRadar}
             showSectors={showSectors}
             showInfluence={showInfluence}
+            influenceOpacity={influenceOpacity}
             colorMode={colorMode}
             showStabilityZones={showStabilityZones}
             stabilitySystemPos={stabilitySystemPos}
@@ -263,9 +272,10 @@ export default function Carte() {
                   <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
                       {/* Filtre multi-sélection des commandants */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          <span style={{ fontSize: '0.85em', color: '#aaa' }}>Commandants</span>
+                          <span style={{ fontSize: '0.85em', color: '#aaa' }}>Afficher uniquement Commandants</span>
                           <MultiSelectDropdown
-                              title="Tous"
+                              title=""
+                              placeholder={"Choisir"}
                               options={selectedOwnersOption}
                               selectedValues={selectedOwners}
                               onChange={setSelectedOwners}
@@ -310,6 +320,25 @@ export default function Carte() {
                             />
                             Afficher influence
                           </label>
+
+                          {showInfluence && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginLeft: 20 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={{ fontSize: '0.8em', color: '#aaa' }}>Opacité ( défaut 18% )</span>
+                                      <span style={{ fontSize: '0.8em', color: '#eee' }}>{Math.round(influenceOpacity * 100)}%</span>
+                                  </div>
+                                  <input
+                                      type="range"
+                                      min={0.05}
+                                      max={0.5}
+                                      step={0.01}
+                                      value={influenceOpacity}
+                                      onChange={(e) => setInfluenceOpacity(parseFloat(e.target.value))}
+                                      style={{ width: '100%', cursor: 'pointer' }}
+                                  />
+                              </div>
+                          )}
+
                           <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
                             <input
                               type="checkbox"

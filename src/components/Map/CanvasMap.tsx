@@ -39,6 +39,7 @@ type Props = {
     colorMode?: 'status' | 'player';
     showStabilityZones: boolean;
     stabilitySystemPos?: string;
+    influenceOpacity?: number;
 };
 
 export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[], colorMode: 'status' | 'player' = 'status') {
@@ -73,7 +74,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#f80c0c';
 }
 
-export default function CanvasMap({onSelect, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos}: Props) {
+export default function CanvasMap({onSelect, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -251,7 +252,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
                 const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
                 for (let c = 0; c <= cols; c++) {
                     const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
-                    
+
                     let minDist = Infinity;
                     let closestOwner = -1;
 
@@ -298,32 +299,36 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
                     const closestOwner = influenceGrid[r][c];
                     const baseColor = getColorForPlayer(closestOwner);
                     // On convertit HSL en HSLA un peu plus marqué
-                    ctx.fillStyle = baseColor.replace(')', ', 0.18)').replace('hsl', 'hsla');
+                    ctx.fillStyle = baseColor.replace(')', `, ${influenceOpacity})`).replace('hsl', 'hsla');
                     ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
                 }
+
+                const influenceBorderWidth = 0.6;
 
                 // Bordures d'influence
                 if (showInfluence && influenceGrid[r]) {
                     const currentOwner = influenceGrid[r][c];
-                    ctx.lineWidth = 1;
-                    
+                    ctx.lineWidth = 0.3;
+
                     // Bordure droite
                     if (c < cols) {
                         const rightOwner = influenceGrid[r][c+1];
                         if (currentOwner !== rightOwner) {
-                            ctx.strokeStyle = currentOwner !== -1 ? getColorForPlayer(currentOwner).replace('hsl', 'hsla').replace(')', ', 0.6)') : getColorForPlayer(rightOwner).replace('hsl', 'hsla').replace(')', ', 0.6)');
+                            ctx.lineWidth = influenceBorderWidth;
+                            ctx.strokeStyle = '#FFFF';
                             ctx.beginPath();
                             ctx.moveTo((c + 1) * cellSize, r * cellSize);
                             ctx.lineTo((c + 1) * cellSize, (r + 1) * cellSize);
                             ctx.stroke();
                         }
                     }
-                    
+
                     // Bordure basse
                     if (r < rows) {
                         const bottomOwner = influenceGrid[r+1][c];
                         if (currentOwner !== bottomOwner) {
-                            ctx.strokeStyle = currentOwner !== -1 ? getColorForPlayer(currentOwner).replace('hsl', 'hsla').replace(')', ', 0.6)') : getColorForPlayer(bottomOwner).replace('hsl', 'hsla').replace(')', ', 0.6)');
+                            ctx.strokeStyle = "#FFF";
+                            ctx.lineWidth = influenceBorderWidth;
                             ctx.beginPath();
                             ctx.moveTo(c * cellSize, (r + 1) * cellSize);
                             ctx.lineTo((c + 1) * cellSize, (r + 1) * cellSize);
@@ -902,7 +907,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
 
             cCombat.restore();
         }
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
