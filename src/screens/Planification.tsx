@@ -212,7 +212,12 @@ export default function Planification() {
     const importQueue = (systemKey: string, bp: string) => {
         if (!bp) return;
         try {
-            const decoded = atob(bp);
+            const binary = atob(bp);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            const decoded = new TextDecoder().decode(bytes);
             const items = decoded.split(construireBluePrintSeparator);
             const newEntriesBySystem: Record<string, PlannedItem[]> = {};
 
@@ -281,7 +286,11 @@ export default function Planification() {
             return;
         }
 
-        return btoa(entries.map(e => `${e.systemPos}:${e.qty}:${e.code}:${e.planetNum}`).join(construireBluePrintSeparator));
+        const schema = entries.map(e => `${e.systemPos}:${e.qty}:${e.code}:${e.planetNum}`).join(construireBluePrintSeparator);
+        const utf8Bytes = new TextEncoder().encode(schema);
+        const binary = utf8Bytes.reduce((acc, byte) => acc + String.fromCharCode(byte), '');
+
+        return btoa(binary);
     }
     const blueprint = buildBluePrint() || '';
 
