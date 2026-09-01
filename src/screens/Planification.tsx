@@ -483,7 +483,7 @@ export default function Planification() {
     if (!rapport) return <div style={{ padding: 20 }}>Veuillez charger un rapport XML.</div>;
 
     return (
-        <div style={{ padding: 20, color: '#eee', backgroundColor: '#111', overflowX: 'auto', overflowY: 'auto', height: '100%' }}>
+        <div style={{ padding: 20, paddingTop: 0, color: '#eee', backgroundColor: '#111', overflowX: 'auto', overflowY: 'auto', height: '100%' }}>
             <div className="half">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
                     <h2>Planification Globale</h2>
@@ -715,17 +715,17 @@ export default function Planification() {
                                         <div style={{ fontSize: '0.8em', color: '#888' }}>
                                             [{s.pos.x.toString().padStart(2, '0')}-{s.pos.y.toString().padStart(2, '0')}] &nbsp;
                                         </div>
-                                        <div style={{ fontWeight: 'bold' }}>{s.nom}</div>
+                                        <div style={{ fontWeight: 'bold' }} className="hideOnMobile">{s.nom}</div>
                                     </div>
                                 </td>
 
                                 <td style={{ padding: 8, textAlign: 'center' }}>
-                                    <div style={{ fontSize: '0.8em', color: '#888' }} title="Points de Construction (Production par tour)">{initial.pc}</div>
+                                    <div style={{ fontSize: '0.8em', color: '#888' }} title="Points de Construction (Production par tour)" className="hideOnMobile">{initial.pc}</div>
                                     <div style={{ color: finalPc < 0 ? '#f55' : (finalPc < initial.pc ? '#5f5' : '#aaa'), fontWeight: finalPc < initial.pc ? 'bold' : 'normal' }}>{finalPc}</div>
                                 </td>
 
                                 <td style={{ padding: 8, textAlign: 'center' }}>
-                                    <div style={{ fontSize: '0.8em', color: '#888' }} title="Stock + Production">
+                                    <div style={{ fontSize: '0.8em', color: '#888' }} title="Stock + Production" className="hideOnMobile">
                                         {initial.initialMinerai.stock} {initial.initialMinerai.prod > 0 ? `( +${initial.initialMinerai.prod} )` : ''}
                                     </div>
                                     <div style={{ color: finalMinerai < 0 ? '#f55' : (finalMinerai < initial.minerai ? '#5f5' : '#aaa'), fontWeight: finalMinerai < initial.minerai ? 'bold' : 'normal' }}>{finalMinerai}</div>
@@ -737,7 +737,7 @@ export default function Planification() {
                                     const val = finalMarchandises[m.code] || 0;
                                     return (
                                         <td key={m.code} style={{ padding: 8, textAlign: 'center' }}>
-                                            <div style={{ fontSize: '0.8em', color: '#888' }} title="Stock + Production">
+                                            <div style={{ fontSize: '0.8em', color: '#888' }} title="Stock + Production" className="hideOnMobile">
                                                 {detail.stock} {detail.prod > 0 ? `( +${detail.prod} )` : ''}
                                             </div>
                                             <div style={{ color: val < 0 ? '#f55' : (val < initVal ? '#5f5' : '#aaa'), fontWeight: val < initVal ? 'bold' : 'normal' }}>{val}</div>
