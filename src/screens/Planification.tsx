@@ -66,6 +66,19 @@ export default function Planification() {
         return saved ? JSON.parse(saved) : {};
     });
 
+    const hasAnyPlannedItem = useMemo(() => {
+        return Object.values(queues).some(q => q.length > 0);
+    }, [queues]);
+
+    const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+    const [confirmText, setConfirmText] = useState('');
+
+    const clearAllQueues = () => {
+        setQueues({});
+        setIsClearModalOpen(false);
+        setConfirmText('');
+    };
+
     useEffect(() => {
         localStorage.setItem('planification_queues', JSON.stringify(queues));
     }, [queues]);
@@ -579,6 +592,31 @@ export default function Planification() {
                 </svg>
 
                 </button>
+                <button
+                    onClick={() => setIsClearModalOpen(true)}
+                    disabled={!hasAnyPlannedItem}
+                    style={{
+                        padding: '4px 8px',
+                        cursor: hasAnyPlannedItem ? 'pointer' : 'default',
+                        backgroundColor: hasAnyPlannedItem ? '#822' : '#333',
+                        color: hasAnyPlannedItem ? '#eee' : '#666',
+                        border: '1px solid #555',
+                        borderRadius: 4,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: '32px',
+                        opacity: hasAnyPlannedItem ? 1 : 0.5
+                    }}
+                    title="Tout vider"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                </button>
         </div>
             <table className="planification_table">
                 <thead>
@@ -955,6 +993,86 @@ export default function Planification() {
                     </>
                 )}
             </div>
+
+            {isClearModalOpen && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 2000
+                }}>
+                    <div style={{
+                        backgroundColor: '#222',
+                        padding: '24px',
+                        borderRadius: '8px',
+                        border: '1px solid #444',
+                        maxWidth: '400px',
+                        width: '90%',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+                    }}>
+                        <h3 style={{ marginTop: 0, color: '#f55' }}>Tout vider ?</h3>
+                        <p style={{ color: '#ccc', lineHeight: '1.5' }}>
+                            Êtes-vous sûr de vouloir supprimer <strong>tous</strong> les éléments planifiés dans <strong>tous</strong> les systèmes ?
+                        </p>
+                        <p style={{ color: '#aaa', fontSize: '0.9em' }}>
+                            Pour confirmer, veuillez saisir le mot <strong style={{ color: '#eee' }}>supprimer</strong> ci-dessous :
+                        </p>
+                        <input
+                            type="text"
+                            value={confirmText}
+                            onChange={(e) => setConfirmText(e.target.value)}
+                            placeholder="Saisir supprimer"
+                            autoFocus
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                backgroundColor: '#111',
+                                border: '1px solid #444',
+                                borderRadius: '4px',
+                                color: '#fff',
+                                marginBottom: '20px',
+                                boxSizing: 'border-box'
+                            }}
+                        />
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => { setIsClearModalOpen(false); setConfirmText(''); }}
+                                style={{
+                                    padding: '8px 16px',
+                                    backgroundColor: '#444',
+                                    color: '#eee',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                onClick={clearAllQueues}
+                                disabled={confirmText.toLowerCase() !== 'supprimer'}
+                                style={{
+                                    padding: '8px 16px',
+                                    backgroundColor: confirmText.toLowerCase() === 'supprimer' ? '#822' : '#333',
+                                    color: confirmText.toLowerCase() === 'supprimer' ? '#fff' : '#666',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: confirmText.toLowerCase() === 'supprimer' ? 'pointer' : 'not-allowed',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                Tout vider
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
