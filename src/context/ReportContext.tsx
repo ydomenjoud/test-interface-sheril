@@ -158,7 +158,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
 
             const [dataTxt, combatsTxt] = await Promise.all([
                 fetchWithTimeout(
-                    `https://sheril.pbem-france.neta/stats/data.xml`,
+                    `https://sheril.pbem-france.net/stats/data.xml`,
                     'https://ydomenjoud.github.io/test-interface-sheril/examples/data.xml'
                 ),
                 fetchWithTimeout('https://sheril.pbem-france.net/stats/combats.htm'),
