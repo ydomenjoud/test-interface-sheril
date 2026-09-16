@@ -1,5 +1,6 @@
 import { XY } from '../types';
-export const BOUNDS = { minX: 0, maxX: 40, minY: 0, maxY: 40 };
+export const BOUNDS = { minX: 0, maxX: 60, minY: 0, maxY: 60 };
+export const CENTER = { x: Math.floor(BOUNDS.maxX / 2), y: Math.floor(BOUNDS.maxY / 2) };
 
 export  function isPos(pos: string): boolean {
     if(!pos || !pos.split) { return false; }

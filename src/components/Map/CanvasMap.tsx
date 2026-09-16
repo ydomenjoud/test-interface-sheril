@@ -1,6 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
-import {BOUNDS, getTorusDistance, torusDelta, wrapX, wrapY} from '../../utils/position';
+import {BOUNDS, CENTER, getTorusDistance, torusDelta, wrapX, wrapY} from '../../utils/position';
 import {getSectorNumber, isSectorLabelCell, sectorBackgroundColor, sectorLabelColor} from '../../utils/sectors';
 import {countCombatsByKind} from '../../parsers/parseCombatMessages';
 import {drawCombatMarkers} from '../../utils/combatMarkers';
@@ -192,7 +192,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
     useEffect(() => {
         const cvs = canvasRef.current;
         if (!cvs) return;
-        const currentCenter = center || {x: 20, y: 20};
+        const currentCenter = center || CENTER;
         const dpr = window.devicePixelRatio || 1;
         const width = Math.round(cvs.clientWidth * dpr);
         const height = Math.round(cvs.clientHeight * dpr);
@@ -282,7 +282,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
             }
         }
 
-        // fond des secteurs 10×10 (16 secteurs sur la carte 40×40)
+        // fond des secteurs 10×10
         for (let r = 0; r < rows; r++) {
             const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
             for (let c = 0; c < cols; c++) {

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import { useReport } from '../../context/ReportContext';
-import { BOUNDS, wrapX, wrapY } from '../../utils/position';
+import {BOUNDS, CENTER, wrapX, wrapY} from '../../utils/position';
 import {colorForOwnership} from "./CanvasMap";
 
 type Props = {
@@ -19,7 +19,7 @@ function torusDelta(a: number, b: number, max: number): number {
 
 export default function MiniMap({ onCenter, colorMode = 'status' }: Props) {
   const { rapport, center, viewportCols, viewportRows } = useReport();
-  const currentCenter = useMemo(() => center || {x: 20, y: 20}, [center]);
+  const currentCenter = useMemo(() => center || CENTER, [center]);
   const ref = useRef<HTMLCanvasElement>(null);
   const playerId = rapport?.joueur?.numero || 0;
 

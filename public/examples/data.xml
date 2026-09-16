@@ -66,14 +66,14 @@
             <parent code="cargoIX"/>
             <parent code="moteurIX"/>
         </t>
-        <t base="creplan" code="creplanI" niv="0" nom="Maîtrise de l'espace" publique="1" recherche="200" type="-1">
+        <t base="creplan" code="creplanI" niv="0" nom="Maîtrise de l'espace" publique="0" recherche="200" type="-1">
             <description>La connaissance de cette technologie permet de créer des plans de vaisseaux.</description>
             <parent code="armeI"/>
         </t>
-        <t base="diplo" code="diploI" niv="0" nom="Maîtrise de la diplomatie" publique="1" recherche="200" type="-1">
+        <t base="diplo" code="diploI" niv="0" nom="Maîtrise de la diplomatie" publique="0" recherche="200" type="-1">
             <description>La connaissance de cette technologie permet de créer des alliances.</description>
         </t>
-        <t base="gestpla" code="gestplaI" niv="0" nom="Maîtrise de la gestion" publique="1" recherche="200" type="-1">
+        <t base="gestpla" code="gestplaI" niv="0" nom="Maîtrise de la gestion" publique="0" recherche="200" type="-1">
             <description>La connaissance de cette technologie permet de détruire des bâtiments inutiles sur ses systèmes et de modifier la taxation et la terraformation de planètes précises, au lieu d'être obligé de modifier toutes les planètes du système en même temps.</description>
         </t>
         <t base="progco" code="progcoI" niv="0" nom="Maîtrise de la planification" publique="0" recherche="200" type="-1">
@@ -122,7 +122,7 @@
         <t base="stratco" code="stratcoI" niv="0" nom="Maîtrise du combat" publique="0" recherche="200" type="-1">
             <description>La connaissance de cette technologie permet de créer des stratégies de combat pour ses flottes.</description>
         </t>
-        <t base="maitde" code="maitdeI" niv="0" nom="Maîtrise du développement" publique="1" recherche="4000" type="-1">
+        <t base="maitde" code="maitdeI" niv="0" nom="Maîtrise du développement" publique="0" recherche="4000" type="-1">
             <description>Permet principalement l'amélioration des usines de productions</description>
             <parent code="agroI"/>
             <parent code="modeI"/>
@@ -398,11 +398,11 @@
             <parent code="lancetorIX"/>
             <parent code="boucplaX"/>
         </t>
-        <t base="battla" code="battlaI" niv="0" nom="batterie de lasers" publique="1" recherche="400" type="0">
+        <t base="battla" code="battlaI" niv="0" nom="batterie de lasers" publique="0" recherche="400" type="0">
             <specification arme="laser" min="5" pc="10" prix="80.0" structure="25"/>
             <description>Une batterie laser permet de mieux défendre la planète sur laquelle elle est construite.</description>
         </t>
-        <t base="battla" code="battlaII" niv="1" nom="batterie de lasers" publique="1" recherche="800" type="0">
+        <t base="battla" code="battlaII" niv="1" nom="batterie de lasers" publique="0" recherche="800" type="0">
             <specification arme="laser" min="5" pc="10" prix="150.0" structure="50"/>
             <marchandise code="9" nb="1"/>
             <description>Une batterie laser permet de mieux défendre la planète sur laquelle elle est construite.</description>
@@ -548,12 +548,12 @@
             <parent code="rampemisIX"/>
             <parent code="boucplaX"/>
         </t>
-        <t base="battpla" code="battplaI" niv="0" nom="batterie de plasmas" publique="1" recherche="400" type="0">
+        <t base="battpla" code="battplaI" niv="0" nom="batterie de plasmas" publique="0" recherche="400" type="0">
             <specification arme="plasma" min="5" pc="10" prix="80.0" structure="25"/>
             <description>Une batterie plasma permet de mieux défendre la planète sur laquelle elle est construite.</description>
             <parent code="battlaI"/>
         </t>
-        <t base="battpla" code="battplaII" niv="1" nom="batterie de plasmas" publique="1" recherche="800" type="0">
+        <t base="battpla" code="battplaII" niv="1" nom="batterie de plasmas" publique="0" recherche="800" type="0">
             <specification arme="plasma" min="5" pc="10" prix="150.0" structure="50"/>
             <marchandise code="9" nb="1"/>
             <description>Une batterie plasma permet de mieux défendre la planète sur laquelle elle est construite.</description>
@@ -619,7 +619,7 @@
             <parent code="battplaIX"/>
             <parent code="boucplaX"/>
         </t>
-        <t base="bombe" code="bombeI" niv="0" nom="bombe" publique="1" recherche="400" type="1">
+        <t base="bombe" code="bombeI" niv="0" nom="bombe" publique="0" recherche="400" type="1">
             <specification case="1" min="5" prix="7.0" type="arme"/>
             <arme degat_bouclier="0" degat_coque="0" degat_sol="5" portee="0" vitesse="0"/>
             <marchandise code="9" nb="1"/>
@@ -697,13 +697,13 @@
             <parent code="bombeIX"/>
             <parent code="moteurIX"/>
         </t>
-        <t base="boucpla" code="boucplaI" niv="0" nom="bouclier planétaire" publique="1" recherche="400" type="0">
+        <t base="boucpla" code="boucplaI" niv="0" nom="bouclier planétaire" publique="0" recherche="400" type="0">
             <specification arme="" min="10" pc="10" prix="100.0" structure="100"/>
             <caracteristique code="6" value="1"/>
             <caracteristique code="4" value="1"/>
             <description>Un bouclier planétaire procure une protection efficace en cas d'attaque de la planète.&lt;br&gt;Les attaquants doivent d'abord le détruire avant de pilonner la population et les éventuelles constructions de défense.</description>
         </t>
-        <t base="boucpla" code="boucplaII" niv="1" nom="bouclier planétaire" publique="1" recherche="800" type="0">
+        <t base="boucpla" code="boucplaII" niv="1" nom="bouclier planétaire" publique="0" recherche="800" type="0">
             <specification arme="" min="15" pc="15" prix="150.0" structure="400"/>
             <caracteristique code="6" value="2"/>
             <caracteristique code="4" value="1"/>
@@ -711,7 +711,7 @@
             <description>Un bouclier planétaire procure une protection efficace en cas d'attaque de la planète.&lt;br&gt;Les attaquants doivent d'abord le détruire avant de pilonner la population et les éventuelles constructions de défense.</description>
             <parent code="boucplaI"/>
         </t>
-        <t base="boucpla" code="boucplaIII" niv="2" nom="bouclier planétaire" publique="1" recherche="1600" type="0">
+        <t base="boucpla" code="boucplaIII" niv="2" nom="bouclier planétaire" publique="0" recherche="1600" type="0">
             <specification arme="" min="20" pc="20" prix="200.0" structure="1350"/>
             <caracteristique code="6" value="3"/>
             <caracteristique code="4" value="1"/>
@@ -720,7 +720,7 @@
             <description>Un bouclier planétaire procure une protection efficace en cas d'attaque de la planète.&lt;br&gt;Les attaquants doivent d'abord le détruire avant de pilonner la population et les éventuelles constructions de défense.</description>
             <parent code="boucplaII"/>
         </t>
-        <t base="boucpla" code="boucplaIV" niv="3" nom="bouclier planétaire" publique="1" recherche="3200" type="0">
+        <t base="boucpla" code="boucplaIV" niv="3" nom="bouclier planétaire" publique="0" recherche="3200" type="0">
             <specification arme="" min="25" pc="25" prix="250.0" structure="3200"/>
             <caracteristique code="6" value="4"/>
             <caracteristique code="4" value="1"/>
@@ -729,7 +729,7 @@
             <description>Un bouclier planétaire procure une protection efficace en cas d'attaque de la planète.&lt;br&gt;Les attaquants doivent d'abord le détruire avant de pilonner la population et les éventuelles constructions de défense.</description>
             <parent code="boucplaIII"/>
         </t>
-        <t base="boucpla" code="boucplaV" niv="4" nom="bouclier planétaire" publique="1" recherche="6400" type="0">
+        <t base="boucpla" code="boucplaV" niv="4" nom="bouclier planétaire" publique="0" recherche="6400" type="0">
             <specification arme="" min="30" pc="30" prix="300.0" structure="6250"/>
             <caracteristique code="6" value="5"/>
             <caracteristique code="4" value="1"/>
@@ -786,7 +786,7 @@
             <description>Un bouclier planétaire procure une protection efficace en cas d'attaque de la planète.&lt;br&gt;Les attaquants doivent d'abord le détruire avant de pilonner la population et les éventuelles constructions de défense.</description>
             <parent code="boucplaIX"/>
         </t>
-        <t base="bouclier" code="bouclierI" niv="0" nom="bouclier" publique="1" recherche="400" type="1">
+        <t base="bouclier" code="bouclierI" niv="0" nom="bouclier" publique="0" recherche="400" type="1">
             <specification case="4" min="10" prix="10.0" type="autre"/>
             <caracteristique code="4" value="2"/>
             <description>Un bouclier est un composant de vaisseau.&lt;br&gt; Un bouclier permet de parer un nombre de dommages égal à sa capacité &amp;quot;Capacité bouclier magnétique&amp;quot; et se régénère aprés le combat. &lt;br&gt; Il ne peut pas y avoir plus de 10 boucliers par vaisseau.</description>
@@ -1393,7 +1393,7 @@
             <parent code="lmineIX"/>
             <parent code="moteurIX"/>
         </t>
-        <t base="laser" code="laserI" niv="0" nom="laser" publique="1" recherche="200" type="1">
+        <t base="laser" code="laserI" niv="0" nom="laser" publique="0" recherche="200" type="1">
             <specification case="1" min="7" prix="6.0" type="arme"/>
             <arme degat_bouclier="2" degat_coque="1" degat_sol="1" portee="8" vitesse="10"/>
             <marchandise code="8" nb="1"/>
@@ -1621,13 +1621,13 @@
         </t>
         <t base="radar" code="radarI" niv="0" nom="radar" publique="0" recherche="400" type="0">
             <specification arme="" min="10" pc="10" prix="100.0" structure="100"/>
-            <caracteristique code="8" value="2"/>
+            <caracteristique code="8" value="1"/>
             <caracteristique code="4" value="1"/>
             <description>Un radar permet de détecter les flottes et les systèmes qui se trouvent au plus à une distance égale à sa caractéristique &amp;quot;Portée radar&amp;quot;.</description>
         </t>
         <t base="radar" code="radarII" niv="1" nom="radar" publique="0" recherche="800" type="0">
             <specification arme="" min="15" pc="15" prix="150.0" structure="150"/>
-            <caracteristique code="8" value="3"/>
+            <caracteristique code="8" value="2"/>
             <caracteristique code="4" value="1"/>
             <marchandise code="6" nb="1"/>
             <description>Un radar permet de détecter les flottes et les systèmes qui se trouvent au plus à une distance égale à sa caractéristique &amp;quot;Portée radar&amp;quot;.</description>
@@ -1636,7 +1636,7 @@
         </t>
         <t base="radar" code="radarIII" niv="2" nom="radar" publique="0" recherche="1600" type="0">
             <specification arme="" min="20" pc="20" prix="200.0" structure="200"/>
-            <caracteristique code="8" value="4"/>
+            <caracteristique code="8" value="3"/>
             <caracteristique code="4" value="1"/>
             <marchandise code="6" nb="2"/>
             <description>Un radar permet de détecter les flottes et les systèmes qui se trouvent au plus à une distance égale à sa caractéristique &amp;quot;Portée radar&amp;quot;.</description>
@@ -1645,7 +1645,7 @@
         </t>
         <t base="radar" code="radarIV" niv="3" nom="radar" publique="0" recherche="3200" type="0">
             <specification arme="" min="25" pc="25" prix="250.0" structure="350"/>
-            <caracteristique code="8" value="5"/>
+            <caracteristique code="8" value="4"/>
             <caracteristique code="4" value="1"/>
             <marchandise code="6" nb="2"/>
             <description>Un radar permet de détecter les flottes et les systèmes qui se trouvent au plus à une distance égale à sa caractéristique &amp;quot;Portée radar&amp;quot;.</description>
@@ -1654,7 +1654,7 @@
         </t>
         <t base="radar" code="radarV" niv="4" nom="radar" publique="0" recherche="6400" type="0">
             <specification arme="" min="30" pc="30" prix="300.0" structure="400"/>
-            <caracteristique code="8" value="6"/>
+            <caracteristique code="8" value="5"/>
             <caracteristique code="4" value="1"/>
             <marchandise code="6" nb="3"/>
             <description>Un radar permet de détecter les flottes et les systèmes qui se trouvent au plus à une distance égale à sa caractéristique &amp;quot;Portée radar&amp;quot;.</description>
@@ -1663,7 +1663,7 @@
         </t>
         <t base="radar" code="radarVI" niv="5" nom="radar" publique="0" recherche="12000" type="0">
             <specification arme="" min="35" pc="35" prix="350.0" structure="450"/>
-            <caracteristique code="8" value="7"/>
+            <caracteristique code="8" value="6"/>
             <caracteristique code="4" value="1"/>
             <marchandise code="6" nb="4"/>
             <description>Un radar permet de détecter les flottes et les systèmes qui se trouvent au plus à une distance égale à sa caractéristique &amp;quot;Portée radar&amp;quot;.</description>
@@ -1672,7 +1672,7 @@
         </t>
         <t base="radar" code="radarVII" niv="6" nom="radar" publique="0" recherche="20000" type="0">
             <specification arme="" min="40" pc="40" prix="400.0" structure="500"/>
-            <caracteristique code="8" value="8"/>
+            <caracteristique code="8" value="7"/>
             <caracteristique code="4" value="1"/>
             <marchandise code="6" nb="5"/>
             <description>Un radar permet de détecter les flottes et les systèmes qui se trouvent au plus à une distance égale à sa caractéristique &amp;quot;Portée radar&amp;quot;.</description>
@@ -1681,7 +1681,7 @@
         </t>
         <t base="radar" code="radarVIII" niv="7" nom="radar" publique="0" recherche="40000" type="0">
             <specification arme="" min="45" pc="45" prix="450.0" structure="550"/>
-            <caracteristique code="8" value="9"/>
+            <caracteristique code="8" value="8"/>
             <caracteristique code="4" value="1"/>
             <marchandise code="6" nb="6"/>
             <marchandise code="13" nb="1"/>
@@ -1691,7 +1691,7 @@
         </t>
         <t base="radar" code="radarIX" niv="8" nom="radar" publique="0" recherche="60000" type="0">
             <specification arme="" min="50" pc="50" prix="500.0" structure="650"/>
-            <caracteristique code="8" value="10"/>
+            <caracteristique code="8" value="9"/>
             <caracteristique code="4" value="1"/>
             <marchandise code="6" nb="7"/>
             <marchandise code="13" nb="2"/>
@@ -1701,7 +1701,7 @@
         </t>
         <t base="radar" code="radarX" niv="9" nom="radar" publique="0" recherche="120000" type="0">
             <specification arme="" min="55" pc="55" prix="550.0" structure="700"/>
-            <caracteristique code="8" value="11"/>
+            <caracteristique code="8" value="10"/>
             <caracteristique code="4" value="1"/>
             <marchandise code="6" nb="8"/>
             <marchandise code="13" nb="3"/>
@@ -1893,13 +1893,13 @@
             <parent code="scanIX"/>
             <parent code="moteurIX"/>
         </t>
-        <t base="arme" code="armeI" niv="0" nom="station d'armement et explosifs" publique="1" recherche="400" type="0">
+        <t base="arme" code="armeI" niv="0" nom="station d'armement et explosifs" publique="0" recherche="400" type="0">
             <specification arme="" min="10" pc="5" prix="100.0" structure="100"/>
             <caracteristique code="7" value="10"/>
             <description>Une station d'armement et explosifs procure (5 fois le niveau du bâtiment ) unités d'armement et d'explosif par tour.</description>
             <parent code="transfoI"/>
         </t>
-        <t base="arme" code="armeII" niv="1" nom="station d'armement et explosifs" publique="1" recherche="800" type="0">
+        <t base="arme" code="armeII" niv="1" nom="station d'armement et explosifs" publique="0" recherche="800" type="0">
             <specification arme="" min="19" pc="5" prix="190.0" structure="100"/>
             <caracteristique code="7" value="10"/>
             <marchandise code="10" nb="1"/>
@@ -1965,13 +1965,13 @@
             <description>Une station d'armement et explosifs procure (5 fois le niveau du bâtiment ) unités d'armement et d'explosif par tour.</description>
             <parent code="armeIX"/>
         </t>
-        <t base="culturel" code="culturelI" niv="0" nom="station d'holofilms et hololivres" publique="1" recherche="400" type="0">
+        <t base="culturel" code="culturelI" niv="0" nom="station d'holofilms et hololivres" publique="0" recherche="400" type="0">
             <specification arme="" min="10" pc="5" prix="100.0" structure="100"/>
             <caracteristique code="7" value="4"/>
             <description>Une station d'holofilms et hololivres procure (5 fois le niveau du bâtiment )  unités de holofilms et hololivres par tour.</description>
             <parent code="modeI"/>
         </t>
-        <t base="culturel" code="culturelII" niv="1" nom="station d'holofilms et hololivres" publique="1" recherche="800" type="0">
+        <t base="culturel" code="culturelII" niv="1" nom="station d'holofilms et hololivres" publique="0" recherche="800" type="0">
             <specification arme="" min="19" pc="5" prix="190.0" structure="100"/>
             <caracteristique code="7" value="4"/>
             <marchandise code="10" nb="1"/>
@@ -2180,13 +2180,13 @@
             <description>Un station de composants électroniques procure (5 fois le niveau du bâtiment ) unités de composants électroniques par tour.</description>
             <parent code="technoIX"/>
         </t>
-        <t base="info" code="infoI" niv="0" nom="station de logiciels" publique="1" recherche="400" type="0">
+        <t base="info" code="infoI" niv="0" nom="station de logiciels" publique="0" recherche="400" type="0">
             <specification arme="" min="10" pc="5" prix="100.0" structure="100"/>
             <caracteristique code="7" value="7"/>
             <description>Une station de logiciels procure (5 fois le niveau du bâtiment )  unités de logiciels par tour.</description>
             <parent code="robotI"/>
         </t>
-        <t base="info" code="infoII" niv="1" nom="station de logiciels" publique="1" recherche="800" type="0">
+        <t base="info" code="infoII" niv="1" nom="station de logiciels" publique="0" recherche="800" type="0">
             <specification arme="" min="19" pc="5" prix="190.0" structure="100"/>
             <caracteristique code="7" value="7"/>
             <marchandise code="10" nb="1"/>
@@ -2396,13 +2396,13 @@
             <description>Une station de métaux précieux procure (5 fois le niveau du bâtiment ) unités de métaux précieux par tour.</description>
             <parent code="metauxIX"/>
         </t>
-        <t base="lourde" code="lourdeI" niv="0" nom="station de pièce industrielle" publique="1" recherche="400" type="0">
+        <t base="lourde" code="lourdeI" niv="0" nom="station de pièce industrielle" publique="0" recherche="400" type="0">
             <specification arme="" min="10" pc="5" prix="100.0" structure="100"/>
             <caracteristique code="7" value="12"/>
             <description>Une station de pièce industrielle procure (5 fois le niveau du bâtiment ) unités de pièces industrielles par tour.</description>
             <parent code="raffineI"/>
         </t>
-        <t base="lourde" code="lourdeII" niv="1" nom="station de pièce industrielle" publique="1" recherche="800" type="0">
+        <t base="lourde" code="lourdeII" niv="1" nom="station de pièce industrielle" publique="0" recherche="800" type="0">
             <specification arme="" min="19" pc="5" prix="190.0" structure="100"/>
             <caracteristique code="7" value="12"/>
             <marchandise code="10" nb="1"/>
@@ -2468,12 +2468,12 @@
             <description>Une station de pièce industrielle procure (5 fois le niveau du bâtiment ) unités de pièces industrielles par tour.</description>
             <parent code="lourdeIX"/>
         </t>
-        <t base="agro" code="agroI" niv="0" nom="station de produits alimentaires" publique="1" recherche="400" type="0">
+        <t base="agro" code="agroI" niv="0" nom="station de produits alimentaires" publique="0" recherche="400" type="0">
             <specification arme="" min="10" pc="5" prix="100.0" structure="100"/>
             <caracteristique code="7" value="1"/>
             <description>Une station de produits alimentaires procure (5 fois le niveau du bâtiment ) unités de produits alimentaires par tour.</description>
         </t>
-        <t base="agro" code="agroII" niv="1" nom="station de produits alimentaires" publique="1" recherche="800" type="0">
+        <t base="agro" code="agroII" niv="1" nom="station de produits alimentaires" publique="0" recherche="800" type="0">
             <specification arme="" min="19" pc="5" prix="190.0" structure="100"/>
             <caracteristique code="7" value="1"/>
             <marchandise code="10" nb="1"/>
@@ -2752,6 +2752,12 @@
             <marchandise code="10" nb="9"/>
             <description>Une station de système de guidage procure (5 fois le niveau du bâtiment ) unités de systèmes de guidage par tour.</description>
             <parent code="transfoIX"/>
+        </t>
+        <t base="recylage" code="recylageI" niv="0" nom="unité de recyclage" publique="0" recherche="8000" type="0">
+            <specification arme="" min="5" pc="5" prix="100.0" structure="20"/>
+            <caracteristique code="2" value="1"/>
+            <description>Une unité de recyclage est un bâtiment .&lt;br&gt;Une unité de recyclage permet de récupérer le minerai de construction lors de la destruction d'un bâtiment.</description>
+            <parent code="maitdeI"/>
         </t>
         <t base="agricole" code="agricoleI" niv="0" nom="usine agricole" publique="0" recherche="400" type="0">
             <specification arme="" min="10" pc="5" prix="100.0" structure="100"/>
@@ -3153,49 +3159,49 @@
         <r code="5" couleur="#777777" grav_max="80" grav_min="0" nom="Cyborg" rad_max="180" rad_min="0" temp_max="100" temp_min="-100"/>
     </races>
     <planpublic>
-        <p ap="20" as="0" centaures="32.0" concepteur="0" marque="Dune" minerai="21" nom="Bombardier standard" pc="2" royalties="0" taille="1" tour="0" vitesse="9">
+        <p ap="20" as="0" centaures="32.0" concepteur="0" marque="Corylis" minerai="21" nom="Bombardier standard" pc="2" royalties="0" taille="1" tour="0" vitesse="9">
             <comp code="moteurI" nb="1"/>
             <comp code="bombeI" nb="4"/>
         </p>
-        <p ap="4" as="12" centaures="28.0" concepteur="0" marque="Dune" minerai="29" nom="Chasseur standard" pc="2" royalties="0" taille="1" tour="0" vitesse="9">
+        <p ap="4" as="12" centaures="28.0" concepteur="0" marque="Corylis" minerai="29" nom="Chasseur standard" pc="2" royalties="0" taille="1" tour="0" vitesse="9">
             <comp code="moteurI" nb="1"/>
             <comp code="laserI" nb="4"/>
         </p>
-        <p ap="0" as="0" centaures="54.0" concepteur="0" marque="Dune" minerai="11" nom="Colonisateur" pc="6" royalties="0" taille="2" tour="0" vitesse="8">
+        <p ap="0" as="0" centaures="54.0" concepteur="0" marque="Corylis" minerai="11" nom="Colonisateur" pc="6" royalties="0" taille="2" tour="0" vitesse="8">
             <comp code="moteurI" nb="1"/>
             <comp code="robocoI" nb="1"/>
         </p>
-        <p ap="40" as="60" centaures="284.0" concepteur="0" marque="Dune" minerai="311" nom="Croiseur standard" pc="35" royalties="0" taille="5" tour="0" vitesse="5">
+        <p ap="40" as="60" centaures="284.0" concepteur="0" marque="Corylis" minerai="311" nom="Croiseur standard" pc="35" royalties="0" taille="5" tour="0" vitesse="5">
             <comp code="moteurI" nb="1"/>
             <comp code="plasmaI" nb="10"/>
             <comp code="missI" nb="10"/>
             <comp code="bouclierI" nb="10"/>
             <comp code="torpI" nb="10"/>
         </p>
-        <p ap="20" as="50" centaures="174.0" concepteur="0" marque="Dune" minerai="191" nom="Destroyer standard" pc="20" royalties="0" taille="4" tour="0" vitesse="6">
+        <p ap="20" as="50" centaures="174.0" concepteur="0" marque="Corylis" minerai="191" nom="Destroyer standard" pc="20" royalties="0" taille="4" tour="0" vitesse="6">
             <comp code="plasmaI" nb="10"/>
             <comp code="laserI" nb="10"/>
             <comp code="moteurI" nb="1"/>
             <comp code="bouclierI" nb="5"/>
         </p>
-        <p ap="0" as="0" centaures="14.0" concepteur="0" marque="Dune" minerai="6" nom="Eclaireur standard" pc="2" royalties="0" taille="1" tour="0" vitesse="9">
+        <p ap="0" as="0" centaures="14.0" concepteur="0" marque="Corylis" minerai="6" nom="Eclaireur standard" pc="2" royalties="0" taille="1" tour="0" vitesse="9">
             <comp code="moteurI" nb="1"/>
             <comp code="scanI" nb="1"/>
         </p>
-        <p ap="10" as="20" centaures="114.0" concepteur="0" marque="Dune" minerai="121" nom="Fregate standard" pc="15" royalties="0" taille="3" tour="0" vitesse="7">
+        <p ap="10" as="20" centaures="114.0" concepteur="0" marque="Corylis" minerai="121" nom="Fregate standard" pc="15" royalties="0" taille="3" tour="0" vitesse="7">
             <comp code="moteurI" nb="1"/>
             <comp code="bouclierI" nb="5"/>
             <comp code="plasmaI" nb="10"/>
         </p>
-        <p ap="35" as="0" centaures="53.0" concepteur="0" marque="Dune" minerai="36" nom="Grand Bombardier standard" pc="4" royalties="0" taille="1" tour="0" vitesse="9">
+        <p ap="35" as="0" centaures="53.0" concepteur="0" marque="Corylis" minerai="36" nom="Grand Bombardier standard" pc="4" royalties="0" taille="1" tour="0" vitesse="9">
             <comp code="moteurI" nb="1"/>
             <comp code="bombeI" nb="7"/>
         </p>
-        <p ap="1" as="3" centaures="10.0" concepteur="0" marque="Dune" minerai="8" nom="Intercepteur standard" pc="1" royalties="0" taille="0" tour="0" vitesse="10">
+        <p ap="1" as="3" centaures="10.0" concepteur="0" marque="Corylis" minerai="8" nom="Intercepteur standard" pc="1" royalties="0" taille="0" tour="0" vitesse="10">
             <comp code="moteurI" nb="1"/>
             <comp code="laserI" nb="1"/>
         </p>
-        <p ap="130" as="160" centaures="534.0" concepteur="0" marque="Dune" minerai="571" nom="Supercroiseur standard" pc="55" royalties="0" taille="5" tour="0" vitesse="5">
+        <p ap="130" as="160" centaures="534.0" concepteur="0" marque="Corylis" minerai="571" nom="Supercroiseur standard" pc="55" royalties="0" taille="5" tour="0" vitesse="5">
             <comp code="laserI" nb="20"/>
             <comp code="bombeI" nb="10"/>
             <comp code="plasmaI" nb="20"/>
@@ -3203,19 +3209,9 @@
             <comp code="bouclierI" nb="10"/>
             <comp code="torpI" nb="20"/>
         </p>
-        <p ap="8" as="12" centaures="28.0" concepteur="0" marque="Dune" minerai="29" nom="Torpilleur standard" pc="2" royalties="0" taille="1" tour="0" vitesse="9">
+        <p ap="8" as="12" centaures="28.0" concepteur="0" marque="Corylis" minerai="29" nom="Torpilleur standard" pc="2" royalties="0" taille="1" tour="0" vitesse="9">
             <comp code="moteurI" nb="1"/>
             <comp code="torpI" nb="4"/>
-        </p>
-        <p ap="6" as="3" centaures="17.85" concepteur="9" marque="rigolbien" minerai="13" nom="rigolus" pc="1" royalties="5" taille="0" tour="10" vitesse="10">
-            <comp code="bombeI" nb="1"/>
-            <comp code="moteurI" nb="1"/>
-            <comp code="laserI" nb="1"/>
-        </p>
-        <p ap="7" as="3" centaures="17.17" concepteur="9" marque="rigolus" minerai="13" nom="superrigolo" pc="1" royalties="1" taille="0" tour="12" vitesse="10">
-            <comp code="bombeI" nb="1"/>
-            <comp code="moteurI" nb="1"/>
-            <comp code="torpI" nb="1"/>
         </p>
     </planpublic>
     <modificateur_stabilite>
@@ -3250,329 +3246,605 @@
         <t max="1000000" min="1026" taille="10" vitesse="0"/>
     </taille_vaisseaux>
     <commandants>
-        <c nom="mabeur" num="1" pla="288" pui="1353542" race="1" rep="-615"/>
-        <c nom="Falerko" num="2" pla="242" pui="616231" race="2" rep="-387"/>
-        <c nom="Lavega" num="3" pla="30" pui="102212" race="1" rep="9"/>
-        <c nom="Gremios" num="4" pla="90" pui="372934" race="3" rep="167"/>
-        <c nom="Rakshass" num="5" pla="279" pui="562518" race="4" rep="-18819"/>
-        <c nom="Yoplait" num="6" pla="328" pui="1018421" race="3" rep="-686"/>
-        <c nom="Salardon" num="7" pla="326" pui="1304719" race="1" rep="-2989"/>
-        <c nom="Imotep" num="8" pla="234" pui="540031" race="3" rep="-1790"/>
-        <c nom="Gagbey" num="9" pla="114" pui="312815" race="2" rep="-560"/>
-        <c nom="Gzav" num="10" pla="446" pui="1626146" race="1" rep="-4192"/>
-        <c nom="Taraxacum" num="12" pla="283" pui="786638" race="4" rep="-32891"/>
-        <c nom="Rikoom" num="13" pla="207" pui="696384" race="2" rep="-306"/>
-        <c nom="Fexellerein" num="14" pla="218" pui="690709" race="3" rep="-457"/>
-        <c nom="Brethin" num="15" pla="229" pui="903390" race="0" rep="-1388"/>
-        <c nom="Deus_Ex_Machina" num="16" pla="283" pui="1220988" race="2" rep="88"/>
-        <c nom="Gardakan" num="18" pla="4" pui="60789" race="4" rep="-374"/>
-        <c nom="Snagha" num="19" pla="150" pui="568900" race="2" rep="157"/>
-        <c nom="Hecate" num="22" pla="86" pui="125992" race="2" rep="-2130"/>
-        <c nom="Belios" num="23" pla="200" pui="666591" race="2" rep="68"/>
-        <c nom="Upanishad" num="24" pla="177" pui="446860" race="1" rep="247"/>
-        <c nom="Gomraz" num="25" pla="65" pui="206730" race="0" rep="-1311"/>
-        <c nom="Sitael" num="27" pla="52" pui="94316" race="3" rep="-1728"/>
+        <c nom="Raakasz" num="1" pla="30" pui="39914" race="4" rep="0"/>
+        <c nom="Darkspy" num="2" pla="30" pui="39748" race="3" rep="0"/>
+        <c nom="BoggShuggoth" num="3" pla="30" pui="39834" race="4" rep="0"/>
+        <c nom="Bouffosaure" num="4" pla="30" pui="40004" race="0" rep="0"/>
+        <c nom="Carolus" num="5" pla="30" pui="39817" race="0" rep="0"/>
+        <c nom="ShaDaSun" num="6" pla="30" pui="39833" race="2" rep="0"/>
+        <c nom="Belios" num="7" pla="30" pui="40186" race="2" rep="0"/>
+        <c nom="Zor" num="8" pla="30" pui="40253" race="2" rep="0"/>
+        <c nom="Rikoom" num="9" pla="30" pui="39948" race="2" rep="0"/>
+        <c nom="Sitael" num="10" pla="30" pui="40022" race="1" rep="0"/>
+        <c nom="Gremios" num="11" pla="30" pui="39965" race="3" rep="0"/>
+        <c nom="Gagbey" num="12" pla="30" pui="39894" race="2" rep="0"/>
+        <c nom="Snagha_Da_Dry" num="13" pla="30" pui="39912" race="2" rep="0"/>
+        <c nom="Elemwe" num="14" pla="30" pui="39975" race="1" rep="0"/>
+        <c nom="Hawoyse" num="15" pla="30" pui="40059" race="2" rep="0"/>
+        <c nom="Erekose" num="16" pla="30" pui="40128" race="0" rep="0"/>
+        <c nom="Prj" num="17" pla="30" pui="39856" race="3" rep="0"/>
+        <c nom="Chaeros" num="18" pla="30" pui="39832" race="4" rep="0"/>
+        <c nom="Upanishad" num="19" pla="30" pui="40099" race="1" rep="0"/>
+        <c nom="Strom" num="20" pla="30" pui="39860" race="1" rep="0"/>
+        <c nom="Elyrion" num="21" pla="30" pui="40198" race="1" rep="0"/>
+        <c nom="Ulukai" num="22" pla="30" pui="40113" race="2" rep="0"/>
+        <c nom="Astheon" num="23" pla="30" pui="39998" race="0" rep="0"/>
+        <c nom="Lorendoras" num="24" pla="30" pui="39791" race="1" rep="0"/>
+        <c nom="Grokan" num="25" pla="30" pui="39808" race="4" rep="0"/>
+        <c nom="Noshera" num="26" pla="30" pui="40260" race="4" rep="0"/>
+        <c nom="Hertz" num="27" pla="30" pui="39819" race="4" rep="0"/>
+        <c nom="Taraxacum" num="28" pla="30" pui="39969" race="3" rep="0"/>
+        <c nom="Brethin" num="29" pla="30" pui="39964" race="0" rep="0"/>
+        <c nom="Akashi" num="30" pla="30" pui="40138" race="3" rep="0"/>
+        <c nom="AdWorks" num="31" pla="30" pui="40099" race="1" rep="0"/>
+        <c nom="Fexellerein" num="32" pla="30" pui="39712" race="4" rep="0"/>
+        <c nom="Cynapse" num="33" pla="30" pui="39970" race="3" rep="0"/>
+        <c nom="Concile d Ilyr" num="34" pla="30" pui="40002" race="2" rep="0"/>
+        <c nom="Kent" num="35" pla="30" pui="39876" race="0" rep="0"/>
+        <c nom="BrunS" num="36" pla="30" pui="39873" race="2" rep="0"/>
+        <c nom="Achab Kynoor" num="37" pla="30" pui="39991" race="3" rep="0"/>
+        <c nom="Gomraz" num="38" pla="30" pui="39988" race="0" rep="0"/>
+        <c nom="Savyia" num="39" pla="30" pui="39915" race="3" rep="0"/>
+        <c nom="Barlabuk" num="40" pla="30" pui="39673" race="4" rep="0"/>
+        <c nom="Imotep" num="41" pla="30" pui="39842" race="3" rep="0"/>
+        <c nom="Hecate" num="42" pla="30" pui="40026" race="2" rep="0"/>
+        <c nom="Lord Snake" num="43" pla="30" pui="40145" race="4" rep="0"/>
+        <c nom="Grablu Flon" num="44" pla="30" pui="39969" race="0" rep="0"/>
+        <c nom="Faere" num="45" pla="30" pui="40120" race="1" rep="0"/>
+        <c nom="Ezradion" num="46" pla="30" pui="40035" race="1" rep="0"/>
     </commandants>
     <systemes>
-        <s nom="Gyb" position="0_1_6"/>
-        <s nom="Empire Machina" position="0_1_11"/>
-        <s nom="Empire Machina" position="0_1_13"/>
-        <s nom="Gzav" position="0_1_18"/>
-        <s nom="Gzav" position="0_1_22"/>
-        <s nom="Gardakan Proxima" position="0_1_27"/>
-        <s nom="Gzav" position="0_1_28"/>
-        <s nom="Deucosi" position="0_1_30"/>
-        <s nom="Binilo" position="0_1_31"/>
-        <s nom="Riuycia" position="0_1_33"/>
-        <s nom="Xaiom" position="0_1_36"/>
-        <s nom="Ouc" position="0_1_40"/>
-        <s nom="Ianyb" position="0_2_2"/>
-        <s nom="Xogbc" position="0_2_4"/>
-        <s nom="Vic" position="0_2_6"/>
-        <s nom="Gzav" position="0_2_26"/>
-        <s nom="Centra" position="0_3_6"/>
-        <s nom="Empire Machina" position="0_3_11"/>
-        <s nom="Empire Machina" position="0_3_13"/>
-        <s nom="Gzav" position="0_3_18"/>
-        <s nom="Empire Machina" position="0_4_15"/>
-        <s nom="Gzav" position="0_4_18"/>
-        <s nom="Gzav" position="0_4_20"/>
-        <s nom="Gzav" position="0_4_22"/>
-        <s nom="Gzav" position="0_4_23"/>
-        <s nom="Gzav" position="0_4_26"/>
-        <s nom="Buuifoe" position="0_4_30"/>
-        <s nom="Nygbjep" position="0_4_32"/>
-        <s nom="Bba" position="0_4_36"/>
-        <s nom="Wibiz" position="0_5_2"/>
-        <s nom="Coey" position="0_5_4"/>
-        <s nom="Hyauqu" position="0_5_6"/>
-        <s nom="Yopuh" position="0_5_8"/>
-        <s nom="Empire Machina" position="0_5_12"/>
-        <s nom="Empire Machina" position="0_5_16"/>
-        <s nom="Gzav" position="0_5_25"/>
-        <s nom="Opb Oo" position="0_5_31"/>
-        <s nom="Yuoyqb" position="0_5_33"/>
-        <s nom="Tbua" position="0_5_36"/>
-        <s nom="Zobaue" position="0_5_37"/>
-        <s nom="Empire Machina" position="0_6_14"/>
-        <s nom="Gzav" position="0_6_17"/>
-        <s nom="Gzav" position="0_6_20"/>
-        <s nom="Ubtbb" position="0_6_28"/>
-        <s nom="Zyn" position="0_6_37"/>
-        <s nom="Hus" position="0_6_39"/>
-        <s nom="Yuhiiad" position="0_7_5"/>
-        <s nom="Empire Machina" position="0_7_10"/>
-        <s nom="Empire Machina" position="0_7_12"/>
-        <s nom="Empire Machina" position="0_7_15"/>
-        <s nom="Gzav" position="0_7_20"/>
-        <s nom="Gzav" position="0_7_24"/>
-        <s nom="Ma" position="0_7_28"/>
-        <s nom="Xyrygi" position="0_7_32"/>
-        <s nom="Basema" position="0_7_39"/>
-        <s nom="Suailo" position="0_8_1"/>
-        <s nom="Miqyme" position="0_8_3"/>
-        <s nom="Gzav" position="0_8_18"/>
-        <s nom="Gzav" position="0_8_21"/>
-        <s nom="Batu" position="0_8_29"/>
-        <s nom="Sarai" position="0_8_31"/>
-        <s nom="Tyqyeu" position="0_9_1"/>
-        <s nom="Empire Machina" position="0_9_11"/>
-        <s nom="Gzav" position="0_9_22"/>
-        <s nom="Euphonicon" position="0_9_35"/>
-        <s nom="Imperia Water" position="0_10_5"/>
-        <s nom="Aquadia" position="0_10_7"/>
-        <s nom="Hydros" position="0_10_9"/>
-        <s nom="Empire Machina" position="0_10_13"/>
-        <s nom="Coxegyl" position="0_10_20"/>
-        <s nom="Gzav" position="0_10_23"/>
-        <s nom="Pobyu" position="0_10_26"/>
-        <s nom="Ia" position="0_10_27"/>
-        <s nom="Zy" position="0_10_29"/>
-        <s nom="Xo" position="0_10_31"/>
-        <s nom="Orphica" position="0_10_33"/>
-        <s nom="Xeoyji" position="0_10_38"/>
-        <s nom="Iyyot" position="0_10_40"/>
-        <s nom="Lucu" position="0_11_2"/>
-        <s nom="Empire Machina" position="0_11_17"/>
-        <s nom="Oise" position="0_11_19"/>
-        <s nom="Dece" position="0_11_21"/>
-        <s nom="Byjbwe" position="0_11_27"/>
-        <s nom="Eyv" position="0_11_40"/>
-        <s nom="Oceanus" position="0_12_6"/>
-        <s nom="Hydraxion" position="0_12_10"/>
-        <s nom="Abyssia" position="0_12_12"/>
-        <s nom="Vortexia" position="0_12_15"/>
-        <s nom="Gzav" position="0_12_24"/>
-        <s nom="Vibi" position="0_12_26"/>
-        <s nom="Six" position="0_12_27"/>
-        <s nom="Aofi" position="0_12_29"/>
-        <s nom="Ge Ujas" position="0_12_30"/>
-        <s nom="Zbyasix" position="0_12_31"/>
-        <s nom="Metronomicon" position="0_12_35"/>
-        <s nom="Saphiria" position="0_13_5"/>
-        <s nom="Tidalia" position="0_13_7"/>
-        <s nom="Fluvius" position="0_13_13"/>
-        <s nom="Coralia" position="0_13_15"/>
-        <s nom="Caeoea" position="0_13_19"/>
-        <s nom="Cbwicuo" position="0_13_21"/>
-        <s nom="Momycas" position="0_13_26"/>
-        <s nom="Pbwylyx" position="0_13_29"/>
-        <s nom="Moogsfer" position="0_13_38"/>
-        <s nom="Oe" position="0_14_1"/>
-        <s nom="Nautilia" position="0_14_8"/>
-        <s nom="Aethelgard" position="0_14_10"/>
-        <s nom="Mare Liberum" position="0_14_11"/>
-        <s nom="Dyeacai" position="0_14_17"/>
-        <s nom="Oezy" position="0_14_20"/>
-        <s nom="Mugame" position="0_14_21"/>
-        <s nom="Ve" position="0_14_27"/>
-        <s nom="Lbnobu" position="0_14_31"/>
-        <s nom="Suxybbm" position="0_14_33"/>
-        <s nom="Organum" position="0_14_36"/>
-        <s nom="Vusuei" position="0_14_40"/>
-        <s nom="Yyzbn" position="0_15_3"/>
-        <s nom="Thalassion" position="0_15_8"/>
-        <s nom="Hadalis" position="0_15_10"/>
-        <s nom="Aytefb" position="0_15_14"/>
-        <s nom="Rboeyyj" position="0_15_18"/>
-        <s nom="Bi" position="0_15_21"/>
-        <s nom="Wuqbe" position="0_15_26"/>
-        <s nom="Sandbox 7" position="0_15_28"/>
-        <s nom="Gubeki" position="0_15_32"/>
-        <s nom="Kuhoa" position="0_15_35"/>
-        <s nom="Rof" position="0_16_2"/>
-        <s nom="Didiw" position="0_16_6"/>
-        <s nom="Silb" position="0_16_12"/>
-        <s nom="Kbbu" position="0_16_15"/>
-        <s nom="Xojocy" position="0_16_19"/>
-        <s nom="Ob" position="0_16_40"/>
-        <s nom="Nuoav" position="0_17_1"/>
-        <s nom="Eyxum" position="0_17_4"/>
-        <s nom="Eb" position="0_17_5"/>
-        <s nom="Tagbpe" position="0_17_16"/>
-        <s nom="Qu" position="0_17_22"/>
-        <s nom="Toyezom" position="0_17_24"/>
-        <s nom="Lerevbb" position="0_17_25"/>
-        <s nom="Qb" position="0_17_32"/>
-        <s nom="Juyi" position="0_17_35"/>
-        <s nom="Rafa" position="0_17_40"/>
-        <s nom="Ma" position="0_18_2"/>
-        <s nom="Rak" position="0_18_9"/>
-        <s nom="Ewa" position="0_18_11"/>
-        <s nom="Xis" position="0_18_17"/>
-        <s nom="Lyaaho" position="0_18_19"/>
-        <s nom="Sandbox 6" position="0_18_27"/>
-        <s nom="Sandbox 8" position="0_18_29"/>
-        <s nom="Sandbox 1" position="0_18_33"/>
-        <s nom="Sandbox 2" position="0_18_35"/>
-        <s nom="Iome" position="0_19_6"/>
-        <s nom="Eahi" position="0_19_9"/>
-        <s nom="Yy" position="0_19_11"/>
-        <s nom="Aubuca" position="0_19_13"/>
-        <s nom="Eoji" position="0_19_16"/>
-        <s nom="Dekehio" position="0_19_17"/>
-        <s nom="Nb" position="0_19_27"/>
-        <s nom="Lomokb" position="0_19_40"/>
-        <s nom="Hbfb" position="0_20_4"/>
-        <s nom="Cocyte" position="0_20_10"/>
-        <s nom="Yy" position="0_20_21"/>
-        <s nom="Iyee" position="0_20_24"/>
-        <s nom="Sandbox 3" position="0_20_30"/>
-        <s nom="Sujuhup" position="0_20_32"/>
-        <s nom="Ebgudik" position="0_20_33"/>
-        <s nom="Sandbox 9" position="0_20_36"/>
-        <s nom="Sandbox 4" position="0_20_37"/>
-        <s nom="Fab" position="0_21_7"/>
-        <s nom="Vaxonu" position="0_21_9"/>
-        <s nom="Wux" position="0_21_13"/>
-        <s nom="Wyhb" position="0_21_15"/>
-        <s nom="Kike" position="0_21_20"/>
-        <s nom="Tejituh" position="0_21_23"/>
-        <s nom="Wiwova" position="0_21_27"/>
-        <s nom="Def" position="0_21_32"/>
-        <s nom="Sandbox 10" position="0_21_34"/>
-        <s nom="Nuk" position="0_21_38"/>
-        <s nom="Oyaada" position="0_22_5"/>
-        <s nom="Crocell" position="0_22_11"/>
-        <s nom="We" position="0_22_17"/>
-        <s nom="Exocrine" position="0_23_10"/>
-        <s nom="Barzum" position="0_23_12"/>
-        <s nom="Phenex" position="0_23_13"/>
-        <s nom="Pa" position="0_23_17"/>
-        <s nom="Guluba" position="0_23_23"/>
-        <s nom="Sandbox 5" position="0_23_30"/>
-        <s nom="Lahysy" position="0_24_5"/>
-        <s nom="Suz" position="0_24_8"/>
-        <s nom="Uajo" position="0_24_16"/>
-        <s nom="Belenos" position="0_24_21"/>
-        <s nom="Sorbus" position="0_24_26"/>
-        <s nom="Acer" position="0_24_28"/>
-        <s nom="Sbiuj" position="0_25_1"/>
-        <s nom="Juqav" position="0_25_5"/>
-        <s nom="Procyon" position="0_25_13"/>
-        <s nom="Quercus" position="0_25_26"/>
-        <s nom="Gbgynb" position="0_25_39"/>
-        <s nom="Xioutb" position="0_26_5"/>
-        <s nom="Oal" position="0_26_8"/>
-        <s nom="Dyy" position="0_26_9"/>
-        <s nom="Alcor" position="0_26_19"/>
-        <s nom="Durant" position="0_26_32"/>
-        <s nom="Jokic" position="0_26_34"/>
-        <s nom="Ki" position="0_26_36"/>
-        <s nom="Xbfo" position="0_27_1"/>
-        <s nom="Luw" position="0_27_8"/>
-        <s nom="Haagenti" position="0_27_10"/>
-        <s nom="Fagus" position="0_27_24"/>
-        <s nom="Prunus" position="0_27_28"/>
-        <s nom="Pinus" position="0_27_29"/>
-        <s nom="Wembanyama" position="0_27_36"/>
-        <s nom="Bu Aj" position="0_28_3"/>
-        <s nom="Mutbou" position="0_28_6"/>
-        <s nom="Sepheus" position="0_28_14"/>
-        <s nom="Eez" position="0_28_17"/>
-        <s nom="Abies" position="0_28_23"/>
-        <s nom="Ge Uy" position="0_28_37"/>
-        <s nom="Qbrebb" position="0_29_1"/>
-        <s nom="Uivyziw" position="0_29_6"/>
-        <s nom="Corax" position="0_29_13"/>
-        <s nom="Seltris" position="0_29_15"/>
-        <s nom="Dizep" position="0_29_17"/>
-        <s nom="Hbb" position="0_29_22"/>
-        <s nom="Fraxinus" position="0_29_26"/>
-        <s nom="Shai" position="0_29_31"/>
-        <s nom="Cunningham" position="0_29_36"/>
-        <s nom="Fex" position="0_30_4"/>
-        <s nom="Pé’Weda" position="0_30_8"/>
-        <s nom="Zbtanaq" position="0_30_10"/>
-        <s nom="Se" position="0_30_11"/>
-        <s nom="Jordan" position="0_30_34"/>
-        <s nom="Fex" position="0_30_37"/>
-        <s nom="Ry" position="0_30_39"/>
-        <s nom="Fex" position="0_31_1"/>
-        <s nom="Uudiyy" position="0_31_8"/>
-        <s nom="Xeuupyu" position="0_31_10"/>
-        <s nom="Eligos" position="0_31_12"/>
-        <s nom="Joo" position="0_31_13"/>
-        <s nom="Ban" position="0_31_22"/>
-        <s nom="Mic" position="0_31_24"/>
-        <s nom="Flagg" position="0_31_26"/>
-        <s nom="LeBron" position="0_31_31"/>
-        <s nom="Gregminster" position="0_32_8"/>
-        <s nom="Fa'Nu" position="0_32_10"/>
-        <s nom="Ta" position="0_32_15"/>
-        <s nom="Doncic" position="0_32_36"/>
-        <s nom="Fex" position="0_32_38"/>
-        <s nom="Fex" position="0_33_3"/>
-        <s nom="Fex" position="0_33_5"/>
-        <s nom="Vuzbdi" position="0_33_16"/>
-        <s nom="Rego" position="0_33_18"/>
-        <s nom="Pbvyqb" position="0_33_20"/>
-        <s nom="Brunson" position="0_33_30"/>
-        <s nom="Fex" position="0_34_1"/>
-        <s nom="Fex" position="0_34_3"/>
-        <s nom="Rockaxe" position="0_34_8"/>
-        <s nom="Falaya" position="0_34_9"/>
-        <s nom="Pecyc" position="0_34_12"/>
-        <s nom="Edwards" position="0_34_28"/>
-        <s nom="Curry" position="0_34_33"/>
-        <s nom="Antetokounmpo" position="0_34_35"/>
-        <s nom="Fex" position="0_35_2"/>
-        <s nom="Fex" position="0_35_3"/>
-        <s nom="Fbaozy" position="0_35_25"/>
-        <s nom="Xo" position="0_35_34"/>
-        <s nom="Fex" position="0_35_40"/>
-        <s nom="Ziyus" position="0_36_14"/>
-        <s nom="Vus" position="0_36_15"/>
-        <s nom="Ga" position="0_36_19"/>
-        <s nom="Y" position="0_36_21"/>
-        <s nom="Booker" position="0_36_28"/>
-        <s nom="Ooual" position="0_36_31"/>
-        <s nom="Quibqe" position="0_36_35"/>
-        <s nom="Tambj" position="0_37_6"/>
-        <s nom="Empire Machina" position="0_37_14"/>
-        <s nom="Gzav" position="0_37_20"/>
-        <s nom="Gzav" position="0_37_26"/>
-        <s nom="Gzav" position="0_37_27"/>
-        <s nom="Fex" position="0_38_2"/>
-        <s nom="Xupb" position="0_38_3"/>
-        <s nom="Pebu" position="0_38_7"/>
-        <s nom="Ob" position="0_38_32"/>
-        <s nom="fex" position="0_38_36"/>
-        <s nom="Fex" position="0_38_39"/>
-        <s nom="Vii" position="0_39_4"/>
-        <s nom="Tyu" position="0_39_5"/>
-        <s nom="Empire Machina" position="0_39_8"/>
-        <s nom="Ayneey" position="0_39_9"/>
-        <s nom="Gzav" position="0_39_20"/>
-        <s nom="Gzav" position="0_39_21"/>
-        <s nom="Gardakan Prime" position="0_39_25"/>
-        <s nom="Bbvire" position="0_39_28"/>
-        <s nom="Zumbgy" position="0_39_29"/>
-        <s nom="Capiposi" position="0_39_32"/>
-        <s nom="Empire Machina" position="0_40_13"/>
-        <s nom="Gzav" position="0_40_17"/>
-        <s nom="Puxo" position="0_40_35"/>
-        <s nom="Lozoj" position="0_40_37"/>
-        <s nom="Ku" position="0_40_39"/>
+        <s nom="Kyt" position="0_1_35"/>
+        <s nom="Reniei" position="0_2_1"/>
+        <s nom="Vae" position="0_2_3"/>
+        <s nom="Euaao" position="0_2_5"/>
+        <s nom="Dy" position="0_2_6"/>
+        <s nom="Sagisep" position="0_2_13"/>
+        <s nom="Qimb" position="0_2_17"/>
+        <s nom="Yipoyuv" position="0_2_29"/>
+        <s nom="Gehe O" position="0_2_32"/>
+        <s nom="Gbqyso" position="0_2_37"/>
+        <s nom="Iixyi" position="0_2_40"/>
+        <s nom="Ba" position="0_2_43"/>
+        <s nom="Qioi A" position="0_2_46"/>
+        <s nom="Sogiabv" position="0_2_51"/>
+        <s nom="Ximbha" position="0_2_55"/>
+        <s nom="Wuioaa" position="0_2_59"/>
+        <s nom="Hoye" position="0_3_33"/>
+        <s nom="Wami" position="0_4_7"/>
+        <s nom="Movubae" position="0_4_9"/>
+        <s nom="Yabe" position="0_4_23"/>
+        <s nom="Bbsowev" position="0_4_25"/>
+        <s nom="A" position="0_4_37"/>
+        <s nom="Kimexu" position="0_4_46"/>
+        <s nom="Zydikyp" position="0_5_6"/>
+        <s nom="Vine" position="0_5_13"/>
+        <s nom="Nbai" position="0_5_21"/>
+        <s nom="Peio" position="0_5_27"/>
+        <s nom="Gujecu" position="0_5_38"/>
+        <s nom="Fay" position="0_5_40"/>
+        <s nom="Ybmoz" position="0_5_43"/>
+        <s nom="Kujb" position="0_5_46"/>
+        <s nom="Lemah" position="0_5_51"/>
+        <s nom="Qen" position="0_5_53"/>
+        <s nom="Zbjive" position="0_5_57"/>
+        <s nom="Git" position="0_6_11"/>
+        <s nom="Ubviye" position="0_6_25"/>
+        <s nom="Pbibfi" position="0_6_33"/>
+        <s nom="Aoubn" position="0_6_46"/>
+        <s nom="Ayfuvub" position="0_6_48"/>
+        <s nom="Yaf" position="0_6_56"/>
+        <s nom="Kefan" position="0_6_59"/>
+        <s nom="Qo" position="0_7_2"/>
+        <s nom="Yuw" position="0_7_5"/>
+        <s nom="Vyjizif" position="0_7_6"/>
+        <s nom="Wodbzuj" position="0_7_7"/>
+        <s nom="Uai" position="0_7_13"/>
+        <s nom="Hybu" position="0_7_15"/>
+        <s nom="Fa" position="0_7_18"/>
+        <s nom="Na" position="0_7_29"/>
+        <s nom="Va Ivez" position="0_7_31"/>
+        <s nom="Obzoca" position="0_7_39"/>
+        <s nom="Qu" position="0_7_41"/>
+        <s nom="Ci" position="0_7_50"/>
+        <s nom="Aazi B" position="0_8_22"/>
+        <s nom="Fuluhuh" position="0_8_29"/>
+        <s nom="Qasereh" position="0_8_30"/>
+        <s nom="Eo" position="0_8_37"/>
+        <s nom="Qixuua" position="0_8_39"/>
+        <s nom="Yoaioym" position="0_8_51"/>
+        <s nom="Toqy" position="0_8_55"/>
+        <s nom="Ze" position="0_8_59"/>
+        <s nom="Jeyoty" position="0_9_6"/>
+        <s nom="Hufa" position="0_9_12"/>
+        <s nom="Pihee" position="0_9_14"/>
+        <s nom="Eyrbt" position="0_9_20"/>
+        <s nom="Xa" position="0_9_22"/>
+        <s nom="Ryaelau" position="0_9_23"/>
+        <s nom="Ibdol" position="0_9_30"/>
+        <s nom="Balisis" position="0_9_32"/>
+        <s nom="Suiu" position="0_9_33"/>
+        <s nom="Ky" position="0_9_34"/>
+        <s nom="Ki" position="0_9_38"/>
+        <s nom="Tog" position="0_9_40"/>
+        <s nom="Rupe" position="0_9_46"/>
+        <s nom="Qoa" position="0_9_48"/>
+        <s nom="Yeceq" position="0_9_50"/>
+        <s nom="Aaaema" position="0_9_57"/>
+        <s nom="Dyqa" position="0_9_58"/>
+        <s nom="Byfyyyn" position="0_10_6"/>
+        <s nom="Pbg" position="0_10_7"/>
+        <s nom="Ieaz" position="0_10_15"/>
+        <s nom="Iidb" position="0_10_17"/>
+        <s nom="Wyb" position="0_10_28"/>
+        <s nom="Sb" position="0_10_39"/>
+        <s nom="Euzb Od" position="0_10_42"/>
+        <s nom="Nuuiau" position="0_10_46"/>
+        <s nom="Joj" position="0_10_58"/>
+        <s nom="Aumyd" position="0_11_3"/>
+        <s nom="Nise" position="0_11_15"/>
+        <s nom="Uiaitew" position="0_11_21"/>
+        <s nom="Fb" position="0_11_24"/>
+        <s nom="Misebuz" position="0_11_25"/>
+        <s nom="Pa" position="0_11_47"/>
+        <s nom="Eadbu" position="0_11_51"/>
+        <s nom="Fuse" position="0_11_54"/>
+        <s nom="Tegyabj" position="0_11_58"/>
+        <s nom="Jamenag" position="0_11_60"/>
+        <s nom="Ouri Oj" position="0_12_4"/>
+        <s nom="Tev" position="0_12_6"/>
+        <s nom="Legawaf" position="0_12_8"/>
+        <s nom="Bazo" position="0_12_16"/>
+        <s nom="Uyjuh" position="0_12_17"/>
+        <s nom="Liuuwy" position="0_12_19"/>
+        <s nom="Boae" position="0_12_24"/>
+        <s nom="So" position="0_12_29"/>
+        <s nom="Xi Usa" position="0_12_32"/>
+        <s nom="Hanue" position="0_12_37"/>
+        <s nom="Xir" position="0_14_7"/>
+        <s nom="Ababhob" position="0_14_11"/>
+        <s nom="Cewalbr" position="0_14_20"/>
+        <s nom="Duiil" position="0_14_35"/>
+        <s nom="Xydu" position="0_14_37"/>
+        <s nom="Ooe" position="0_14_39"/>
+        <s nom="Vuua" position="0_14_43"/>
+        <s nom="Zuzi" position="0_14_51"/>
+        <s nom="Bpbui" position="0_14_58"/>
+        <s nom="Xoninb" position="0_14_59"/>
+        <s nom="Yuiuaoy" position="0_15_13"/>
+        <s nom="Cy" position="0_15_16"/>
+        <s nom="Gor" position="0_15_23"/>
+        <s nom="Dowb" position="0_15_29"/>
+        <s nom="We" position="0_15_30"/>
+        <s nom="Wob" position="0_15_33"/>
+        <s nom="Zbfipy" position="0_15_38"/>
+        <s nom="Juib" position="0_15_40"/>
+        <s nom="Aap" position="0_15_41"/>
+        <s nom="Yejyq" position="0_15_46"/>
+        <s nom="I" position="0_15_48"/>
+        <s nom="Semevov" position="0_15_56"/>
+        <s nom="Carip" position="0_15_57"/>
+        <s nom="Ut" position="0_16_4"/>
+        <s nom="Ibz" position="0_16_5"/>
+        <s nom="Ie" position="0_16_6"/>
+        <s nom="Dopajev" position="0_16_15"/>
+        <s nom="Dezojo" position="0_16_17"/>
+        <s nom="Ma" position="0_16_19"/>
+        <s nom="Iakoia" position="0_16_33"/>
+        <s nom="Ka" position="0_16_35"/>
+        <s nom="Erim" position="0_16_40"/>
+        <s nom="Cetiz" position="0_16_48"/>
+        <s nom="Bsabe" position="0_16_49"/>
+        <s nom="Eovuyy" position="0_16_59"/>
+        <s nom="Box" position="0_17_5"/>
+        <s nom="Wity On" position="0_17_6"/>
+        <s nom="Caqaau" position="0_17_7"/>
+        <s nom="Ouiat" position="0_17_11"/>
+        <s nom="Hbvbuil" position="0_17_13"/>
+        <s nom="Kagaye" position="0_17_14"/>
+        <s nom="Iu" position="0_17_16"/>
+        <s nom="Hy" position="0_17_20"/>
+        <s nom="Uyauyu" position="0_17_22"/>
+        <s nom="Vigab" position="0_17_23"/>
+        <s nom="Qaeo" position="0_17_25"/>
+        <s nom="Cuoum" position="0_17_29"/>
+        <s nom="Wit" position="0_17_32"/>
+        <s nom="Me" position="0_17_40"/>
+        <s nom="Owaru" position="0_17_48"/>
+        <s nom="Ka" position="0_17_55"/>
+        <s nom="Lb" position="0_17_57"/>
+        <s nom="Lbli" position="0_18_31"/>
+        <s nom="Mese" position="0_18_37"/>
+        <s nom="Gbn" position="0_18_43"/>
+        <s nom="Reoi" position="0_18_59"/>
+        <s nom="Zbmiwuq" position="0_18_60"/>
+        <s nom="Tis" position="0_19_17"/>
+        <s nom="Uyi" position="0_19_21"/>
+        <s nom="Rimohyy" position="0_19_25"/>
+        <s nom="Dos" position="0_19_31"/>
+        <s nom="Mox" position="0_19_35"/>
+        <s nom="Kipbt" position="0_19_39"/>
+        <s nom="Abfi" position="0_19_46"/>
+        <s nom="Ebeo" position="0_19_48"/>
+        <s nom="Eoqoaiz" position="0_19_53"/>
+        <s nom="Ao" position="0_19_57"/>
+        <s nom="Uyaa" position="0_20_3"/>
+        <s nom="Jy" position="0_20_6"/>
+        <s nom="Cbj" position="0_20_7"/>
+        <s nom="Ru" position="0_20_11"/>
+        <s nom="Abxesy" position="0_20_13"/>
+        <s nom="Gbpa" position="0_20_19"/>
+        <s nom="Seeyho" position="0_20_22"/>
+        <s nom="Pyee" position="0_20_27"/>
+        <s nom="Eesea" position="0_20_32"/>
+        <s nom="Hover" position="0_20_37"/>
+        <s nom="Qug" position="0_20_50"/>
+        <s nom="Ui Oh" position="0_20_51"/>
+        <s nom="Hycaiyb" position="0_20_60"/>
+        <s nom="Lo" position="0_21_6"/>
+        <s nom="Dygetyo" position="0_21_45"/>
+        <s nom="Bywo" position="0_22_10"/>
+        <s nom="Hudu" position="0_22_18"/>
+        <s nom="Po" position="0_22_21"/>
+        <s nom="Bbza" position="0_22_27"/>
+        <s nom="Ooyeaag" position="0_22_32"/>
+        <s nom="Guf" position="0_22_35"/>
+        <s nom="Pa" position="0_22_39"/>
+        <s nom="Ki" position="0_22_40"/>
+        <s nom="Uim" position="0_22_56"/>
+        <s nom="Gulilu" position="0_23_1"/>
+        <s nom="Qatbri" position="0_23_14"/>
+        <s nom="Wuqe" position="0_23_16"/>
+        <s nom="Ooxbh" position="0_23_20"/>
+        <s nom="Aurayyr" position="0_23_25"/>
+        <s nom="Qyj" position="0_23_38"/>
+        <s nom="Xuf" position="0_23_43"/>
+        <s nom="Gote" position="0_23_45"/>
+        <s nom="Jyyyy" position="0_23_55"/>
+        <s nom="Oaoioo" position="0_24_6"/>
+        <s nom="Bis" position="0_24_11"/>
+        <s nom="Iooys" position="0_24_13"/>
+        <s nom="Pey" position="0_24_23"/>
+        <s nom="Ehbke" position="0_24_27"/>
+        <s nom="Taiom" position="0_24_30"/>
+        <s nom="Tavy" position="0_24_31"/>
+        <s nom="Zo" position="0_24_35"/>
+        <s nom="Xaqivul" position="0_24_49"/>
+        <s nom="Vbpucak" position="0_24_52"/>
+        <s nom="Cyhyuaa" position="0_24_57"/>
+        <s nom="Iygi" position="0_25_10"/>
+        <s nom="Hbbim" position="0_25_14"/>
+        <s nom="Jb" position="0_25_23"/>
+        <s nom="Livoaat" position="0_25_28"/>
+        <s nom="Eyw" position="0_25_32"/>
+        <s nom="Tu" position="0_25_40"/>
+        <s nom="Qo" position="0_25_44"/>
+        <s nom="Kareeb" position="0_25_56"/>
+        <s nom="Ne" position="0_25_57"/>
+        <s nom="Vuwbkua" position="0_26_14"/>
+        <s nom="Ni" position="0_26_20"/>
+        <s nom="Mes" position="0_26_23"/>
+        <s nom="Do" position="0_26_24"/>
+        <s nom="Xysix" position="0_26_25"/>
+        <s nom="Kanife" position="0_26_28"/>
+        <s nom="Gub" position="0_26_31"/>
+        <s nom="Keg" position="0_26_33"/>
+        <s nom="Rij" position="0_26_35"/>
+        <s nom="Iewuoa" position="0_26_38"/>
+        <s nom="Vywona" position="0_26_41"/>
+        <s nom="Deo" position="0_26_55"/>
+        <s nom="Ap" position="0_27_12"/>
+        <s nom="Wu" position="0_27_14"/>
+        <s nom="Nyq" position="0_27_17"/>
+        <s nom="Vet" position="0_27_30"/>
+        <s nom="Jbsbpb" position="0_27_39"/>
+        <s nom="Ezalo" position="0_27_42"/>
+        <s nom="Fa" position="0_27_52"/>
+        <s nom="Ia" position="0_27_55"/>
+        <s nom="Gua" position="0_28_3"/>
+        <s nom="Fiba" position="0_28_6"/>
+        <s nom="Syqyfya" position="0_28_23"/>
+        <s nom="Ibuax" position="0_28_50"/>
+        <s nom="Tuzy" position="0_28_54"/>
+        <s nom="Robu" position="0_28_60"/>
+        <s nom="Vigyubm" position="0_30_3"/>
+        <s nom="Lubyhu" position="0_30_9"/>
+        <s nom="Deeeoan" position="0_30_24"/>
+        <s nom="Mijug" position="0_30_32"/>
+        <s nom="Aaay" position="0_30_36"/>
+        <s nom="Gyoumit" position="0_30_60"/>
+        <s nom="Jooihyh" position="0_31_2"/>
+        <s nom="Lbyeh" position="0_31_4"/>
+        <s nom="Mbf" position="0_31_14"/>
+        <s nom="Rizyfeu" position="0_31_16"/>
+        <s nom="Feqog" position="0_31_18"/>
+        <s nom="Xim" position="0_31_21"/>
+        <s nom="Seq" position="0_31_28"/>
+        <s nom="Niaigag" position="0_31_39"/>
+        <s nom="Ci" position="0_31_47"/>
+        <s nom="Augeh" position="0_31_57"/>
+        <s nom="Gauohbb" position="0_32_6"/>
+        <s nom="Bidasa" position="0_32_7"/>
+        <s nom="Ay" position="0_32_23"/>
+        <s nom="Pybe" position="0_32_26"/>
+        <s nom="Kesyro" position="0_32_33"/>
+        <s nom="Za" position="0_32_42"/>
+        <s nom="Ci" position="0_32_49"/>
+        <s nom="Payihix" position="0_32_53"/>
+        <s nom="Jyuoeuv" position="0_33_4"/>
+        <s nom="Fuxu" position="0_33_6"/>
+        <s nom="Gu" position="0_33_14"/>
+        <s nom="Hbq" position="0_33_15"/>
+        <s nom="Za" position="0_33_23"/>
+        <s nom="Rb" position="0_33_24"/>
+        <s nom="Myrypy" position="0_33_28"/>
+        <s nom="Eaae" position="0_33_32"/>
+        <s nom="Geo" position="0_33_33"/>
+        <s nom="Bb I" position="0_33_48"/>
+        <s nom="Kotye" position="0_33_49"/>
+        <s nom="Loyiqeb" position="0_33_51"/>
+        <s nom="Vyaajec" position="0_33_56"/>
+        <s nom="Yyhype" position="0_33_57"/>
+        <s nom="Mixu" position="0_33_59"/>
+        <s nom="La" position="0_34_6"/>
+        <s nom="Oemi" position="0_34_13"/>
+        <s nom="Baoi" position="0_34_21"/>
+        <s nom="Gyr" position="0_34_30"/>
+        <s nom="Bidisye" position="0_34_32"/>
+        <s nom="Nyroxbs" position="0_34_34"/>
+        <s nom="Oufyuyn" position="0_34_45"/>
+        <s nom="Dyail" position="0_34_48"/>
+        <s nom="Save" position="0_34_49"/>
+        <s nom="Fba" position="0_34_55"/>
+        <s nom="Nyxav" position="0_34_57"/>
+        <s nom="Poli" position="0_34_60"/>
+        <s nom="Pedexoq" position="0_35_11"/>
+        <s nom="Obxic" position="0_35_16"/>
+        <s nom="Ubkyo" position="0_35_17"/>
+        <s nom="Ybx" position="0_35_20"/>
+        <s nom="Ji B" position="0_35_23"/>
+        <s nom="Iiliauj" position="0_35_26"/>
+        <s nom="Fina" position="0_35_40"/>
+        <s nom="Yehok" position="0_35_45"/>
+        <s nom="Zujahu" position="0_36_16"/>
+        <s nom="Jogboai" position="0_36_24"/>
+        <s nom="Vbdoz" position="0_36_45"/>
+        <s nom="Jbhypb" position="0_36_58"/>
+        <s nom="Ho" position="0_36_60"/>
+        <s nom="Ebibuou" position="0_37_2"/>
+        <s nom="Qil" position="0_37_11"/>
+        <s nom="Se" position="0_37_14"/>
+        <s nom="Gb" position="0_37_24"/>
+        <s nom="Jboywbj" position="0_37_30"/>
+        <s nom="Aeqbryk" position="0_37_33"/>
+        <s nom="Noga" position="0_37_38"/>
+        <s nom="Ux" position="0_37_55"/>
+        <s nom="Uitbtuo" position="0_38_9"/>
+        <s nom="Vbw" position="0_38_16"/>
+        <s nom="Aituo" position="0_38_18"/>
+        <s nom="Yofuxac" position="0_38_20"/>
+        <s nom="Dy" position="0_38_25"/>
+        <s nom="Pilahyc" position="0_38_35"/>
+        <s nom="Uyubo" position="0_38_49"/>
+        <s nom="Yi" position="0_38_51"/>
+        <s nom="Nuu" position="0_39_6"/>
+        <s nom="Aajbwoa" position="0_39_23"/>
+        <s nom="Luyaga" position="0_39_25"/>
+        <s nom="Rea" position="0_39_42"/>
+        <s nom="Myvu" position="0_39_46"/>
+        <s nom="Uowom" position="0_39_59"/>
+        <s nom="Do" position="0_40_9"/>
+        <s nom="Aiwbxal" position="0_40_11"/>
+        <s nom="Ru Ib" position="0_40_14"/>
+        <s nom="Ay" position="0_40_25"/>
+        <s nom="Neoyryn" position="0_40_30"/>
+        <s nom="Lbyyz" position="0_40_31"/>
+        <s nom="Xoea" position="0_40_35"/>
+        <s nom="Iaqy" position="0_40_40"/>
+        <s nom="Pooaje" position="0_40_42"/>
+        <s nom="Qbpb I" position="0_40_47"/>
+        <s nom="Iuf" position="0_40_50"/>
+        <s nom="Xy" position="0_40_52"/>
+        <s nom="Nayat" position="0_40_57"/>
+        <s nom="Lb" position="0_41_4"/>
+        <s nom="Votu" position="0_41_6"/>
+        <s nom="Boubeea" position="0_41_16"/>
+        <s nom="Co" position="0_41_31"/>
+        <s nom="Iowy" position="0_41_32"/>
+        <s nom="Heciv" position="0_41_41"/>
+        <s nom="Cox" position="0_41_42"/>
+        <s nom="Bih" position="0_41_60"/>
+        <s nom="Pu" position="0_42_4"/>
+        <s nom="Si" position="0_42_6"/>
+        <s nom="Fiiu" position="0_42_12"/>
+        <s nom="Ry" position="0_42_13"/>
+        <s nom="Vbuugo" position="0_42_14"/>
+        <s nom="Bowo" position="0_42_23"/>
+        <s nom="Peqoqo" position="0_42_29"/>
+        <s nom="Tivbh" position="0_42_32"/>
+        <s nom="Kiv" position="0_42_34"/>
+        <s nom="Tiyaey" position="0_42_40"/>
+        <s nom="Fedbty" position="0_42_48"/>
+        <s nom="Jymije" position="0_42_55"/>
+        <s nom="Lbmequh" position="0_42_57"/>
+        <s nom="Xiboduk" position="0_43_5"/>
+        <s nom="Towa" position="0_43_12"/>
+        <s nom="Vysbca" position="0_43_17"/>
+        <s nom="Hie" position="0_43_21"/>
+        <s nom="Qexamy" position="0_43_22"/>
+        <s nom="Ho" position="0_43_24"/>
+        <s nom="Lovbg" position="0_43_27"/>
+        <s nom="Ti" position="0_43_37"/>
+        <s nom="Ei Oqoj" position="0_43_47"/>
+        <s nom="Ib" position="0_43_50"/>
+        <s nom="Tiya" position="0_43_53"/>
+        <s nom="Zeyapau" position="0_43_58"/>
+        <s nom="Sypaca" position="0_43_59"/>
+        <s nom="Eixaso" position="0_44_5"/>
+        <s nom="Minaceo" position="0_44_11"/>
+        <s nom="Qar" position="0_44_23"/>
+        <s nom="Iequo" position="0_44_34"/>
+        <s nom="Gavecy" position="0_44_39"/>
+        <s nom="Fapoxeu" position="0_44_46"/>
+        <s nom="Ubaigau" position="0_44_58"/>
+        <s nom="Mui" position="0_44_59"/>
+        <s nom="Qeg" position="0_45_2"/>
+        <s nom="Ec" position="0_45_6"/>
+        <s nom="Poobxi" position="0_45_9"/>
+        <s nom="Ka" position="0_45_14"/>
+        <s nom="Kubbxe" position="0_45_32"/>
+        <s nom="Aum" position="0_45_39"/>
+        <s nom="Xon" position="0_45_43"/>
+        <s nom="Tyzao" position="0_46_27"/>
+        <s nom="Io Yfys" position="0_46_28"/>
+        <s nom="Co" position="0_46_47"/>
+        <s nom="Fu" position="0_46_50"/>
+        <s nom="Sixyzuc" position="0_46_56"/>
+        <s nom="De" position="0_46_59"/>
+        <s nom="Nodojul" position="0_47_11"/>
+        <s nom="Af" position="0_47_14"/>
+        <s nom="Fi" position="0_47_19"/>
+        <s nom="Cafb" position="0_47_38"/>
+        <s nom="Oy" position="0_47_53"/>
+        <s nom="Tam" position="0_48_3"/>
+        <s nom="Dbnese" position="0_48_4"/>
+        <s nom="Ek" position="0_48_7"/>
+        <s nom="Kihyfiv" position="0_48_16"/>
+        <s nom="Zajbliz" position="0_48_22"/>
+        <s nom="Va" position="0_48_28"/>
+        <s nom="Xaooj" position="0_48_29"/>
+        <s nom="Vyueqa" position="0_48_40"/>
+        <s nom="Aufu" position="0_48_43"/>
+        <s nom="Pykok" position="0_49_12"/>
+        <s nom="But" position="0_49_15"/>
+        <s nom="Iop" position="0_49_21"/>
+        <s nom="Vijyy" position="0_49_31"/>
+        <s nom="Jiwyzy" position="0_49_33"/>
+        <s nom="Fovane" position="0_49_34"/>
+        <s nom="Waiiri" position="0_49_38"/>
+        <s nom="Qaii" position="0_49_48"/>
+        <s nom="Nbgbmb" position="0_49_51"/>
+        <s nom="Qia" position="0_49_53"/>
+        <s nom="Ouku" position="0_49_55"/>
+        <s nom="Io" position="0_50_8"/>
+        <s nom="Dyhevu" position="0_50_22"/>
+        <s nom="Iaw" position="0_50_32"/>
+        <s nom="Kilym" position="0_50_33"/>
+        <s nom="Mysb" position="0_50_37"/>
+        <s nom="Fuzo" position="0_50_39"/>
+        <s nom="Tyweiih" position="0_50_40"/>
+        <s nom="Raz" position="0_50_56"/>
+        <s nom="Tono" position="0_50_58"/>
+        <s nom="Ou Iq" position="0_51_1"/>
+        <s nom="Eauoc" position="0_51_4"/>
+        <s nom="Aioody" position="0_51_5"/>
+        <s nom="Safbjy" position="0_51_6"/>
+        <s nom="Biv" position="0_51_12"/>
+        <s nom="Tydan" position="0_51_14"/>
+        <s nom="Fosbae" position="0_51_19"/>
+        <s nom="Zikeu" position="0_51_23"/>
+        <s nom="Oie" position="0_51_26"/>
+        <s nom="Suh" position="0_51_32"/>
+        <s nom="Qboieo" position="0_51_40"/>
+        <s nom="Yuzo" position="0_51_41"/>
+        <s nom="Xbob" position="0_51_45"/>
+        <s nom="Jab" position="0_51_47"/>
+        <s nom="Ye Eoa" position="0_51_48"/>
+        <s nom="Eeoapi" position="0_51_50"/>
+        <s nom="Uepbx" position="0_51_57"/>
+        <s nom="Qov" position="0_51_58"/>
+        <s nom="Davaw" position="0_52_6"/>
+        <s nom="Uaje" position="0_52_17"/>
+        <s nom="Futy" position="0_52_25"/>
+        <s nom="Petu" position="0_52_29"/>
+        <s nom="Pibu" position="0_52_35"/>
+        <s nom="U" position="0_52_41"/>
+        <s nom="Zbqop" position="0_52_43"/>
+        <s nom="Ry" position="0_52_49"/>
+        <s nom="Zyw" position="0_52_50"/>
+        <s nom="We" position="0_52_52"/>
+        <s nom="Teraho" position="0_52_54"/>
+        <s nom="Ey" position="0_53_4"/>
+        <s nom="Pafesaa" position="0_53_5"/>
+        <s nom="Daiiduu" position="0_53_9"/>
+        <s nom="Laqbui" position="0_53_13"/>
+        <s nom="Pb Uu" position="0_53_15"/>
+        <s nom="Aiz" position="0_53_18"/>
+        <s nom="Rac" position="0_53_22"/>
+        <s nom="Fofbd" position="0_53_23"/>
+        <s nom="Hy" position="0_53_45"/>
+        <s nom="Yicyvuv" position="0_53_56"/>
+        <s nom="Biri" position="0_54_49"/>
+        <s nom="Dusay" position="0_54_59"/>
+        <s nom="Zab" position="0_55_7"/>
+        <s nom="Amajum" position="0_55_16"/>
+        <s nom="Zyju" position="0_55_25"/>
+        <s nom="Yo" position="0_55_27"/>
+        <s nom="Ciba" position="0_55_30"/>
+        <s nom="So" position="0_55_35"/>
+        <s nom="Ibqaeab" position="0_55_41"/>
+        <s nom="Aso" position="0_55_48"/>
+        <s nom="Dyvyred" position="0_55_55"/>
+        <s nom="Zyxa" position="0_56_5"/>
+        <s nom="Jbxysib" position="0_56_11"/>
+        <s nom="Suz" position="0_56_13"/>
+        <s nom="Ua" position="0_56_18"/>
+        <s nom="Eaabuaq" position="0_56_21"/>
+        <s nom="Ky" position="0_56_27"/>
+        <s nom="Yb" position="0_56_30"/>
+        <s nom="Vaki I" position="0_56_32"/>
+        <s nom="Pbob" position="0_56_38"/>
+        <s nom="Dubove" position="0_56_49"/>
+        <s nom="Eue" position="0_56_58"/>
+        <s nom="Vbuuwb" position="0_57_25"/>
+        <s nom="Aef" position="0_57_28"/>
+        <s nom="Tiqeeie" position="0_57_47"/>
+        <s nom="Qye" position="0_57_54"/>
+        <s nom="Wi" position="0_57_60"/>
+        <s nom="Iy" position="0_58_3"/>
+        <s nom="Vbp" position="0_58_6"/>
+        <s nom="Go" position="0_58_8"/>
+        <s nom="Goriri" position="0_58_26"/>
+        <s nom="Koaahyf" position="0_58_34"/>
+        <s nom="Ebviou" position="0_58_40"/>
+        <s nom="Yihowb" position="0_58_42"/>
+        <s nom="Di" position="0_58_43"/>
+        <s nom="Yayeee" position="0_58_53"/>
+        <s nom="Nece" position="0_58_58"/>
+        <s nom="Uoburo" position="0_59_11"/>
+        <s nom="Aydeeew" position="0_59_12"/>
+        <s nom="U A" position="0_59_13"/>
+        <s nom="Lyealoy" position="0_59_14"/>
+        <s nom="Duce" position="0_59_18"/>
+        <s nom="Zuhu" position="0_59_22"/>
+        <s nom="Coh" position="0_59_24"/>
+        <s nom="Zi" position="0_59_33"/>
+        <s nom="Dava B" position="0_59_38"/>
+        <s nom="Eo" position="0_59_42"/>
+        <s nom="Auvbo" position="0_59_46"/>
+        <s nom="Lypy" position="0_59_47"/>
+        <s nom="Kowa" position="0_59_50"/>
+        <s nom="Wyr" position="0_59_55"/>
+        <s nom="Nydamu" position="0_59_58"/>
+        <s nom="Bzaca" position="0_59_59"/>
+        <s nom="Wbcutyh" position="0_60_5"/>
+        <s nom="Kytymu" position="0_60_6"/>
+        <s nom="Ib" position="0_60_8"/>
+        <s nom="Gbm" position="0_60_14"/>
+        <s nom="Iob" position="0_60_15"/>
+        <s nom="Yityd" position="0_60_21"/>
+        <s nom="Yofbeb" position="0_60_22"/>
+        <s nom="Yecugo" position="0_60_23"/>
+        <s nom="Auqo" position="0_60_25"/>
+        <s nom="Aawbf" position="0_60_30"/>
+        <s nom="Son" position="0_60_31"/>
+        <s nom="Pbcaqb" position="0_60_32"/>
+        <s nom="Bodo" position="0_60_37"/>
+        <s nom="Lyjyqu" position="0_60_40"/>
+        <s nom="Dycu" position="0_60_47"/>
+        <s nom="Womedo" position="0_60_48"/>
+        <s nom="Gou" position="0_60_49"/>
+        <s nom="Mopat" position="0_60_52"/>
+        <s nom="Xok" position="0_60_57"/>
     </systemes>
 </data>

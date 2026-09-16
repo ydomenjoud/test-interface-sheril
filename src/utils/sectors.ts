@@ -3,7 +3,6 @@ import { BOUNDS } from './position';
 export const SECTOR_SIZE = 10;
 export const GALAXY_SIZE = BOUNDS.maxX;
 export const SECTORS_PER_AXIS = GALAXY_SIZE / SECTOR_SIZE;
-export const SECTOR_COUNT = 16;
 
 const SECTOR_LABEL_OFFSET = Math.floor((SECTOR_SIZE - 1) / 2);
 
