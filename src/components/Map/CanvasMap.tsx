@@ -25,6 +25,7 @@ const RACE_BADGE_COLORS: Record<number, string> = {
 
 type Props = {
     onSelect: (xy: XY, ctrl: boolean) => void;
+    onCreateZone?: (xy: XY) => void; // Alt + clic gauche
     selected?: XY;
     showFleetsFor?: XY; // Position pour laquelle afficher les flèches de portée
     showSystems: boolean;
@@ -74,8 +75,8 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#f80c0c';
 }
 
-export default function CanvasMap({onSelect, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18}: Props) {
-    const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats} = useReport();
+export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18}: Props) {
+    const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Ref sur le center pour des mises à jour synchrones dans le drag
@@ -393,6 +394,49 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(String(yCoord), xPos + cellSize / 2, cellSize / 2);
+        }
+
+        // ZONES MANUELLES – rectangles saisis à la main (coin haut-gauche = case cliquée)
+        {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(cellSize, cellSize, cols * cellSize - cellSize, rows * cellSize - cellSize);
+            ctx.clip();
+            zones.forEach(z => {
+                if (z.label && hiddenZoneLabels.includes(z.label)) return;
+                // décalage signé (tore) du coin haut-gauche par rapport au centre
+                let offX = z.x - currentCenter.x;
+                if (offX > BOUNDS.maxX / 2) offX -= BOUNDS.maxX;
+                if (offX < -BOUNDS.maxX / 2) offX += BOUNDS.maxX;
+                let offY = z.y - currentCenter.y;
+                if (offY > BOUNDS.maxY / 2) offY -= BOUNDS.maxY;
+                if (offY < -BOUNDS.maxY / 2) offY += BOUNDS.maxY;
+                // copies décalées d'un tour pour les zones qui chevauchent le bord
+                for (const wx of [-BOUNDS.maxX, 0, BOUNDS.maxX]) {
+                    for (const wy of [-BOUNDS.maxY, 0, BOUNDS.maxY]) {
+                        const px = (halfCols + offY + wy) * cellSize;
+                        const py = (halfRows + offX + wx) * cellSize;
+                        const w = z.width * cellSize;
+                        const h = z.height * cellSize;
+                        if (px + w < 0 || py + h < 0 || px > cols * cellSize || py > rows * cellSize) continue;
+                        ctx.globalAlpha = 0.25;
+                        ctx.fillStyle = z.bgColor;
+                        ctx.fillRect(px, py, w, h);
+                        ctx.globalAlpha = 1;
+                        ctx.strokeStyle = z.borderColor;
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(px, py, w, h);
+                        if (z.label) {
+                            ctx.fillStyle = z.borderColor;
+                            ctx.font = 'bold 12px sans-serif';
+                            ctx.textAlign = 'left';
+                            ctx.textBaseline = 'top';
+                            ctx.fillText(z.label, px + 4, py + 3);
+                        }
+                    }
+                }
+            });
+            ctx.restore();
         }
 
         // ZONES DE DÉTECTION (scan) – systèmes et flottes du joueur
@@ -972,7 +1016,7 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
 
             cCombat.restore();
         }
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, hiddenZoneLabels]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
@@ -1018,6 +1062,10 @@ export default function CanvasMap({onSelect, selected, showFleetsFor, showSystem
         const x = torusDelta(center.x, row - halfRows, BOUNDS.maxX);
         const y = torusDelta(center.y, col - halfCols, BOUNDS.maxY);
 
+        if (evt.altKey && onCreateZone) {
+            onCreateZone({x, y});
+            return;
+        }
         onSelect({x, y}, evt.ctrlKey);
     };
 
