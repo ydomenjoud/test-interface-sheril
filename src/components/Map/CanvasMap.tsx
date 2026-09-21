@@ -397,47 +397,47 @@ export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsF
         }
 
         // ZONES MANUELLES – rectangles saisis à la main (coin haut-gauche = case cliquée)
-        {
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(cellSize, cellSize, cols * cellSize - cellSize, rows * cellSize - cellSize);
-            ctx.clip();
-            zones.forEach(z => {
-                if (z.label && hiddenZoneLabels.includes(z.label)) return;
-                // décalage signé (tore) du coin haut-gauche par rapport au centre
-                let offX = z.x - currentCenter.x;
-                if (offX > BOUNDS.maxX / 2) offX -= BOUNDS.maxX;
-                if (offX < -BOUNDS.maxX / 2) offX += BOUNDS.maxX;
-                let offY = z.y - currentCenter.y;
-                if (offY > BOUNDS.maxY / 2) offY -= BOUNDS.maxY;
-                if (offY < -BOUNDS.maxY / 2) offY += BOUNDS.maxY;
-                // copies décalées d'un tour pour les zones qui chevauchent le bord
-                for (const wx of [-BOUNDS.maxX, 0, BOUNDS.maxX]) {
-                    for (const wy of [-BOUNDS.maxY, 0, BOUNDS.maxY]) {
-                        const px = (halfCols + offY + wy) * cellSize;
-                        const py = (halfRows + offX + wx) * cellSize;
-                        const w = z.width * cellSize;
-                        const h = z.height * cellSize;
-                        if (px + w < 0 || py + h < 0 || px > cols * cellSize || py > rows * cellSize) continue;
-                        ctx.globalAlpha = 0.25;
-                        ctx.fillStyle = z.bgColor;
-                        ctx.fillRect(px, py, w, h);
-                        ctx.globalAlpha = 1;
-                        ctx.strokeStyle = z.borderColor;
-                        ctx.lineWidth = 2;
-                        ctx.strokeRect(px, py, w, h);
-                        if (z.label) {
-                            ctx.fillStyle = z.borderColor;
-                            ctx.font = 'bold 12px sans-serif';
-                            ctx.textAlign = 'left';
-                            ctx.textBaseline = 'top';
-                            ctx.fillText(z.label, px + 4, py + 3);
-                        }
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(cellSize, cellSize, cols * cellSize - cellSize, rows * cellSize - cellSize);
+        ctx.clip();
+        zones.forEach(z => {
+            if (z.label && hiddenZoneLabels.includes(z.label)) return;
+            // décalage signé (tore) du coin haut-gauche par rapport au centre
+            let offX = z.x - currentCenter.x;
+            if (offX > BOUNDS.maxX / 2) offX -= BOUNDS.maxX;
+            if (offX < -BOUNDS.maxX / 2) offX += BOUNDS.maxX;
+            let offY = z.y - currentCenter.y;
+            if (offY > BOUNDS.maxY / 2) offY -= BOUNDS.maxY;
+            if (offY < -BOUNDS.maxY / 2) offY += BOUNDS.maxY;
+            // copies décalées d'un tour pour les zones qui chevauchent le bord
+            for (const wx of [-BOUNDS.maxX, 0, BOUNDS.maxX]) {
+                for (const wy of [-BOUNDS.maxY, 0, BOUNDS.maxY]) {
+                    const px = (halfCols + offY + wy) * cellSize;
+                    const py = (halfRows + offX + wx) * cellSize;
+                    const w = z.width * cellSize;
+                    const h = z.height * cellSize;
+                    if (px + w < 0 || py + h < 0 || px > cols * cellSize || py > rows * cellSize) continue;
+                    ctx.globalAlpha = 0.25;
+                    ctx.fillStyle = z.bgColor;
+                    ctx.fillRect(px, py, w, h);
+                    ctx.globalAlpha = 1;
+                    ctx.strokeStyle = z.borderColor;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(px, py, w, h);
+                    if (z.label) {
+                        ctx.fillStyle = z.borderColor;
+                        ctx.font = 'bold 12px sans-serif';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'top';
+                        ctx.fillText(z.label, px + 4, py + 3);
                     }
                 }
-            });
-            ctx.restore();
-        }
+            }
+        });
+        ctx.restore();
+
 
         // ZONES DE DÉTECTION (scan) – systèmes et flottes du joueur
         // On calcule d’abord l’ensemble des cases détectées pour éviter tout empilement de couleurs.
