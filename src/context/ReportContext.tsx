@@ -1,5 +1,5 @@
 import React, {createContext, useContext, useEffect, useMemo, useState, useCallback} from 'react';
-import {GlobalData, Rapport, XY, SystemeDetecte, Note, CombatEvent} from '../types';
+import {GlobalData, Rapport, XY, SystemeDetecte, Note, CombatEvent, Zone} from '../types';
 import {parseRapportXml, addManualDetectedSystems, getCachedDetectedSystems} from '../parsers/parseRapport';
 import {parsePublicCombatsHtml} from '../parsers/parsePublicCombats';
 import {parseManualDetectedSystems} from '../parsers/parseManualSystems';
@@ -24,6 +24,12 @@ type ReportContextType = {
     setSelectedTags: (tags: string[]) => void;
     addNote: (pos: XY, text: string, color: string, tag?: string) => void;
     deleteNote: (pos: XY, noteId: string) => void;
+    zones: Zone[];
+    zoneLabels: string[];
+    hiddenZoneLabels: string[];
+    setHiddenZoneLabels: (labels: string[]) => void;
+    addZone: (zone: Omit<Zone, 'id'>) => void;
+    deleteZone: (id: string) => void;
     publicCombats: CombatEvent[];
     refreshStats: () => Promise<void>;
 };
@@ -46,11 +52,48 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
             return [];
         }
     });
+    const [zones, setZones] = useState<Zone[]>(() => {
+        try {
+            const saved = localStorage.getItem('carte_zones');
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    });
+    const [hiddenZoneLabels, setHiddenZoneLabels] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('carte_hidden_zone_labels');
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    });
     const [publicCombats, setPublicCombats] = useState<CombatEvent[]>([]);
 
     useEffect(() => {
         localStorage.setItem('carte_selected_tags', JSON.stringify(selectedTags));
     }, [selectedTags]);
+
+    useEffect(() => {
+        localStorage.setItem('carte_zones', JSON.stringify(zones));
+    }, [zones]);
+
+    useEffect(() => {
+        localStorage.setItem('carte_hidden_zone_labels', JSON.stringify(hiddenZoneLabels));
+    }, [hiddenZoneLabels]);
+
+    const zoneLabels = useMemo(
+        () => Array.from(new Set(zones.map(z => z.label).filter((l): l is string => !!l))).sort(),
+        [zones]
+    );
+
+    const addZone = useCallback((zone: Omit<Zone, 'id'>) => {
+        setZones(prev => [...prev, {...zone, id: Math.random().toString(36).substr(2, 9)}]);
+    }, []);
+
+    const deleteZone = useCallback((id: string) => {
+        setZones(prev => prev.filter(z => z.id !== id));
+    }, []);
 
     const allTags = useMemo(() => {
         const tags = new Set<string>();
@@ -315,7 +358,13 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         setSelectedTags,
         addNote,
         deleteNote,
-    }), [rapport, global, publicCombats, refreshStats, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, allTags, selectedTags, addNote, deleteNote]);
+        zones,
+        zoneLabels,
+        hiddenZoneLabels,
+        setHiddenZoneLabels,
+        addZone,
+        deleteZone,
+    }), [rapport, global, publicCombats, refreshStats, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, allTags, selectedTags, addNote, deleteNote, zones, zoneLabels, hiddenZoneLabels, addZone, deleteZone]);
 
     return <ReportContext.Provider value={value}>{children}</ReportContext.Provider>;
 }

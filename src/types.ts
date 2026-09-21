@@ -8,6 +8,17 @@ export type Note = {
     date: number;
 };
 
+export type Zone = {
+    id: string;
+    x: number; // ligne (coin haut-gauche)
+    y: number; // colonne (coin haut-gauche)
+    width: number; // nombre de colonnes (axe y)
+    height: number; // nombre de lignes (axe x)
+    label?: string;
+    borderColor: string;
+    bgColor: string;
+};
+
 export type Range = {min: number, max: number};
 
 export type Race = {
