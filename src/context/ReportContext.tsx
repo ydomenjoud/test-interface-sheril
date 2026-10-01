@@ -4,6 +4,7 @@ import {parseRapportXml, addManualDetectedSystems, getCachedDetectedSystems} fro
 import {parsePublicCombatsHtml} from '../parsers/parsePublicCombats';
 import {parseManualDetectedSystems} from '../parsers/parseManualSystems';
 import {parseDataXml} from '../parsers/parseData';
+import {CENTER} from '../utils/position';
 
 type ReportContextType = {
     rapport?: Rapport;
@@ -41,7 +42,8 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
     const [rapport, setRapport] = useState<Rapport | undefined>(undefined);
     const [global, setGlobal] = useState<GlobalData | undefined>(undefined);
     const [cellSize, setCellSize] = useState<number>(32);
-    const [center, setCenter] = useState<XY | undefined>(undefined);
+    // Centre de la galaxie par défaut (sans rapport) ; remplacé par la capitale au chargement d'un rapport
+    const [center, setCenter] = useState<XY | undefined>(CENTER);
     const [viewportCols, setViewportCols] = useState<number>(0);
     const [viewportRows, setViewportRows] = useState<number>(0);
     const [notes, setNotes] = useState<Record<string, Note[]>>({});
