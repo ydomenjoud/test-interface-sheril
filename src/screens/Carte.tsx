@@ -1,6 +1,6 @@
 import React, {useState, useEffect} from 'react';
 import {useReport} from '../context/ReportContext';
-import CanvasMap from '../components/Map/CanvasMap';
+import CanvasMap, {ZoneRect} from '../components/Map/CanvasMap';
 import MiniMap from '../components/Map/MiniMap';
 import InfoPanel from '../components/Map/InfoPanel';
 import ZoneDialog from '../components/Map/ZoneDialog';
@@ -9,7 +9,7 @@ import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
 
 export default function Carte() {
   const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText, allTags, selectedTags, setSelectedTags, zones, zoneLabels, hiddenZoneLabels, setHiddenZoneLabels } = useReport();
-  const [zoneDialogPos, setZoneDialogPos] = useState<XY | undefined>(undefined);
+  const [zoneDialogRect, setZoneDialogRect] = useState<ZoneRect | undefined>(undefined);
   const [selected, setSelected] = useState<XY | undefined>(undefined);
   const [showFleetsFor, setShowFleetsFor] = useState<XY | undefined>(undefined);
   const [selectedOwners, setSelectedOwners] = useState<(number)[]>(() => {
@@ -209,7 +209,7 @@ export default function Carte() {
         )}
         <div style={{ position: 'relative', width: '100%', height: '100%', display: global ? 'block' : 'none' }}>
           <CanvasMap
-            onCreateZone={setZoneDialogPos}
+            onCreateZone={setZoneDialogRect}
             onSelect={(xy, ctrl) => {
               setSelected(xy);
               if (ctrl) {
@@ -413,7 +413,7 @@ export default function Carte() {
 
                       {zoneLabels.length > 0 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid #444', paddingTop: 8 }}>
-                              <span style={{ fontSize: '0.85em', color: '#aaa' }}>Zones manuelles (Alt + clic)</span>
+                              <span style={{ fontSize: '0.85em', color: '#aaa' }}>Zones manuelles (Alt + glisser)</span>
                               {zoneLabels.map(label => (
                                   <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
                                       <input
@@ -495,7 +495,7 @@ export default function Carte() {
 
       <InfoPanel selected={selected} />
 
-      {zoneDialogPos && <ZoneDialog pos={zoneDialogPos} onClose={() => setZoneDialogPos(undefined)} />}
+      {zoneDialogRect && <ZoneDialog rect={zoneDialogRect} onClose={() => setZoneDialogRect(undefined)} />}
 
       {showPaste && (
         <div

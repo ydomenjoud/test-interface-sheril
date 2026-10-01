@@ -23,9 +23,27 @@ const RACE_BADGE_COLORS: Record<number, string> = {
     5: '#777777',
 };
 
+export type ZoneRect = { x: number; y: number; width: number; height: number };
+
+// Rectangle (coin haut-gauche + taille) couvrant deux cases opposées, en prenant le plus court chemin sur le tore
+function zoneRectFrom(a: XY, b: XY): ZoneRect {
+    let dX = b.x - a.x;
+    if (dX > BOUNDS.maxX / 2) dX -= BOUNDS.maxX;
+    if (dX < -BOUNDS.maxX / 2) dX += BOUNDS.maxX;
+    let dY = b.y - a.y;
+    if (dY > BOUNDS.maxY / 2) dY -= BOUNDS.maxY;
+    if (dY < -BOUNDS.maxY / 2) dY += BOUNDS.maxY;
+    return {
+        x: dX < 0 ? b.x : a.x,
+        y: dY < 0 ? b.y : a.y,
+        width: Math.abs(dY) + 1,
+        height: Math.abs(dX) + 1,
+    };
+}
+
 type Props = {
     onSelect: (xy: XY, ctrl: boolean) => void;
-    onCreateZone?: (xy: XY) => void; // Alt + clic gauche
+    onCreateZone?: (rect: ZoneRect) => void; // Alt + clic gauche glissé du coin de départ au coin de fin
     selected?: XY;
     showFleetsFor?: XY; // Position pour laquelle afficher les flèches de portée
     showSystems: boolean;
@@ -87,6 +105,9 @@ export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsF
 
     // Gestion du drag
     const dragRef = useRef({dragging: false, lastX: 0, lastY: 0, accX: 0, accY: 0, moved: false});
+
+    // Tracé d'une zone en cours (Alt + glisser)
+    const [zoneDraft, setZoneDraft] = useState<{ start: XY; end: XY } | undefined>(undefined);
 
     // Redraw quand le canvas change de taille (évite l'étirement non proportionnel)
     const [canvasSizeVersion, setCanvasSizeVersion] = useState(0);
@@ -438,6 +459,33 @@ export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsF
                 }
             }
         });
+
+        // Aperçu de la zone en cours de tracé
+        if (zoneDraft) {
+            const r = zoneRectFrom(zoneDraft.start, zoneDraft.end);
+            let offX = r.x - currentCenter.x;
+            if (offX > BOUNDS.maxX / 2) offX -= BOUNDS.maxX;
+            if (offX < -BOUNDS.maxX / 2) offX += BOUNDS.maxX;
+            let offY = r.y - currentCenter.y;
+            if (offY > BOUNDS.maxY / 2) offY -= BOUNDS.maxY;
+            if (offY < -BOUNDS.maxY / 2) offY += BOUNDS.maxY;
+            const px = (halfCols + offY) * cellSize;
+            const py = (halfRows + offX) * cellSize;
+            const w = r.width * cellSize;
+            const h = r.height * cellSize;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.fillRect(px, py, w, h);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            ctx.strokeRect(px, py, w, h);
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(`${r.width}×${r.height}`, px + 4, py + 3);
+        }
         ctx.restore();
 
 
@@ -1082,7 +1130,7 @@ export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsF
             }
             cSel.restore();
         }
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, hiddenZoneLabels]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, hiddenZoneLabels, zoneDraft]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
@@ -1107,36 +1155,62 @@ export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsF
         return () => window.removeEventListener('keydown', onKey);
     }, [center, setCenter]);
 
+    // Case de la carte sous le curseur (les en-têtes sont ramenés à la première case visible)
+    const cellAt = useCallback((clientX: number, clientY: number): XY | undefined => {
+        const cvs = canvasRef.current;
+        const c = centerRef.current;
+        if (!cvs || !c) return undefined;
+        const rect = cvs.getBoundingClientRect();
+        const cols = Math.floor(cvs.clientWidth / cellSize);
+        const rows = Math.floor(cvs.clientHeight / cellSize);
+        const col = Math.min(cols - 1, Math.max(1, Math.floor((clientX - rect.left) / cellSize)));
+        const row = Math.min(rows - 1, Math.max(1, Math.floor((clientY - rect.top) / cellSize)));
+        return {
+            x: torusDelta(c.x, row - Math.floor(rows / 2), BOUNDS.maxX),
+            y: torusDelta(c.y, col - Math.floor(cols / 2), BOUNDS.maxY),
+        };
+    }, [cellSize]);
+
     const handleClick = (evt: React.MouseEvent<HTMLCanvasElement>) => {
         if (dragRef.current.moved) {
             dragRef.current.moved = false;
             return;
         }
-        const rect = (evt.target as HTMLCanvasElement).getBoundingClientRect();
-        const cx = evt.clientX - rect.left;
-        const cy = evt.clientY - rect.top;
-        const col = Math.floor(cx / cellSize);
-        const row = Math.floor(cy / cellSize);
-
-        if (!center || !canvasRef.current) return;
-
-        const cols = Math.floor(canvasRef.current.clientWidth / cellSize);
-        const rows = Math.floor(canvasRef.current.clientHeight / cellSize);
-        const halfCols = Math.floor(cols / 2);
-        const halfRows = Math.floor(rows / 2);
-
-        const x = torusDelta(center.x, row - halfRows, BOUNDS.maxX);
-        const y = torusDelta(center.y, col - halfCols, BOUNDS.maxY);
-
-        if (evt.altKey && onCreateZone) {
-            onCreateZone({x, y});
-            return;
-        }
-        onSelect({x, y}, evt.ctrlKey);
+        if (evt.altKey && onCreateZone) return; // géré par le tracé (mousedown / mouseup)
+        const xy = cellAt(evt.clientX, evt.clientY);
+        if (!xy) return;
+        onSelect(xy, evt.ctrlKey);
     };
 
     const handleMouseDown = useCallback((evt: React.MouseEvent<HTMLCanvasElement>) => {
         if (evt.button !== 0) return; // seulement clic gauche
+
+        // Alt + glisser : tracé d'une zone du coin de départ au coin de fin
+        if (evt.altKey && onCreateZone) {
+            const start = cellAt(evt.clientX, evt.clientY);
+            if (!start) return;
+            evt.preventDefault();
+            let end = start;
+            setZoneDraft({start, end});
+
+            const onMove = (e: MouseEvent) => {
+                const cell = cellAt(e.clientX, e.clientY);
+                if (!cell || (cell.x === end.x && cell.y === end.y)) return;
+                end = cell;
+                setZoneDraft({start, end});
+            };
+            const onUp = (e: MouseEvent) => {
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+                const last = cellAt(e.clientX, e.clientY) ?? end;
+                setZoneDraft(undefined);
+                onCreateZone(zoneRectFrom(start, last));
+            };
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+            return;
+        }
+
         dragRef.current.dragging = true;
         dragRef.current.lastX = evt.clientX;
         dragRef.current.lastY = evt.clientY;
@@ -1198,7 +1272,7 @@ export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsF
 
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
-    }, [cellSize, setCenter]);
+    }, [cellSize, setCenter, cellAt, onCreateZone]);
 
     const handleWheel = useCallback((evt: React.WheelEvent<HTMLCanvasElement>) => {
         const zoomSpeed = 0.1;

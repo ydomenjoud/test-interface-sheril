@@ -30,6 +30,7 @@ type ReportContextType = {
     setHiddenZoneLabels: (labels: string[]) => void;
     addZone: (zone: Omit<Zone, 'id'>) => void;
     deleteZone: (id: string) => void;
+    updateZone: (id: string, changes: Partial<Omit<Zone, 'id'>>) => void;
     publicCombats: CombatEvent[];
     refreshStats: () => Promise<void>;
 };
@@ -89,6 +90,10 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
 
     const addZone = useCallback((zone: Omit<Zone, 'id'>) => {
         setZones(prev => [...prev, {...zone, id: Math.random().toString(36).substr(2, 9)}]);
+    }, []);
+
+    const updateZone = useCallback((id: string, changes: Partial<Omit<Zone, 'id'>>) => {
+        setZones(prev => prev.map(z => z.id === id ? {...z, ...changes} : z));
     }, []);
 
     const deleteZone = useCallback((id: string) => {
@@ -364,7 +369,8 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         setHiddenZoneLabels,
         addZone,
         deleteZone,
-    }), [rapport, global, publicCombats, refreshStats, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, allTags, selectedTags, addNote, deleteNote, zones, zoneLabels, hiddenZoneLabels, addZone, deleteZone]);
+        updateZone,
+    }), [rapport, global, publicCombats, refreshStats, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, allTags, selectedTags, addNote, deleteNote, zones, zoneLabels, hiddenZoneLabels, addZone, deleteZone, updateZone]);
 
     return <ReportContext.Provider value={value}>{children}</ReportContext.Provider>;
 }

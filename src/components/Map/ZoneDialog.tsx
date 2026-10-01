@@ -1,10 +1,10 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
 import {BOUNDS, wrapX, wrapY} from '../../utils/position';
-import {XY} from '../../types';
+import {ZoneRect} from './CanvasMap';
 
 type Props = {
-    pos: XY;
+    rect: ZoneRect;
     onClose: () => void;
 };
 
@@ -12,17 +12,18 @@ const inputStyle: React.CSSProperties = {
     background: '#333', color: '#eee', border: '1px solid #555', padding: '4px 6px', borderRadius: 4, width: '100%', boxSizing: 'border-box',
 };
 
-export default function ZoneDialog({pos, onClose}: Props) {
-    const {zones, addZone, deleteZone} = useReport();
-    const [width, setWidth] = useState('');
-    const [height, setHeight] = useState('');
+export default function ZoneDialog({rect, onClose}: Props) {
+    const {zones, addZone, deleteZone, updateZone} = useReport();
+    const pos = {x: rect.x, y: rect.y};
+    const [width, setWidth] = useState(String(rect.width));
+    const [height, setHeight] = useState(String(rect.height));
     const [label, setLabel] = useState('');
     const [borderColor, setBorderColor] = useState('#ffcc00');
     const [bgColor, setBgColor] = useState('#ffcc00');
-    const widthRef = useRef<HTMLInputElement>(null);
+    const labelRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        widthRef.current?.focus();
+        labelRef.current?.focus();
     }, []);
 
     // Combinaisons (libellé + couleurs) déjà utilisées, dédoublonnées, les plus récentes d'abord
@@ -44,7 +45,7 @@ export default function ZoneDialog({pos, onClose}: Props) {
         const dx = wrapX(pos.x - z.x + 1) - 1; // 0-based, tore
         const dy = wrapY(pos.y - z.y + 1) - 1;
         return dx < z.height && dy < z.width;
-    }), [zones, pos]);
+    }), [zones, pos.x, pos.y]);
 
     const w = parseInt(width, 10);
     const h = height.trim() === '' ? w : parseInt(height, 10);
@@ -69,12 +70,12 @@ export default function ZoneDialog({pos, onClose}: Props) {
                 style={{background: '#1e1e1e', color: '#eee', padding: 16, borderRadius: 6, width: 340, display: 'flex', flexDirection: 'column', gap: 10}}
             >
                 <h3 style={{margin: 0}}>Nouvelle zone en {pos.x}-{pos.y}</h3>
-                <div style={{fontSize: '0.8em', color: '#aaa'}}>La case cliquée est le coin haut-gauche de la zone.</div>
+                <div style={{fontSize: '0.8em', color: '#aaa'}}>Taille issue du tracé (Alt + glisser), modifiable si besoin.</div>
 
                 <div style={{display: 'flex', gap: 8}}>
                     <label style={{flex: 1}}>
                         Largeur *
-                        <input ref={widthRef} type="number" min={1} max={BOUNDS.maxY} value={width} onChange={(e) => setWidth(e.target.value)} style={inputStyle}/>
+                        <input type="number" min={1} max={BOUNDS.maxY} value={width} onChange={(e) => setWidth(e.target.value)} style={inputStyle}/>
                     </label>
                     <label style={{flex: 1}}>
                         Hauteur
@@ -84,7 +85,7 @@ export default function ZoneDialog({pos, onClose}: Props) {
 
                 <label>
                     Label
-                    <input type="text" value={label} list="zone-labels-list" onChange={(e) => setLabel(e.target.value)} style={inputStyle}/>
+                    <input ref={labelRef} type="text" value={label} list="zone-labels-list" onChange={(e) => setLabel(e.target.value)} style={inputStyle}/>
                     <datalist id="zone-labels-list">
                         {existingLabels.map(l => <option key={l} value={l}/>)}
                     </datalist>
@@ -127,10 +128,27 @@ export default function ZoneDialog({pos, onClose}: Props) {
                     <div>
                         <div style={{fontSize: '0.8em', color: '#aaa', marginBottom: 4}}>Zones existantes sur cette case</div>
                         {zonesHere.map(z => (
-                            <div key={z.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85em'}}>
-                                <span>
-                                    <span style={{color: z.borderColor}}>■</span> {z.label || '(sans label)'} — {z.width}×{z.height} en {z.x}-{z.y}
-                                </span>
+                            <div key={z.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, fontSize: '0.85em'}}>
+                                <span style={{color: z.borderColor}}>■</span>
+                                <input
+                                    type="text"
+                                    defaultValue={z.label || ''}
+                                    placeholder="(sans label)"
+                                    list="zone-labels-list"
+                                    title="Modifier le label (Entrée ou sortie du champ pour valider)"
+                                    onBlur={(e) => {
+                                        const next = e.currentTarget.value.trim() || undefined;
+                                        if (next !== z.label) updateZone(z.id, {label: next});
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault(); // ne pas soumettre le formulaire de création
+                                            e.currentTarget.blur();
+                                        }
+                                    }}
+                                    style={{...inputStyle, flex: 1, padding: '2px 4px'}}
+                                />
+                                <span style={{whiteSpace: 'nowrap', color: '#aaa'}}>{z.width}×{z.height} en {z.x}-{z.y}</span>
                                 <button type="button" onClick={() => deleteZone(z.id)} title="Supprimer" style={{cursor: 'pointer'}}>×</button>
                             </div>
                         ))}
