@@ -1,15 +1,22 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {useReport} from '../context/ReportContext';
 import CanvasMap, {ZoneRect} from '../components/Map/CanvasMap';
 import MiniMap from '../components/Map/MiniMap';
 import InfoPanel from '../components/Map/InfoPanel';
 import ZoneDialog from '../components/Map/ZoneDialog';
-import {XY} from '../types';
+import MapHelp from '../components/Map/MapHelp';
+import Modal from '../components/utils/Modal';
+import {XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
 
 export default function Carte() {
   const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText, allTags, selectedTags, setSelectedTags, zones, zoneLabels, hiddenZoneLabels, setHiddenZoneLabels } = useReport();
   const [zoneDialogRect, setZoneDialogRect] = useState<ZoneRect | undefined>(undefined);
+  const [zonePreview, setZonePreview] = useState<Omit<Zone, 'id'> | undefined>(undefined);
+  const closeZoneDialog = useCallback(() => {
+    setZoneDialogRect(undefined);
+    setZonePreview(undefined); // validée ou annulée, l'aperçu disparaît
+  }, []);
   const [selected, setSelected] = useState<XY | undefined>(undefined);
   const [showFleetsFor, setShowFleetsFor] = useState<XY | undefined>(undefined);
   const [selectedOwners, setSelectedOwners] = useState<(number)[]>(() => {
@@ -210,6 +217,7 @@ export default function Carte() {
         <div style={{ position: 'relative', width: '100%', height: '100%', display: global ? 'block' : 'none' }}>
           <CanvasMap
             onCreateZone={setZoneDialogRect}
+            previewZone={zonePreview}
             onSelect={(xy, ctrl) => {
               setSelected(xy);
               if (ctrl) {
@@ -235,6 +243,7 @@ export default function Carte() {
             stabilitySystemPos={stabilitySystemPos}
           />
           {showMiniMap && <MiniMap onCenter={(x, y) => setCenter({ x, y })} colorMode={colorMode} />}
+          <MapHelp />
 
           {/* Filtres Popup en bas à droite */}
           <div style={{
@@ -249,6 +258,8 @@ export default function Carte() {
               zIndex: 100,
               display: 'flex',
               flexDirection: 'column',
+              // Sur les petits écrans, le panneau ne dépasse pas la hauteur visible : l'en-tête reste accessible et le contenu défile
+              maxHeight: 'min(calc(100% - 40px), calc(100vh - 160px))',
               transition: 'width 0.3s ease'
           }}>
               <div
@@ -264,7 +275,8 @@ export default function Carte() {
                       alignItems: 'center',
                       fontWeight: 'bold',
                       fontSize: '0.9em',
-                      color: '#eee'
+                      color: '#eee',
+                      flexShrink: 0
                   }}
               >
                   <span>Filtres</span>
@@ -272,7 +284,7 @@ export default function Carte() {
               </div>
 
               {filtersExpanded && (
-                  <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', minHeight: 0 }}>
                       {/* Filtre multi-sélection des commandants */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                           <span style={{ fontSize: '0.85em', color: '#aaa' }}>Afficher uniquement Commandants</span>
@@ -413,7 +425,7 @@ export default function Carte() {
 
                       {zoneLabels.length > 0 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid #444', paddingTop: 8 }}>
-                              <span style={{ fontSize: '0.85em', color: '#aaa' }}>Zones manuelles (Alt + glisser)</span>
+                              <span style={{ fontSize: '0.85em', color: '#aaa' }}>Zones manuelles (Alt + clic + glisser)</span>
                               {zoneLabels.map(label => (
                                   <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
                                       <input
@@ -495,58 +507,46 @@ export default function Carte() {
 
       <InfoPanel selected={selected} />
 
-      {zoneDialogRect && <ZoneDialog rect={zoneDialogRect} onClose={() => setZoneDialogRect(undefined)} />}
+      {zoneDialogRect && <ZoneDialog rect={zoneDialogRect} onClose={closeZoneDialog} onPreview={setZonePreview} />}
 
       {showPaste && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-          }}
-          onClick={() => setShowPaste(false)}
-        >
-          <div
-            style={{ background: '#1e1e1e', color: '#eee', padding: 16, borderRadius: 6, minWidth: 600, maxWidth: '80%' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ marginTop: 0 }}>Ajouter des systèmes détectés</h3>
-            <p style={{ marginTop: 0 }}>
-              Collez un système par ligne, au format:
-              <br/>
-              <code>nbpla=16; nom=Nb 9C; pop=3475; popMax=43547; pos=0_1_26; typeEtoile=1; proprios=4,1</code>
-            </p>
-            <textarea
-              value={pasteText}
-              onChange={(e) => setPasteText(e.target.value)}
-              placeholder={"Un système par ligne"}
-              style={{ width: '100%', height: 180 }}
-            />
-            {pasteFeedback && (
-              <div style={{ marginTop: 8, color: '#9f9' }}>{pasteFeedback}</div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-              <button type="button" onClick={() => setShowPaste(false)}>Annuler</button>
-              <button
-                type="button"
-                onClick={() => {
-                  const res = addDetectedSystemsFromText(pasteText);
-                  const msgParts = [] as string[];
-                  if (res.added > 0) msgParts.push(`${res.added} ajouté(s)`);
-                  if (res.errors.length > 0) msgParts.push(`${res.errors.length} erreur(s)`);
-                  setPasteFeedback(msgParts.join(' · ') || 'Aucune modification');
-                  if (res.errors.length === 0) {
-                    // fermer et reset pour un flux rapide
-                    setShowPaste(false);
-                    setPasteText('');
-                  }
-                }}
-                style={{ fontWeight: 'bold' }}
-              >
-                Importer
-              </button>
-            </div>
+        <Modal title="Ajouter des systèmes détectés" onClose={() => setShowPaste(false)} panelStyle={{ minWidth: 600, maxWidth: '80%' }}>
+          <p style={{ marginTop: 0 }}>
+            Collez un système par ligne, au format:
+            <br/>
+            <code>nbpla=16; nom=Nb 9C; pop=3475; popMax=43547; pos=0_1_26; typeEtoile=1; proprios=4,1</code>
+          </p>
+          <textarea
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            placeholder={"Un système par ligne"}
+            style={{ width: '100%', height: 180 }}
+          />
+          {pasteFeedback && (
+            <div style={{ marginTop: 8, color: '#9f9' }}>{pasteFeedback}</div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+            <button type="button" onClick={() => setShowPaste(false)}>Annuler</button>
+            <button
+              type="button"
+              onClick={() => {
+                const res = addDetectedSystemsFromText(pasteText);
+                const msgParts = [] as string[];
+                if (res.added > 0) msgParts.push(`${res.added} ajouté(s)`);
+                if (res.errors.length > 0) msgParts.push(`${res.errors.length} erreur(s)`);
+                setPasteFeedback(msgParts.join(' · ') || 'Aucune modification');
+                if (res.errors.length === 0) {
+                  // fermer et reset pour un flux rapide
+                  setShowPaste(false);
+                  setPasteText('');
+                }
+              }}
+              style={{ fontWeight: 'bold' }}
+            >
+              Importer
+            </button>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

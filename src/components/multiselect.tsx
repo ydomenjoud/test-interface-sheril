@@ -1,4 +1,7 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
+
+// Minuscules et sans accents, pour une recherche tolérante
+const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 // L'interface de l'option devient générique
 export interface DropdownOption<T> {
@@ -26,7 +29,21 @@ export const MultiSelectDropdown = <T extends string | number>({
                                                                    placeholder = "Choisir les options",
                                                                }: MultiSelectDropdownProps<T>) => {
     const [isOpen, setIsOpen] = useState<boolean>(false);
+    const [query, setQuery] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const searchRef = useRef<HTMLInputElement>(null);
+
+    // À l'ouverture : focus sur la recherche ; à la fermeture : recherche réinitialisée
+    useEffect(() => {
+        if (isOpen) searchRef.current?.focus();
+        else setQuery('');
+    }, [isOpen]);
+
+    const filteredOptions = useMemo(() => {
+        const q = normalize(query.trim());
+        if (!q) return options;
+        return options.filter(o => normalize(o.label).includes(q));
+    }, [options, query]);
 
     // Fermer au clic extérieur
     useEffect(() => {
@@ -67,7 +84,19 @@ export const MultiSelectDropdown = <T extends string | number>({
 
                 {isOpen && (
                     <div style={styles.optionsContainer}>
-                  {options.map((option) => (
+                  <div style={styles.searchWrap}>
+                      <input
+                          ref={searchRef}
+                          type="text"
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Escape') setIsOpen(false); }}
+                          placeholder="Rechercher..."
+                          style={styles.search}
+                      />
+                  </div>
+                  {filteredOptions.length === 0 && <div style={styles.empty}>Aucun résultat</div>}
+                  {filteredOptions.map((option) => (
                       <label key={String(option.value)} style={Object.assign({}, option.style, styles.label)} className={option.className}>
                           <input
                               type="checkbox"
@@ -121,11 +150,15 @@ const styles: { [key: string]: React.CSSProperties } = {
         borderRadius: '4px',
         backgroundColor: '#000',
         marginTop: '4px',
-        maxHeight: '200px',
+        maxHeight: '240px',
         overflowY: 'auto',
         zIndex: 10,
         boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
     },
+    // Champ de recherche collé en haut de la liste pendant le défilement
+    searchWrap: {position: 'sticky', top: 0, backgroundColor: '#000', padding: '6px', borderBottom: '1px solid #333'},
+    search: {width: '100%', boxSizing: 'border-box', padding: '4px 6px', background: '#123', color: '#eee', border: '1px solid #345', borderRadius: '3px'},
+    empty: {padding: '8px 12px', color: '#888', fontStyle: 'italic'},
     label: {display: 'flex', alignItems: 'center', padding: '8px 12px', cursor: 'pointer', color: '#FFF'},
     checkbox: {marginRight: '10px'}
 };

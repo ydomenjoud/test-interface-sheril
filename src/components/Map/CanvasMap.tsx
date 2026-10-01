@@ -4,8 +4,9 @@ import {BOUNDS, CENTER, getTorusDistance, torusDelta, wrapX, wrapY} from '../../
 import {getSectorNumber, isSectorLabelCell, sectorBackgroundColor, sectorLabelColor} from '../../utils/sectors';
 import {countCombatsByKind} from '../../parsers/parseCombatMessages';
 import {drawCombatMarkers} from '../../utils/combatMarkers';
-import {Alliance, XY} from '../../types';
+import {Alliance, XY, Zone} from '../../types';
 import {lightenHexColor, getColorForPlayer} from "../../utils/global";
+import {isTypingTarget} from '../../utils/keyboard';
 
 const OWNER_BADGE_COLORS: Record<number, string> = {
     1: '#0066CC',
@@ -43,7 +44,8 @@ function zoneRectFrom(a: XY, b: XY): ZoneRect {
 
 type Props = {
     onSelect: (xy: XY, ctrl: boolean) => void;
-    onCreateZone?: (rect: ZoneRect) => void; // Alt + clic gauche glissé du coin de départ au coin de fin
+    onCreateZone?: (rect: ZoneRect) => void; // Alt + clic + glisser du coin de départ au coin de fin
+    previewZone?: Omit<Zone, 'id'>; // zone en cours de création, pas encore validée
     selected?: XY;
     showFleetsFor?: XY; // Position pour laquelle afficher les flèches de portée
     showSystems: boolean;
@@ -93,7 +95,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#f80c0c';
 }
 
-export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18}: Props) {
+export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -425,8 +427,9 @@ export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsF
         ctx.beginPath();
         ctx.rect(cellSize, cellSize, cols * cellSize - cellSize, rows * cellSize - cellSize);
         ctx.clip();
-        zones.forEach(z => {
-            if (z.label && hiddenZoneLabels.includes(z.label)) return;
+        const zonesToDraw: (Omit<Zone, 'id'> & { preview?: boolean })[] = previewZone ? [...zones, {...previewZone, preview: true}] : zones;
+        zonesToDraw.forEach(z => {
+            if (!z.preview && z.label && hiddenZoneLabels.includes(z.label)) return;
             // décalage signé (tore) du coin haut-gauche par rapport au centre
             let offX = z.x - currentCenter.x;
             if (offX > BOUNDS.maxX / 2) offX -= BOUNDS.maxX;
@@ -448,7 +451,9 @@ export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsF
                     ctx.globalAlpha = 1;
                     ctx.strokeStyle = z.borderColor;
                     ctx.lineWidth = 2;
+                    if (z.preview) ctx.setLineDash([6, 4]); // pointillés : zone pas encore validée
                     ctx.strokeRect(px, py, w, h);
+                    ctx.setLineDash([]);
                     if (z.label) {
                         ctx.fillStyle = z.borderColor;
                         ctx.font = 'bold 12px sans-serif';
@@ -1130,11 +1135,11 @@ export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsF
             }
             cSel.restore();
         }
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, hiddenZoneLabels, zoneDraft]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, hiddenZoneLabels, zoneDraft, previewZone]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
-            if (!center) return;
+            if (!center || isTypingTarget(e.target)) return;
             const step = e.ctrlKey ? 5 : 1;
             if (e.key === 'ArrowUp') {
                 setCenter({x: wrapX(center.x - step), y: center.y});
@@ -1204,6 +1209,11 @@ export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsF
                 window.removeEventListener('mouseup', onUp);
                 const last = cellAt(e.clientX, e.clientY) ?? end;
                 setZoneDraft(undefined);
+                // Sans glisser : simple sélection, les zones de la case sont éditables dans le panneau
+                if (last.x === start.x && last.y === start.y) {
+                    onSelect(start, false);
+                    return;
+                }
                 onCreateZone(zoneRectFrom(start, last));
             };
             window.addEventListener('mousemove', onMove);
@@ -1272,7 +1282,7 @@ export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsF
 
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
-    }, [cellSize, setCenter, cellAt, onCreateZone]);
+    }, [cellSize, setCenter, cellAt, onCreateZone, onSelect]);
 
     const handleWheel = useCallback((evt: React.WheelEvent<HTMLCanvasElement>) => {
         const zoomSpeed = 0.1;

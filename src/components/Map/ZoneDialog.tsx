@@ -1,20 +1,22 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
-import {BOUNDS, wrapX, wrapY} from '../../utils/position';
+import {BOUNDS} from '../../utils/position';
 import {ZoneRect} from './CanvasMap';
+import {Zone} from '../../types';
+import Modal from '../utils/Modal';
 
 type Props = {
     rect: ZoneRect;
     onClose: () => void;
+    onPreview: (zone: Omit<Zone, 'id'> | undefined) => void; // aperçu en direct sur la carte (undefined si saisie invalide)
 };
 
 const inputStyle: React.CSSProperties = {
     background: '#333', color: '#eee', border: '1px solid #555', padding: '4px 6px', borderRadius: 4, width: '100%', boxSizing: 'border-box',
 };
 
-export default function ZoneDialog({rect, onClose}: Props) {
-    const {zones, addZone, deleteZone, updateZone} = useReport();
-    const pos = {x: rect.x, y: rect.y};
+export default function ZoneDialog({rect, onClose, onPreview}: Props) {
+    const {zones, addZone} = useReport();
     const [width, setWidth] = useState(String(rect.width));
     const [height, setHeight] = useState(String(rect.height));
     const [label, setLabel] = useState('');
@@ -41,36 +43,27 @@ export default function ZoneDialog({rect, onClose}: Props) {
 
     const existingLabels = useMemo(() => Array.from(new Set(zones.map(z => z.label).filter(Boolean))), [zones]);
 
-    const zonesHere = useMemo(() => zones.filter(z => {
-        const dx = wrapX(pos.x - z.x + 1) - 1; // 0-based, tore
-        const dy = wrapY(pos.y - z.y + 1) - 1;
-        return dx < z.height && dy < z.width;
-    }), [zones, pos.x, pos.y]);
-
     const w = parseInt(width, 10);
     const h = height.trim() === '' ? w : parseInt(height, 10);
     const valid = Number.isFinite(w) && w > 0 && w <= BOUNDS.maxY && Number.isFinite(h) && h > 0 && h <= BOUNDS.maxX;
 
+    const trimmedLabel = label.trim() || undefined;
+    useEffect(() => {
+        onPreview(valid ? {x: rect.x, y: rect.y, width: w, height: h, label: trimmedLabel, borderColor, bgColor} : undefined);
+    }, [onPreview, valid, rect.x, rect.y, w, h, trimmedLabel, borderColor, bgColor]);
+
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!valid) return;
-        addZone({x: pos.x, y: pos.y, width: w, height: h, label: label.trim() || undefined, borderColor, bgColor});
+        addZone({x: rect.x, y: rect.y, width: w, height: h, label: trimmedLabel, borderColor, bgColor});
         onClose();
     };
 
     return (
-        <div
-            style={{position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}
-            onClick={onClose}
-            onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
-        >
-            <form
-                onSubmit={submit}
-                onClick={(e) => e.stopPropagation()}
-                style={{background: '#1e1e1e', color: '#eee', padding: 16, borderRadius: 6, width: 340, display: 'flex', flexDirection: 'column', gap: 10}}
-            >
-                <h3 style={{margin: 0}}>Nouvelle zone en {pos.x}-{pos.y}</h3>
-                <div style={{fontSize: '0.8em', color: '#aaa'}}>Taille issue du tracé (Alt + glisser), modifiable si besoin.</div>
+        // fond peu assombri pour laisser voir l'aperçu de la zone sur la carte
+        <Modal title={`Nouvelle zone en ${rect.x}-${rect.y}`} onClose={onClose} backdropOpacity={0.15} panelStyle={{width: 340}}>
+            <form onSubmit={submit} style={{display: 'flex', flexDirection: 'column', gap: 10}}>
+                <div style={{fontSize: '0.8em', color: '#aaa'}}>Taille issue du tracé (Alt + clic + glisser), modifiable si besoin.</div>
 
                 <div style={{display: 'flex', gap: 8}}>
                     <label style={{flex: 1}}>
@@ -124,42 +117,11 @@ export default function ZoneDialog({rect, onClose}: Props) {
                     </div>
                 )}
 
-                {zonesHere.length > 0 && (
-                    <div>
-                        <div style={{fontSize: '0.8em', color: '#aaa', marginBottom: 4}}>Zones existantes sur cette case</div>
-                        {zonesHere.map(z => (
-                            <div key={z.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, fontSize: '0.85em'}}>
-                                <span style={{color: z.borderColor}}>■</span>
-                                <input
-                                    type="text"
-                                    defaultValue={z.label || ''}
-                                    placeholder="(sans label)"
-                                    list="zone-labels-list"
-                                    title="Modifier le label (Entrée ou sortie du champ pour valider)"
-                                    onBlur={(e) => {
-                                        const next = e.currentTarget.value.trim() || undefined;
-                                        if (next !== z.label) updateZone(z.id, {label: next});
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault(); // ne pas soumettre le formulaire de création
-                                            e.currentTarget.blur();
-                                        }
-                                    }}
-                                    style={{...inputStyle, flex: 1, padding: '2px 4px'}}
-                                />
-                                <span style={{whiteSpace: 'nowrap', color: '#aaa'}}>{z.width}×{z.height} en {z.x}-{z.y}</span>
-                                <button type="button" onClick={() => deleteZone(z.id)} title="Supprimer" style={{cursor: 'pointer'}}>×</button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
                 <div style={{display: 'flex', justifyContent: 'flex-end', gap: 8}}>
                     <button type="button" onClick={onClose}>Annuler</button>
                     <button type="submit" disabled={!valid} style={{fontWeight: 'bold'}}>Créer</button>
                 </div>
             </form>
-        </div>
+        </Modal>
     );
 }

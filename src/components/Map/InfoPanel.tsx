@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
 import {CombatEvent, FlotteBase, FlotteDetectee, FlotteJoueur, XY, Note} from '../../types';
 import { getTorusDistance } from '../../utils/position';
@@ -12,13 +12,27 @@ import Commandant from "../utils/Commandant";
 import Position from "../utils/Position";
 import {getDescriptionPuissance, getPuissance, getPuissanceFromString} from "../../utils/puissance";
 import { NavLink } from 'react-router-dom';
+import ZoneEditor from './ZoneEditor';
+import { zoneCovers } from '../../utils/zones';
 
 type Props = {
   selected?: XY;
 };
 
 export default function InfoPanel({ selected }: Props) {
-  const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats } = useReport();
+  const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats, zones, zoneLabels } = useReport();
+
+  // Zones affichées : celles qui couvrent la case, plus celles déjà listées pour cette sélection
+  // (une zone déplacée ou réduite hors de la case reste éditable jusqu'au prochain clic)
+  const [keptZoneIds, setKeptZoneIds] = useState<string[]>([]);
+  useEffect(() => {
+    setKeptZoneIds(selected ? zones.filter(z => zoneCovers(z, selected)).map(z => z.id) : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.x, selected?.y]);
+  const zonesHere = useMemo(
+    () => (selected ? zones.filter(z => keptZoneIds.includes(z.id) || zoneCovers(z, selected)) : []),
+    [zones, selected, keptZoneIds]
+  );
   const [noteText, setNoteText] = useState('');
   const [noteColor, setNoteColor] = useState('#ffcc00');
   const [noteTag, setNoteTag] = useState('');
@@ -253,6 +267,20 @@ export default function InfoPanel({ selected }: Props) {
           <div style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em' }}>
             Aucun combat signalé sur cette case.
           </div>
+        )}
+      </div>
+
+      <div className="info-block">
+        <h4>Zones</h4>
+        {zonesHere.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {zonesHere.map(z => <ZoneEditor key={z.id} zone={z} />)}
+            <datalist id="zone-editor-labels">
+              {zoneLabels.map(l => <option key={l} value={l} />)}
+            </datalist>
+          </div>
+        ) : (
+          <div style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em' }}>Aucune zone sur cette case (Alt + clic + glisser pour en tracer une).</div>
         )}
       </div>
 

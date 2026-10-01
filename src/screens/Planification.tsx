@@ -3,6 +3,7 @@ import {useReport} from '../context/ReportContext';
 import {SystemeJoueur} from '../types';
 import {formatPlannedItems, formatTechName} from '../utils/global';
 import SearchableSelect from '../components/utils/SearchableSelect';
+import Modal from '../components/utils/Modal';
 
 type PlannedItem = {
     id: string;
@@ -995,19 +996,13 @@ export default function Planification() {
             </div>
 
             {isClearModalOpen && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.8)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 2000
-                }}>
-                    <div style={{
+                <Modal
+                    title={<span style={{ color: '#f55' }}>Tout vider ?</span>}
+                    onClose={() => { setIsClearModalOpen(false); setConfirmText(''); }}
+                    backdropOpacity={0.8}
+                    closeOnBackdrop={false}
+                    zIndex={2000}
+                    panelStyle={{
                         backgroundColor: '#222',
                         padding: '24px',
                         borderRadius: '8px',
@@ -1015,63 +1010,62 @@ export default function Planification() {
                         maxWidth: '400px',
                         width: '90%',
                         boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
-                    }}>
-                        <h3 style={{ marginTop: 0, color: '#f55' }}>Tout vider ?</h3>
-                        <p style={{ color: '#ccc', lineHeight: '1.5' }}>
-                            Êtes-vous sûr de vouloir supprimer <strong>tous</strong> les éléments planifiés dans <strong>tous</strong> les systèmes ?
-                        </p>
-                        <p style={{ color: '#aaa', fontSize: '0.9em' }}>
-                            Pour confirmer, veuillez saisir le mot <strong style={{ color: '#eee' }}>supprimer</strong> ci-dessous :
-                        </p>
-                        <input
-                            type="text"
-                            value={confirmText}
-                            onChange={(e) => setConfirmText(e.target.value)}
-                            placeholder="Saisir supprimer"
-                            autoFocus
+                    }}
+                >
+                    <p style={{ color: '#ccc', lineHeight: '1.5' }}>
+                        Êtes-vous sûr de vouloir supprimer <strong>tous</strong> les éléments planifiés dans <strong>tous</strong> les systèmes ?
+                    </p>
+                    <p style={{ color: '#aaa', fontSize: '0.9em' }}>
+                        Pour confirmer, veuillez saisir le mot <strong style={{ color: '#eee' }}>supprimer</strong> ci-dessous :
+                    </p>
+                    <input
+                        type="text"
+                        value={confirmText}
+                        onChange={(e) => setConfirmText(e.target.value)}
+                        placeholder="Saisir supprimer"
+                        autoFocus
+                        style={{
+                            width: '100%',
+                            padding: '10px',
+                            backgroundColor: '#111',
+                            border: '1px solid #444',
+                            borderRadius: '4px',
+                            color: '#fff',
+                            marginBottom: '20px',
+                            boxSizing: 'border-box'
+                        }}
+                    />
+                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                        <button
+                            onClick={() => { setIsClearModalOpen(false); setConfirmText(''); }}
                             style={{
-                                width: '100%',
-                                padding: '10px',
-                                backgroundColor: '#111',
-                                border: '1px solid #444',
+                                padding: '8px 16px',
+                                backgroundColor: '#444',
+                                color: '#eee',
+                                border: 'none',
                                 borderRadius: '4px',
-                                color: '#fff',
-                                marginBottom: '20px',
-                                boxSizing: 'border-box'
+                                cursor: 'pointer'
                             }}
-                        />
-                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                            <button
-                                onClick={() => { setIsClearModalOpen(false); setConfirmText(''); }}
-                                style={{
-                                    padding: '8px 16px',
-                                    backgroundColor: '#444',
-                                    color: '#eee',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                Annuler
-                            </button>
-                            <button
-                                onClick={clearAllQueues}
-                                disabled={confirmText.toLowerCase() !== 'supprimer'}
-                                style={{
-                                    padding: '8px 16px',
-                                    backgroundColor: confirmText.toLowerCase() === 'supprimer' ? '#822' : '#333',
-                                    color: confirmText.toLowerCase() === 'supprimer' ? '#fff' : '#666',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    cursor: confirmText.toLowerCase() === 'supprimer' ? 'pointer' : 'not-allowed',
-                                    fontWeight: 'bold'
-                                }}
-                            >
-                                Tout vider
-                            </button>
-                        </div>
+                        >
+                            Annuler
+                        </button>
+                        <button
+                            onClick={clearAllQueues}
+                            disabled={confirmText.toLowerCase() !== 'supprimer'}
+                            style={{
+                                padding: '8px 16px',
+                                backgroundColor: confirmText.toLowerCase() === 'supprimer' ? '#822' : '#333',
+                                color: confirmText.toLowerCase() === 'supprimer' ? '#fff' : '#666',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: confirmText.toLowerCase() === 'supprimer' ? 'pointer' : 'not-allowed',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            Tout vider
+                        </button>
                     </div>
-                </div>
+                </Modal>
             )}
         </div>
     );
