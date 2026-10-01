@@ -996,80 +996,80 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
             try { if (combatLogCount > 0) console.info(`[CanvasMap] logged ${combatLogCount} combat positions`); } catch (e) { }
 
-            // FLÈCHES DE DÉPLACEMENT (mes flottes vers showFleetsFor)
-            if (showFleetsFor) {
-                const playerFleets = rapport?.flottesJoueur.filter(f => {
-                    return !(f.pos.x === showFleetsFor.x && f.pos.y === showFleetsFor.y);
-                }) || [];
-
-                if (playerFleets.length > 0) {
-                    ctx.save();
-
-                    // Clip pour éviter de dessiner sur les en-têtes (colonne 0 et ligne 0)
-                    ctx.beginPath();
-                    ctx.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
-                    ctx.clip();
-
-                    ctx.lineWidth = 1;
-
-                    playerFleets.forEach(f => {
-                        const dist = getTorusDistance(f.pos, showFleetsFor);
-                        const reachable = dist <= f.vitesse;
-
-                        // Couleur : vert/jaune clair si atteignable, orange clair sinon
-                        ctx.strokeStyle = reachable ? '#ccff00' : '#ffa500';
-                        ctx.fillStyle = reachable ? '#ccff0000' : '#ffa500';
-                        ctx.setLineDash([5, 5]);
-
-                        // On calcule le delta le plus court sur le tore
-                        let dx = showFleetsFor.x - f.pos.x;
-                        if (Math.abs(dx) > BOUNDS.maxX / 2) {
-                            dx = dx > 0 ? dx - BOUNDS.maxX : dx + BOUNDS.maxX;
-                        }
-                        let dy = showFleetsFor.y - f.pos.y;
-                        if (Math.abs(dy) > BOUNDS.maxY / 2) {
-                            dy = dy > 0 ? dy - BOUNDS.maxY : dy + BOUNDS.maxY;
-                        }
-
-                        const getScreenPos = (pos: XY) => {
-                            // Distance signée par rapport au centre, tenant compte du tore
-                            let offX = pos.x - currentCenter.x;
-                            if (offX > BOUNDS.maxX / 2) offX -= BOUNDS.maxX;
-                            if (offX < -BOUNDS.maxX / 2) offX += BOUNDS.maxX;
-
-                            let offY = pos.y - currentCenter.y;
-                            if (offY > BOUNDS.maxY / 2) offY -= BOUNDS.maxY;
-                            if (offY < -BOUNDS.maxY / 2) offY += BOUNDS.maxY;
-
-                            return {
-                                x: (halfCols + offY) * cellSize + cellSize / 2,
-                                y: (halfRows + offX) * cellSize + cellSize / 2
-                            };
-                        };
-
-                        const start = getScreenPos(f.pos);
-                        const end = getScreenPos(showFleetsFor);
-
-                        ctx.beginPath();
-                        ctx.moveTo(start.x, start.y);
-                        ctx.lineTo(end.x, end.y);
-                        ctx.stroke();
-
-                        // Petite flèche au bout
-                        const angle = Math.atan2(end.y - start.y, end.x - start.x);
-                        ctx.setLineDash([]);
-                        ctx.beginPath();
-                        ctx.moveTo(end.x, end.y);
-                        ctx.lineTo(end.x - 10 * Math.cos(angle - Math.PI / 6), end.y - 10 * Math.sin(angle - Math.PI / 6));
-                        ctx.lineTo(end.x - 10 * Math.cos(angle + Math.PI / 6), end.y - 10 * Math.sin(angle + Math.PI / 6));
-                        ctx.closePath();
-                        ctx.fill();
-                    });
-                    ctx.restore();
-                }
-            }
-
             cCombat.restore();
+        }
+
+        // FLÈCHES DE DÉPLACEMENT (mes flottes vers showFleetsFor), indépendantes des badges de combat
+        if (showFleetsFor) {
+            const playerFleets = rapport?.flottesJoueur.filter(f => {
+                return !(f.pos.x === showFleetsFor.x && f.pos.y === showFleetsFor.y);
+            }) || [];
+
+            if (playerFleets.length > 0) {
+                ctx.save();
+
+                // Clip pour éviter de dessiner sur les en-têtes (colonne 0 et ligne 0)
+                ctx.beginPath();
+                ctx.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
+                ctx.clip();
+
+                ctx.lineWidth = 1;
+
+                playerFleets.forEach(f => {
+                    const dist = getTorusDistance(f.pos, showFleetsFor);
+                    const reachable = dist <= f.vitesse;
+
+                    // Couleur : vert/jaune clair si atteignable, orange clair sinon
+                    ctx.strokeStyle = reachable ? '#ccff00' : '#ffa500';
+                    ctx.fillStyle = reachable ? '#ccff0000' : '#ffa500';
+                    ctx.setLineDash([5, 5]);
+
+                    // On calcule le delta le plus court sur le tore
+                    let dx = showFleetsFor.x - f.pos.x;
+                    if (Math.abs(dx) > BOUNDS.maxX / 2) {
+                        dx = dx > 0 ? dx - BOUNDS.maxX : dx + BOUNDS.maxX;
+                    }
+                    let dy = showFleetsFor.y - f.pos.y;
+                    if (Math.abs(dy) > BOUNDS.maxY / 2) {
+                        dy = dy > 0 ? dy - BOUNDS.maxY : dy + BOUNDS.maxY;
+                    }
+
+                    const getScreenPos = (pos: XY) => {
+                        // Distance signée par rapport au centre, tenant compte du tore
+                        let offX = pos.x - currentCenter.x;
+                        if (offX > BOUNDS.maxX / 2) offX -= BOUNDS.maxX;
+                        if (offX < -BOUNDS.maxX / 2) offX += BOUNDS.maxX;
+
+                        let offY = pos.y - currentCenter.y;
+                        if (offY > BOUNDS.maxY / 2) offY -= BOUNDS.maxY;
+                        if (offY < -BOUNDS.maxY / 2) offY += BOUNDS.maxY;
+
+                        return {
+                            x: (halfCols + offY) * cellSize + cellSize / 2,
+                            y: (halfRows + offX) * cellSize + cellSize / 2
+                        };
+                    };
+
+                    const start = getScreenPos(f.pos);
+                    const end = getScreenPos(showFleetsFor);
+
+                    ctx.beginPath();
+                    ctx.moveTo(start.x, start.y);
+                    ctx.lineTo(end.x, end.y);
+                    ctx.stroke();
+
+                    // Petite flèche au bout
+                    const angle = Math.atan2(end.y - start.y, end.x - start.x);
+                    ctx.setLineDash([]);
+                    ctx.beginPath();
+                    ctx.moveTo(end.x, end.y);
+                    ctx.lineTo(end.x - 10 * Math.cos(angle - Math.PI / 6), end.y - 10 * Math.sin(angle - Math.PI / 6));
+                    ctx.lineTo(end.x - 10 * Math.cos(angle + Math.PI / 6), end.y - 10 * Math.sin(angle + Math.PI / 6));
+                    ctx.closePath();
+                    ctx.fill();
+                });
+                ctx.restore();
+            }
         }
 
         // CASE SÉLECTIONNÉE (dessinée en dernier pour rester visible au-dessus de tout)
