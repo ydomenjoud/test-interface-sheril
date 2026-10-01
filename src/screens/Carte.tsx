@@ -12,6 +12,10 @@ import Modal from '../components/utils/Modal';
 import {XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
 
+// Durée d'affichage de chaque tour pendant la lecture automatique de l'historique (en secondes, modifiable)
+const DEFAULT_PLAY_STEP_S = 2;
+const MAX_PLAY_STEP_S = 60;
+
 export default function Carte() {
   const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText, allTags, selectedTags, setSelectedTags, zones, zoneLabels, hiddenZoneLabels, setHiddenZoneLabels, tours, selectTour } = useReport();
   const [zoneDialogRect, setZoneDialogRect] = useState<ZoneRect | undefined>(undefined);
@@ -193,6 +197,43 @@ export default function Carte() {
   const latestTour = tourOptions[0];
   const viewingPastTour = rapport !== undefined && rapport.tour !== latestTour;
 
+  // Lecture automatique de l'historique : du premier tour au dernier, un tour toutes les playStepS secondes
+  const [playing, setPlaying] = useState(false);
+  const [playStepS, setPlayStepS] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('carte_play_step_s'));
+    return saved >= 1 && saved <= MAX_PLAY_STEP_S ? saved : DEFAULT_PLAY_STEP_S;
+  });
+  useEffect(() => {
+    localStorage.setItem('carte_play_step_s', String(playStepS));
+  }, [playStepS]);
+  const playStepMs = playStepS * 1000;
+  const [stepStart, setStepStart] = useState(0);
+  const [now, setNow] = useState(0);
+  const toursAsc = useMemo(() => [...tourOptions].reverse(), [tourOptions]);
+
+  const startPlay = () => {
+    if (toursAsc.length < 2) return;
+    setPlaying(true);
+    selectTour(toursAsc[0]);
+  };
+  const stopPlay = () => setPlaying(false);
+
+  // À chaque tour affiché pendant la lecture : on attend playStepS puis on passe au suivant (arrêt après le dernier)
+  useEffect(() => {
+    if (!playing || !rapport) return;
+    setStepStart(Date.now());
+    setNow(Date.now());
+    const timer = setTimeout(() => {
+      const next = toursAsc.find(t => t > rapport.tour);
+      if (next === undefined) setPlaying(false);
+      else selectTour(next);
+    }, playStepMs);
+    const ticker = setInterval(() => setNow(Date.now()), 200); // pour le décompte affiché
+    return () => { clearTimeout(timer); clearInterval(ticker); };
+  }, [playing, rapport, toursAsc, selectTour, playStepMs]);
+
+  const remainingMs = playing ? Math.max(0, playStepMs - (now - stepStart)) : 0;
+
   // Raccourci : Maj + flèche déplace la case sélectionnée (depuis le centre si aucune case n'est sélectionnée)
   useEffect(() => {
     const moves: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
@@ -218,6 +259,7 @@ export default function Carte() {
         setShowGoto(true);
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault(); // sinon le navigateur revient à la page précédente / suivante
+        setPlaying(false); // une navigation manuelle interrompt la lecture
         const idx = tourOptions.indexOf(rapport?.tour ?? -1);
         if (idx < 0) return;
         // la liste va du plus récent au plus ancien : droite = plus récent, gauche = plus ancien
@@ -261,7 +303,7 @@ export default function Carte() {
             Tour :
             <select
               value={rapport?.tour ?? ''}
-              onChange={(e) => selectTour(Number(e.target.value))}
+              onChange={(e) => { stopPlay(); selectTour(Number(e.target.value)); }}
               style={{
                 marginLeft: 8,
                 background: '#333',
@@ -276,6 +318,41 @@ export default function Carte() {
               ))}
             </select>
           </label>
+        )}
+        {tourOptions.length > 1 && (
+          <div style={{ marginLeft: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              type="button"
+              onClick={playing ? stopPlay : startPlay}
+              title={playing ? 'Arrêter la lecture' : `Rejouer tous les tours depuis le premier (un tour toutes les ${playStepS} s, zones masquées)`}
+              style={{ padding: '2px 8px', cursor: 'pointer', backgroundColor: '#444', color: '#eee', border: '1px solid #666', borderRadius: 4 }}
+            >
+              {playing ? '■' : '▶'}
+            </button>
+            <label title="Durée d'affichage de chaque tour pendant la lecture" style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: '0.85em', color: '#aaa' }}>
+              <input
+                type="number"
+                min={1}
+                max={MAX_PLAY_STEP_S}
+                value={playStepS}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  if (v >= 1 && v <= MAX_PLAY_STEP_S) setPlayStepS(v);
+                }}
+                style={{ width: 40, background: '#333', color: '#eee', border: '1px solid #555', padding: '1px 3px' }}
+              />
+              s
+            </label>
+            {playing && (
+              // Temps restant avant le tour suivant
+              <div title="Temps avant le tour suivant" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.85em', color: '#aaa' }}>
+                <div style={{ width: 50, height: 4, background: '#333', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ width: `${(remainingMs / playStepMs) * 100}%`, height: '100%', background: '#ffe600', transition: 'width 0.2s linear' }} />
+                </div>
+                {Math.ceil(remainingMs / 1000)} s
+              </div>
+            )}
+          </div>
         )}
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
@@ -314,7 +391,7 @@ export default function Carte() {
             showSystemRadar={showSystemRadar}
             showFleetRadar={showFleetRadar}
             showSectors={showSectors}
-            showZones={showZones}
+            showZones={showZones && !playing}
             showInfluence={showInfluence}
             influenceOpacity={influenceOpacity}
             colorMode={colorMode}
