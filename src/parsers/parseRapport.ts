@@ -114,6 +114,10 @@ function saveDetectedToLS(map: Map<string, SystemeDetecte>): void {
 
 const keyOf = (sd: Pick<SystemeDetecte, 'pos'>) => `${sd.pos.x}_${sd.pos.y}`;
 
+// Vrai si l'information connue est plus récente que le tour donné (on ne doit alors pas l'écraser)
+const isNewerThan = (known: SystemeDetecte | undefined, tour: number) =>
+    !!known && typeof known.tour === 'number' && known.tour > tour;
+
 // Ajout manuel de systèmes détectés (persistance + cache)
 export function addManualDetectedSystems(systems: SystemeDetecte[]) {
     if (!systems || systems.length === 0) return;
@@ -283,8 +287,9 @@ export function parseRapportXml(text: string): Rapport {
         });
 
         // si il était présent avant dans les détections, et qu'il possédé maintenant, on le supprime
+        // (sauf si la détection est plus récente que ce rapport : cas de l'import d'un ancien rapport)
         const key = keyOf({pos});
-        if(__detectedSystemsCache.has(key)) {
+        if(__detectedSystemsCache.has(key) && !isNewerThan(__detectedSystemsCache.get(key), tour)) {
             __detectedSystemsCache.delete(key)
         }
 
@@ -332,9 +337,10 @@ export function parseRapportXml(text: string): Rapport {
         systemesDetectes.push({type: 'detecte', nom, pos, pop, popMax, typeEtoile, nbPla, proprietaires: sortedProprietaires, tour});
     });
 
-    // Fusionner avec le cache précédent (clé = position)
+    // Fusionner avec le cache précédent (clé = position), en gardant l'information la plus récente
     const mergedMap: Map<string, SystemeDetecte> = new Map(__detectedSystemsCache);
     systemesDetectes.forEach(sd => {
+        if (isNewerThan(mergedMap.get(keyOf(sd)), tour)) return;
         mergedMap.set(keyOf(sd), sd);
     });
     const mergedSystemesDetectes: SystemeDetecte[] = Array.from(mergedMap.values());
@@ -451,7 +457,7 @@ export function parseRapportXml(text: string): Rapport {
     const rapport: Rapport = {
         tour,
         technologiesAtteignables,
-        technologiesConnues, joueur, systemesJoueur, systemesDetectes: mergedSystemesDetectes, flottesJoueur, flottesDetectees, plansVaisseaux,
+        technologiesConnues, joueur, systemesJoueur, systemesDetectes: mergedSystemesDetectes, systemesDetectesDuTour: systemesDetectes, flottesJoueur, flottesDetectees, plansVaisseaux,
         budgetTechnologique,
         combats,
     };

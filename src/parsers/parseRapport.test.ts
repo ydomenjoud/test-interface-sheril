@@ -96,7 +96,7 @@ describe('parseRapportXml - XML lowercase only', () => {
 describe('parseRapportXml - conservation des systèmes détectés entre tours', () => {
   it("conserve les systèmes détectés d'un tour précédent et remplace par position", () => {
     const xmlTour3 = `
-      <rapport numtour="3" version="1.152">
+      <rapport numtour="30" version="1.152">
         <commandant capitale="0_1_1" grade="comte" nom="mab" numero="1" planetes="0" puissance="0" race="1" reputation="0" statut="neutre">
           <detection>
             <systeme nbpla="10" nom="Ancien" pos="0_6_2" typeetoile="1">
@@ -111,7 +111,7 @@ describe('parseRapportXml - conservation des systèmes détectés entre tours', 
     expect(res3.systemesDetectes[0]).toMatchObject({ nom: 'Ancien', pos: { x: 6, y: 2 }, typeEtoile: 1, nbPla: 10, proprietaires: [9] });
 
     const xmlTour4 = `
-      <rapport numtour="4" version="1.152">
+      <rapport numtour="31" version="1.152">
         <commandant capitale="0_1_1" grade="comte" nom="mab" numero="1" planetes="0" puissance="0" race="1" reputation="0" statut="neutre">
           <detection>
             <systeme nbpla="12" nom="Mis à jour" pos="0_6_2" typeetoile="5">
@@ -135,5 +135,26 @@ describe('parseRapportXml - conservation des systèmes détectés entre tours', 
 
     const nouveau = byKey(8, 8);
     expect(nouveau).toMatchObject({ nom: 'Nouveau', typeEtoile: 3, nbPla: 7, proprietaires: [2] });
+  });
+
+  it("garde l'information la plus récente quand on importe un rapport plus ancien", () => {
+    // Le cache contient déjà le tour 31 (test précédent) : on importe ensuite un tour plus ancien
+    const xmlTour29 = `
+      <rapport numtour="29" version="1.152">
+        <commandant capitale="0_1_1" grade="comte" nom="mab" numero="1" planetes="0" puissance="0" race="1" reputation="0" statut="neutre">
+          <detection>
+            <systeme nbpla="3" nom="Plus ancien" pos="0_6_2" typeetoile="2">
+              <proprio>5</proprio>
+            </systeme>
+          </detection>
+        </commandant>
+      </rapport>
+    `;
+    const res = parseRapportXml(xmlTour29);
+    const sys = res.systemesDetectes.find(s => s.pos.x === 6 && s.pos.y === 2)!;
+    expect(sys).toMatchObject({ nom: 'Mis à jour', proprietaires: [14], tour: 31 });
+    // Les détections propres au rapport restent disponibles pour le stockage par tour
+    expect(res.systemesDetectesDuTour).toHaveLength(1);
+    expect(res.systemesDetectesDuTour[0]).toMatchObject({ nom: 'Plus ancien', tour: 29 });
   });
 });

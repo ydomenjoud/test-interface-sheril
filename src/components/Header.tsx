@@ -1,4 +1,4 @@
-import React, {useRef} from 'react';
+import React, {useRef, useState} from 'react';
 import {useReport} from '../context/ReportContext';
 import Commandant from "./utils/Commandant";
 import {NavLink} from "react-router-dom";
@@ -6,6 +6,7 @@ import {NavLink} from "react-router-dom";
 export default function Header() {
     const {rapport, loadRapportFile, setCenter, refreshStats} = useReport();
     const rapportInput = useRef<HTMLInputElement>(null);
+    const [importMessage, setImportMessage] = useState<string | undefined>(undefined);
 
     return (<header className="app-header">
         <div>
@@ -82,18 +83,40 @@ export default function Header() {
                 className="file-input"
                 type="file"
                 accept=".xml"
+                multiple
                 onChange={async (e) => {
-                    const f = e.currentTarget?.files?.[0];
+                    const files = Array.from(e.currentTarget?.files ?? []);
                     // On capture la ref AVANT l'await pour éviter tout souci avec l'event
                     const inputEl = rapportInput.current;
-                    if (f) {
-                        await loadRapportFile(f);
+                    // Les anciens tours sont stockés pour l'historique ; la carte reste sur le plus récent
+                    const archived: number[] = [];
+                    for (const f of files) {
+                        try {
+                            const res = await loadRapportFile(f);
+                            if (!res.affiche) archived.push(res.tour);
+                        } catch (err) {
+                            console.warn('[rapports] import impossible', f.name, err);
+                            setImportMessage(`Import impossible : ${f.name}`);
+                        }
+                    }
+                    if (archived.length > 0) {
+                        setImportMessage(`Tour${archived.length > 1 ? 's' : ''} ${archived.sort((a, b) => a - b).join(', ')} ajouté${archived.length > 1 ? 's' : ''} à l'historique`);
                     }
                     if (inputEl) inputEl.value = '';
                 }}
-                title="Charger rapport.xml"
+                title="Charger un ou plusieurs rapport.xml"
             />
         </label>
+        {importMessage && (
+            <span
+                className="badge hideOnMobile"
+                onClick={() => setImportMessage(undefined)}
+                title="Cliquer pour masquer"
+                style={{marginLeft: 8, cursor: 'pointer'}}
+            >
+                {importMessage}
+            </span>
+        )}
     </header>
 );
 }

@@ -10,7 +10,7 @@ import {XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
 
 export default function Carte() {
-  const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText, allTags, selectedTags, setSelectedTags, zones, zoneLabels, hiddenZoneLabels, setHiddenZoneLabels } = useReport();
+  const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText, allTags, selectedTags, setSelectedTags, zones, zoneLabels, hiddenZoneLabels, setHiddenZoneLabels, tours, selectTour } = useReport();
   const [zoneDialogRect, setZoneDialogRect] = useState<ZoneRect | undefined>(undefined);
   const [zonePreview, setZonePreview] = useState<Omit<Zone, 'id'> | undefined>(undefined);
   const closeZoneDialog = useCallback(() => {
@@ -172,6 +172,11 @@ export default function Carte() {
         })
 
     const selectedTagsOption: DropdownOption<string>[] = allTags.map(tag => ({ value: tag, label: tag }));
+
+  // Tours stockés (plus le tour affiché, au cas où le stockage aurait échoué), du plus récent au plus ancien
+  const tourOptions = Array.from(new Set([...tours, ...(rapport ? [rapport.tour] : [])])).sort((a, b) => b - a);
+  const latestTour = tourOptions[0];
+  const viewingPastTour = rapport !== undefined && rapport.tour !== latestTour;
   return (
     <div className="carte-wrap">
       <div className="carte-toolbar">
@@ -196,9 +201,27 @@ export default function Carte() {
             Données globales en chargement…
           </div>
         )}
-        <div style={{ marginLeft: 20 }} className="hideOnMobile">
-          Astuce: utilisez les flèches pour naviguer, maintenez Ctrl pour se déplacer par 5.
-        </div>
+        {tourOptions.length > 0 && (
+          <label style={{ marginLeft: 20 }} title="Afficher la carte telle qu'elle était à ce tour">
+            Tour :
+            <select
+              value={rapport?.tour ?? ''}
+              onChange={(e) => selectTour(Number(e.target.value))}
+              style={{
+                marginLeft: 8,
+                background: '#333',
+                color: '#eee',
+                padding: '2px 4px',
+                // tour passé : bordure jaune pour rappeler qu'on ne regarde pas les données actuelles
+                border: viewingPastTour ? '2px solid #ffe600' : '1px solid #555',
+              }}
+            >
+              {tourOptions.map(t => (
+                <option key={t} value={t}>{t === latestTour ? `${t} (dernier)` : t}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
             <button onClick={() => setShowPaste(true)} style={{ padding: '4px 8px', cursor: 'pointer', backgroundColor: '#444', color: '#eee', border: '1px solid #666', borderRadius: 4 }}>

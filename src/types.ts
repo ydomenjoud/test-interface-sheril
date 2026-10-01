@@ -215,7 +215,8 @@ export type Rapport = {
     technologiesAtteignables: string[];
     technologiesConnues: string[];
     systemesJoueur: SystemeJoueur[];
-    systemesDetectes: SystemeDetecte[];
+    systemesDetectes: SystemeDetecte[]; // détections de ce rapport fusionnées avec celles des rapports précédents
+    systemesDetectesDuTour: SystemeDetecte[]; // détections de ce rapport uniquement
     flottesJoueur: FlotteJoueur[];
     flottesDetectees: FlotteDetectee[];
     plansVaisseaux: PlanVaisseau[];

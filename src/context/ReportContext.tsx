@@ -1,15 +1,21 @@
-import React, {createContext, useContext, useEffect, useMemo, useState, useCallback} from 'react';
+import React, {createContext, useContext, useEffect, useMemo, useRef, useState, useCallback} from 'react';
 import {GlobalData, Rapport, XY, SystemeDetecte, Note, CombatEvent, Zone} from '../types';
 import {parseRapportXml, addManualDetectedSystems, getCachedDetectedSystems} from '../parsers/parseRapport';
 import {parsePublicCombatsHtml} from '../parsers/parsePublicCombats';
 import {parseManualDetectedSystems} from '../parsers/parseManualSystems';
 import {parseDataXml} from '../parsers/parseData';
 import {CENTER} from '../utils/position';
+import {getLatestRapport, getRapport, getRapportsUpTo, listTours, saveRapport} from '../storage/rapportStore';
+
+export type ImportResult = { tour: number; affiche: boolean };
 
 type ReportContextType = {
     rapport?: Rapport;
     global?: GlobalData;
-    loadRapportFile: (file: File) => Promise<void>;
+    loadRapportFile: (file: File) => Promise<ImportResult>;
+    tours: number[]; // tours dont le rapport extrait est stocké, du plus ancien au plus récent
+    getRapportForTour: (tour: number) => Promise<Rapport | undefined>;
+    selectTour: (tour: number) => Promise<void>; // affiche la carte telle qu'elle était à ce tour
     addDetectedSystemsFromText: (text: string) => { added: number; errors: { line: number; message: string }[] };
     ready: boolean;
     cellSize: number;
@@ -40,6 +46,12 @@ const ReportContext = createContext<ReportContextType | undefined>(undefined);
 
 export function ReportProvider({children}: { children: React.ReactNode }) {
     const [rapport, setRapport] = useState<Rapport | undefined>(undefined);
+    const [tours, setTours] = useState<number[]>([]);
+    // Tour du rapport affiché et plus récent tour connu, lisibles de façon synchrone pendant un import
+    const displayedTourRef = useRef<number | undefined>(undefined);
+    const latestTourRef = useRef<number | undefined>(undefined);
+    // Évite qu'un changement de tour lent écrase un changement plus récent
+    const selectRequestRef = useRef(0);
     const [global, setGlobal] = useState<GlobalData | undefined>(undefined);
     const [cellSize, setCellSize] = useState<number>(32);
     // Centre de la galaxie par défaut (sans rapport) ; remplacé par la capitale au chargement d'un rapport
@@ -157,19 +169,70 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         });
     }, []);
 
-    const loadRapportFile = useCallback(async (file: File) => {
-        const text = await file.text();
-        // Parse and apply the report
-        const r = parseRapportXml(text);
-        setRapport(r);
-        if (r.joueur?.capitale) setCenter(r.joueur.capitale);
-        // Persist the raw XML so it can be reloaded automatically later
-        try {
-            localStorage.setItem('rapportXml', text);
-        } catch {
-            // Storage might be unavailable (private mode/quota). Ignore silently.
-        }
+    const noteLatestTour = useCallback((tour: number) => {
+        if (latestTourRef.current === undefined || tour > latestTourRef.current) latestTourRef.current = tour;
     }, []);
+
+    // Affiche le rapport le plus récent : ses détections sont complétées par toutes celles connues (cache)
+    const displayRapport = useCallback((r: Rapport, recenter = true) => {
+        selectRequestRef.current += 1;
+        displayedTourRef.current = r.tour;
+        noteLatestTour(r.tour);
+        setRapport({...r, systemesDetectes: mergeDetectedWithOwned(r)});
+        if (recenter && r.joueur?.capitale) setCenter(r.joueur.capitale);
+    }, [mergeDetectedWithOwned, noteLatestTour]);
+
+    const selectTour = useCallback(async (tour: number) => {
+        const request = ++selectRequestRef.current;
+        try {
+            if (tour === latestTourRef.current) {
+                const r = await getRapport(tour);
+                if (r && request === selectRequestRef.current) displayRapport(r, false);
+                return;
+            }
+            // Tour passé : seules les détections connues à ce tour (rapports stockés jusqu'à lui), la plus récente par case
+            const rapports = await getRapportsUpTo(tour);
+            const r = rapports[rapports.length - 1];
+            if (!r || r.tour !== tour || request !== selectRequestRef.current) return;
+            const detected = new Map<string, SystemeDetecte>();
+            rapports.forEach(rp => rp.systemesDetectes.forEach(sd => detected.set(`${sd.pos.x}_${sd.pos.y}`, sd)));
+            const owned = new Set(r.systemesJoueur.map(s => `${s.pos.x}_${s.pos.y}`));
+            displayedTourRef.current = tour;
+            setRapport({...r, systemesDetectes: Array.from(detected.values()).filter(sd => !owned.has(`${sd.pos.x}_${sd.pos.y}`))});
+        } catch (e) {
+            console.warn('[rapports] impossible d\'afficher le tour', tour, e);
+        }
+    }, [displayRapport]);
+
+    // Stocke le rapport extrait de son tour (avec ses seules détections) et met à jour la liste des tours
+    const storeRapport = useCallback(async (r: Rapport) => {
+        try {
+            await saveRapport({...r, systemesDetectes: r.systemesDetectesDuTour});
+            const list = await listTours();
+            setTours(list);
+            if (list.length) noteLatestTour(list[list.length - 1]);
+        } catch (e) {
+            console.warn('[rapports] impossible de stocker le rapport du tour', r.tour, e);
+        }
+    }, [noteLatestTour]);
+
+    const loadRapportFile = useCallback(async (file: File): Promise<ImportResult> => {
+        const r = parseRapportXml(await file.text());
+        const latest = latestTourRef.current; // avant l'enregistrement de ce rapport
+        await storeRapport(r);
+        // Seul le rapport le plus récent est affiché ; un tour plus ancien ne fait qu'enrichir l'historique
+        if (latest === undefined || r.tour >= latest) {
+            displayRapport(r);
+            return {tour: r.tour, affiche: true};
+        }
+        // Si on regarde le dernier tour, il profite des systèmes détectés que lui seul ne connaissait pas
+        if (displayedTourRef.current === latest) {
+            setRapport(prev => prev ? {...prev, systemesDetectes: mergeDetectedWithOwned(prev)} : prev);
+        }
+        return {tour: r.tour, affiche: false};
+    }, [storeRapport, displayRapport, mergeDetectedWithOwned]);
+
+    const getRapportForTour = useCallback((tour: number) => getRapport(tour).catch(() => undefined), []);
 
     const addDetectedSystemsFromText = useCallback((text: string) => {
         const { systems, errors } = parseManualDetectedSystems(text);
@@ -330,17 +393,37 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
                 setNotes(JSON.parse(storedNotes));
             }
 
-            const stored = localStorage.getItem('rapportXml');
-            if (stored) {
-                const r = parseRapportXml(stored);
-                // mettre à jour les détectés avec le cache courant
-                const mergedDetected = mergeDetectedWithOwned(r);
-                setRapport({ ...r, systemesDetectes: mergedDetected });
-                if (r.joueur?.capitale) setCenter(r.joueur.capitale);
-            }
         } catch {
             // Si localStorage n'est pas accessible ou contenu invalide, ignorer
         }
+
+        (async () => {
+            // Migration : l'ancien stockage gardait le XML brut du dernier rapport dans le localStorage
+            let legacy: Rapport | undefined;
+            try {
+                const xml = localStorage.getItem('rapportXml');
+                if (xml) {
+                    legacy = parseRapportXml(xml);
+                    await saveRapport({...legacy, systemesDetectes: legacy.systemesDetectesDuTour});
+                    localStorage.removeItem('rapportXml'); // seulement une fois le rapport extrait bien stocké
+                }
+            } catch (e) {
+                console.warn('[rapports] migration du rapport XML impossible', e);
+            }
+
+            try {
+                const list = await listTours();
+                setTours(list);
+                if (list.length) noteLatestTour(list[list.length - 1]);
+                const latest = await getLatestRapport();
+                if (latest) displayRapport(latest);
+                else if (legacy) displayRapport(legacy);
+            } catch (e) {
+                // IndexedDB indisponible : on affiche au moins le rapport de l'ancien stockage
+                console.warn('[rapports] lecture des rapports stockés impossible', e);
+                if (legacy) displayRapport(legacy);
+            }
+        })();
         // we only want this to run once on mount
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -353,6 +436,9 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         loadRapportFile,
         addDetectedSystemsFromText,
         ready: Boolean(global),
+        tours,
+        getRapportForTour,
+        selectTour,
         cellSize,
         setCellSize,
         center,
@@ -373,7 +459,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         addZone,
         deleteZone,
         updateZone,
-    }), [rapport, global, publicCombats, refreshStats, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, allTags, selectedTags, addNote, deleteNote, zones, zoneLabels, hiddenZoneLabels, addZone, deleteZone, updateZone]);
+    }), [rapport, global, tours, getRapportForTour, selectTour, publicCombats, refreshStats, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, allTags, selectedTags, addNote, deleteNote, zones, zoneLabels, hiddenZoneLabels, addZone, deleteZone, updateZone]);
 
     return <ReportContext.Provider value={value}>{children}</ReportContext.Provider>;
 }
