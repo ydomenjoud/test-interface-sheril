@@ -56,6 +56,7 @@ type Props = {
     showSystemRadar: boolean;
     showFleetRadar: boolean;
     showSectors: boolean;
+    showZones?: boolean; // zones manuelles (toutes)
     showInfluence: boolean;
     colorMode?: 'status' | 'player';
     showStabilityZones: boolean;
@@ -95,7 +96,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#f80c0c';
 }
 
-export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18}: Props) {
+export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -429,7 +430,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         ctx.clip();
         const zonesToDraw: (Omit<Zone, 'id'> & { preview?: boolean })[] = previewZone ? [...zones, {...previewZone, preview: true}] : zones;
         zonesToDraw.forEach(z => {
-            if (!z.preview && z.label && hiddenZoneLabels.includes(z.label)) return;
+            if (!z.preview && (!showZones || (z.label && hiddenZoneLabels.includes(z.label)))) return;
             // décalage signé (tore) du coin haut-gauche par rapport au centre
             let offX = z.x - currentCenter.x;
             if (offX > BOUNDS.maxX / 2) offX -= BOUNDS.maxX;
@@ -1135,11 +1136,11 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
             cSel.restore();
         }
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, hiddenZoneLabels, zoneDraft, previewZone]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
-            if (!center || isTypingTarget(e.target)) return;
+            if (!center || e.altKey || isTypingTarget(e.target)) return; // Alt + flèche : navigation dans les tours
             const step = e.ctrlKey ? 5 : 1;
             if (e.key === 'ArrowUp') {
                 setCenter({x: wrapX(center.x - step), y: center.y});

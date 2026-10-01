@@ -14,6 +14,14 @@ const SECTIONS: { title: string; items: Shortcut[] }[] = [
             {keys: [['Ctrl', 'Flèche']], description: 'Déplacer la carte de 5 cases'},
             {keys: [['Molette']], description: 'Zoomer / dézoomer'},
             {keys: [['Clic sur la minicarte']], description: 'Centrer la carte sur ce point'},
+            {keys: [['Alt', 'G']], description: 'Aller à une case : saisir ses coordonnées (ex. 52-4) pour centrer la carte dessus'},
+        ],
+    },
+    {
+        title: 'Historique',
+        items: [
+            {keys: [['Alt', '←']], description: 'Afficher le tour précédent (plus ancien)'},
+            {keys: [['Alt', '→']], description: 'Afficher le tour suivant (plus récent)'},
         ],
     },
     {

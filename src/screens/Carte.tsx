@@ -1,10 +1,12 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useMemo} from 'react';
 import {useReport} from '../context/ReportContext';
 import CanvasMap, {ZoneRect} from '../components/Map/CanvasMap';
 import MiniMap from '../components/Map/MiniMap';
 import InfoPanel from '../components/Map/InfoPanel';
 import ZoneDialog from '../components/Map/ZoneDialog';
 import MapHelp from '../components/Map/MapHelp';
+import GotoDialog from '../components/Map/GotoDialog';
+import {isTypingTarget} from '../utils/keyboard';
 import Modal from '../components/utils/Modal';
 import {XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
@@ -19,6 +21,7 @@ export default function Carte() {
   }, []);
   const [selected, setSelected] = useState<XY | undefined>(undefined);
   const [showFleetsFor, setShowFleetsFor] = useState<XY | undefined>(undefined);
+  const [showGoto, setShowGoto] = useState(false);
   const [selectedOwners, setSelectedOwners] = useState<(number)[]>(() => {
     const saved = localStorage.getItem('carte_selected_owners');
     return saved ? JSON.parse(saved) : [];
@@ -58,6 +61,10 @@ export default function Carte() {
   const [showSectors, setShowSectors] = useState(() => {
     const saved = localStorage.getItem('carte_show_sectors');
     return saved !== null ? JSON.parse(saved) : false;
+  });
+  const [showZones, setShowZones] = useState(() => {
+    const saved = localStorage.getItem('carte_show_zones');
+    return saved !== null ? JSON.parse(saved) : true;
   });
   const [influenceOpacity, setInfluenceOpacity] = useState(() => {
     const saved = localStorage.getItem('carte_influence_opacity');
@@ -129,6 +136,10 @@ export default function Carte() {
   }, [showSectors]);
 
   useEffect(() => {
+    localStorage.setItem('carte_show_zones', JSON.stringify(showZones));
+  }, [showZones]);
+
+  useEffect(() => {
     localStorage.setItem('carte_influence_opacity', JSON.stringify(influenceOpacity));
   }, [influenceOpacity]);
 
@@ -174,9 +185,32 @@ export default function Carte() {
     const selectedTagsOption: DropdownOption<string>[] = allTags.map(tag => ({ value: tag, label: tag }));
 
   // Tours stockés (plus le tour affiché, au cas où le stockage aurait échoué), du plus récent au plus ancien
-  const tourOptions = Array.from(new Set([...tours, ...(rapport ? [rapport.tour] : [])])).sort((a, b) => b - a);
+  const tourOptions = useMemo(
+    () => Array.from(new Set([...tours, ...(rapport ? [rapport.tour] : [])])).sort((a, b) => b - a),
+    [tours, rapport]
+  );
   const latestTour = tourOptions[0];
   const viewingPastTour = rapport !== undefined && rapport.tour !== latestTour;
+
+  // Raccourcis : Alt + G (aller à une case), Alt + ← / → (tour précédent / suivant de l'historique)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!e.altKey || e.ctrlKey || e.metaKey || isTypingTarget(e.target)) return;
+      if (e.code === 'KeyG' || e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        setShowGoto(true);
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault(); // sinon le navigateur revient à la page précédente / suivante
+        const idx = tourOptions.indexOf(rapport?.tour ?? -1);
+        if (idx < 0) return;
+        // la liste va du plus récent au plus ancien : droite = plus récent, gauche = plus ancien
+        const next = tourOptions[e.key === 'ArrowRight' ? idx - 1 : idx + 1];
+        if (next !== undefined) selectTour(next);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [tourOptions, rapport?.tour, selectTour]);
   return (
     <div className="carte-wrap">
       <div className="carte-toolbar">
@@ -193,7 +227,11 @@ export default function Carte() {
           />
           <span style={{ marginLeft: 8 }}>{cellSize}px</span>
         </div>
-        <div style={{ marginLeft: 20 }}>
+        <div
+          onClick={() => setShowGoto(true)}
+          title="Aller à une case (Alt + G)"
+          style={{ marginLeft: 20, cursor: 'pointer', textDecoration: 'underline dotted' }}
+        >
           Centre: {center ? `${center.x}-${center.y}` : '—'}
         </div>
         {!global && (
@@ -259,6 +297,7 @@ export default function Carte() {
             showSystemRadar={showSystemRadar}
             showFleetRadar={showFleetRadar}
             showSectors={showSectors}
+            showZones={showZones}
             showInfluence={showInfluence}
             influenceOpacity={influenceOpacity}
             colorMode={colorMode}
@@ -446,13 +485,23 @@ export default function Carte() {
                           </label>
                       </div>
 
-                      {zoneLabels.length > 0 && (
+                      {zones.length > 0 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid #444', paddingTop: 8 }}>
                               <span style={{ fontSize: '0.85em', color: '#aaa' }}>Zones manuelles (Alt + clic + glisser)</span>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                                  <input
+                                      type="checkbox"
+                                      checked={showZones}
+                                      onChange={(e) => setShowZones(e.target.checked)}
+                                  />
+                                  Afficher les zones ({zones.length})
+                              </label>
+                              {/* Choix par label, sans effet tant que toutes les zones sont masquées */}
                               {zoneLabels.map(label => (
-                                  <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                                  <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, color: showZones ? '#eee' : '#777', fontSize: '0.9em', cursor: showZones ? 'pointer' : 'default', marginLeft: 16 }}>
                                       <input
                                           type="checkbox"
+                                          disabled={!showZones}
                                           checked={!hiddenZoneLabels.includes(label)}
                                           onChange={(e) => setHiddenZoneLabels(
                                               e.target.checked
@@ -529,6 +578,13 @@ export default function Carte() {
       </div>
 
       <InfoPanel selected={selected} />
+
+      {showGoto && (
+        <GotoDialog
+          onGo={(pos) => { setCenter(pos); setSelected(pos); setShowFleetsFor(undefined); }}
+          onClose={() => setShowGoto(false)}
+        />
+      )}
 
       {zoneDialogRect && <ZoneDialog rect={zoneDialogRect} onClose={closeZoneDialog} onPreview={setZonePreview} />}
 
