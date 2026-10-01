@@ -9,6 +9,10 @@ import {getLatestRapport, getRapport, getRapportsUpTo, listTours, saveRapport} f
 
 export type ImportResult = { tour: number; affiche: boolean };
 
+// Les stats publiques changent à chaque tour mais le serveur n'envoie pas d'en-tête de cache :
+// on force la revalidation (réponse 304 légère si rien n'a changé) pour ne pas afficher un tour périmé
+const STATS_CACHE: RequestCache = 'no-cache';
+
 type ReportContextType = {
     rapport?: Rapport;
     global?: GlobalData;
@@ -253,7 +257,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         try {
             const fetchWithTimeout = async (url: string, fallbackUrl?: string, ms = 5000) => {
                 try {
-                    const response = await fetch(url, { signal: AbortSignal.timeout(ms) });
+                    const response = await fetch(url, { signal: AbortSignal.timeout(ms), cache: STATS_CACHE });
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     return await response.text();
                 } catch (error) {
@@ -261,7 +265,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
                     if (!fallbackUrl) return '';
 
                     try {
-                        const fallbackResponse = await fetch(fallbackUrl, { signal: AbortSignal.timeout(ms) });
+                        const fallbackResponse = await fetch(fallbackUrl, { signal: AbortSignal.timeout(ms), cache: STATS_CACHE });
                         if (!fallbackResponse.ok) return '';
                         return await fallbackResponse.text();
                     } catch {
@@ -311,7 +315,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         let alive = true;
         (async () => {
             try {
-                const txt = await fetch(`https://sheril.pbem-france.net/stats/data.xml`).then(r => r.text());
+                const txt = await fetch(`https://sheril.pbem-france.net/stats/data.xml`, { cache: STATS_CACHE }).then(r => r.text());
                 if (!alive) return;
                 const data = parseDataXml(txt);
                 setGlobal(data);
@@ -360,7 +364,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         let alive = true;
         (async () => {
             try {
-                const txt = await fetch('https://sheril.pbem-france.net/stats/combats.htm').then(r => r.text());
+                const txt = await fetch('https://sheril.pbem-france.net/stats/combats.htm', { cache: STATS_CACHE }).then(r => r.text());
                 if (!alive) return;
                 const parsed = parsePublicCombatsHtml(txt || '');
                 try {
