@@ -141,6 +141,7 @@ export interface SystemeJoueur extends SystemBase {
 
 export interface SystemeDetecte extends SystemBase {
     type: 'detecte';
+    tour?: number; // tour du rapport où le système a été vu pour la dernière fois (inconnu pour les anciennes données)
 }
 
 export interface FlotteBase {

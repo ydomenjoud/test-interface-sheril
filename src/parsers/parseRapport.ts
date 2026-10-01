@@ -80,6 +80,7 @@ function loadDetectedFromLS(): Map<string, SystemeDetecte> {
                 bcont: typeof it.bcont === 'number' ? it.bcont : undefined,
                 besp: typeof it.besp === 'number' ? it.besp : undefined,
                 btech: typeof it.btech === 'number' ? it.btech : undefined,
+                tour: typeof it.tour === 'number' ? it.tour : undefined,
             };
             m.set(key, sd);
         }
@@ -328,7 +329,7 @@ export function parseRapportXml(text: string): Rapport {
             if (!Number.isNaN(v)) proprietaires.push(v);
         });
         const sortedProprietaires = Array.from(proprietaires).sort((a, b) => a - b);
-        systemesDetectes.push({type: 'detecte', nom, pos, pop, popMax, typeEtoile, nbPla, proprietaires: sortedProprietaires});
+        systemesDetectes.push({type: 'detecte', nom, pos, pop, popMax, typeEtoile, nbPla, proprietaires: sortedProprietaires, tour});
     });
 
     // Fusionner avec le cache précédent (clé = position)

@@ -174,7 +174,8 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
     const addDetectedSystemsFromText = useCallback((text: string) => {
         const { systems, errors } = parseManualDetectedSystems(text);
         if (systems.length > 0) {
-            addManualDetectedSystems(systems);
+            // Saisie manuelle : on considère l'information comme datant du tour du rapport chargé
+            addManualDetectedSystems(systems.map(s => ({...s, tour: rapport?.tour})));
             setRapport(prev => {
                 if (!prev) return prev;
                 // Mettre à jour la liste des systèmes détectés depuis le cache
@@ -183,7 +184,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
             });
         }
         return { added: systems.length, errors };
-    }, [mergeDetectedWithOwned]);
+    }, [mergeDetectedWithOwned, rapport?.tour]);
 
     const refreshStats = useCallback(async () => {
         try {

@@ -94,6 +94,13 @@ export default function InfoPanel({ selected }: Props) {
     return atPos.systems[0];
   }, [atPos.systems]);
 
+  // Système détecté lors d'un tour précédent (ou à une date inconnue) : ses informations peuvent être obsolètes
+  const staleTour: number | 'inconnu' | undefined = useMemo(() => {
+    if (!rapport || system?.type !== 'detecte') return undefined;
+    if (typeof system.tour !== 'number' || !system.tour) return 'inconnu';
+    return system.tour < rapport.tour ? system.tour : undefined;
+  }, [system, rapport]);
+
   const isOwner = useMemo(() => system?.proprietaires?.some((p: any) => p === rapport?.joueur?.numero), [system, rapport])
 
   const currentNotes = useMemo(() => {
@@ -142,7 +149,12 @@ export default function InfoPanel({ selected }: Props) {
           <tbody>
           {system ? (
             <tr>
-              <td>{system.nom}</td>
+              <td>
+                {system.nom}
+                {staleTour !== undefined && (
+                  <span title="Information d'un tour précédent, peut-être obsolète" style={{ marginLeft: 6, color: '#ffb000', cursor: 'help' }}>⚠</span>
+                )}
+              </td>
               <td style={{ textAlign: 'right' }}>{system.nbPla ?? '—'}</td>
                 <td>{system.pop}/{system.popMax}</td>
               <td style={{ textAlign: 'right' }}>
@@ -157,6 +169,14 @@ export default function InfoPanel({ selected }: Props) {
           )}
           </tbody>
         </table>
+        {staleTour !== undefined && rapport && (
+          <div style={{ marginTop: 6, padding: '4px 8px', background: '#332200', color: '#ffcc00', borderLeft: '3px solid #ffb000', fontSize: '0.85em' }}>
+            ⚠ {staleTour === 'inconnu'
+              ? <>Tour de la dernière observation inconnu</>
+              : <>Dernière observation au tour {staleTour} ({rapport.tour - staleTour} tour{rapport.tour - staleTour > 1 ? 's' : ''} de retard)</>}
+            {' '}: ces informations peuvent être obsolètes.
+          </div>
+        )}
       </div>
 
       <div className="info-block">
