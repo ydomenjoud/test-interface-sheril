@@ -28,6 +28,7 @@ const SECTIONS: { title: string; items: Shortcut[] }[] = [
         title: 'Sélection',
         items: [
             {keys: [['Clic']], description: 'Sélectionner une case et afficher son contenu (systèmes, flottes, zones, notes) dans le panneau de droite'},
+            {keys: [['Maj', 'Flèche']], description: "Déplacer la case sélectionnée d'une case"},
             {keys: [['Ctrl', 'Clic']], description: 'Sélectionner une case et tracer les flèches de mes flottes vers elle (vert : atteignable ce tour, orange : trop loin)'},
         ],
     },

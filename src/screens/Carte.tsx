@@ -7,6 +7,7 @@ import ZoneDialog from '../components/Map/ZoneDialog';
 import MapHelp from '../components/Map/MapHelp';
 import GotoDialog from '../components/Map/GotoDialog';
 import {isTypingTarget} from '../utils/keyboard';
+import {wrapX, wrapY} from '../utils/position';
 import Modal from '../components/utils/Modal';
 import {XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
@@ -191,6 +192,22 @@ export default function Carte() {
   );
   const latestTour = tourOptions[0];
   const viewingPastTour = rapport !== undefined && rapport.tour !== latestTour;
+
+  // Raccourci : Maj + flèche déplace la case sélectionnée (depuis le centre si aucune case n'est sélectionnée)
+  useEffect(() => {
+    const moves: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+    function onKey(e: KeyboardEvent) {
+      if (!e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || isTypingTarget(e.target)) return;
+      const move = moves[e.key];
+      const from = selected ?? center;
+      if (!move || !from) return;
+      e.preventDefault();
+      setSelected({ x: wrapX(from.x + move[0]), y: wrapY(from.y + move[1]) });
+      setShowFleetsFor(undefined); // comme un clic simple
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selected, center]);
 
   // Raccourcis : Alt + G (aller à une case), Alt + ← / → (tour précédent / suivant de l'historique)
   useEffect(() => {

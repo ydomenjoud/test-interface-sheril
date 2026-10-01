@@ -14,13 +14,23 @@ import {getDescriptionPuissance, getPuissance, getPuissanceFromString} from "../
 import { NavLink } from 'react-router-dom';
 import ZoneEditor from './ZoneEditor';
 import { zoneCovers } from '../../utils/zones';
+import { isObserved, lastKnownFleets } from '../../utils/fleetHistory';
+import { fleetSnapshotOf } from '../../storage/rapportStore';
 
 type Props = {
   selected?: XY;
 };
 
+// Ligne issue d'un tour précédent : texte grisé et icône d'avertissement à côté du nom
+const staleRowStyle: React.CSSProperties = { color: '#999' };
+const StaleIcon = () => (
+  <span title="Information d'un tour précédent, peut-être obsolète" style={{ marginRight: 6, color: '#ffb000', cursor: 'help' }}>⚠</span>
+);
+
+
+
 export default function InfoPanel({ selected }: Props) {
-  const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats, zones, zoneLabels } = useReport();
+  const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats, zones, zoneLabels, fleetSnapshots } = useReport();
 
   // Zones affichées : celles qui couvrent la case, plus celles déjà listées pour cette sélection
   // (une zone déplacée ou réduite hors de la case reste éditable jusqu'au prochain clic)
@@ -101,6 +111,20 @@ export default function InfoPanel({ selected }: Props) {
     return system.tour < rapport.tour ? system.tour : undefined;
   }, [system, rapport]);
 
+  // Case hors de vue au tour affiché : on montre les dernières flottes qui y ont été vues
+  const pastFleets = useMemo(() => {
+    if (!rapport || !selected || atPos.fleets.length > 0) return undefined;
+    if (isObserved(fleetSnapshotOf(rapport).observateurs, selected)) return undefined; // vue et vide : rien à montrer
+    return lastKnownFleets(fleetSnapshots, selected, rapport.tour);
+  }, [rapport, selected, atPos.fleets.length, fleetSnapshots]);
+
+  // Tour (le plus ancien) des données obsolètes affichées : système et/ou flottes d'un tour précédent
+  const staleFromTour: number | 'inconnu' | undefined = useMemo(() => {
+    const known = [typeof staleTour === 'number' ? staleTour : undefined, pastFleets?.tour].filter((t): t is number => t !== undefined);
+    if (known.length > 0) return Math.min(...known);
+    return staleTour; // 'inconnu' ou undefined
+  }, [staleTour, pastFleets]);
+
   const isOwner = useMemo(() => system?.proprietaires?.some((p: any) => p === rapport?.joueur?.numero), [system, rapport])
 
   const currentNotes = useMemo(() => {
@@ -131,7 +155,20 @@ export default function InfoPanel({ selected }: Props) {
   return (
     <div className="carte-info">
       <div className="info-block">
-        <h3>Case <Position pos={selected} /></h3>
+        <h3>
+          Case <Position pos={selected} />
+          {rapport && (
+            <span style={{ marginLeft: 10, fontSize: '0.7em', fontWeight: 'normal', color: '#aaa' }}>
+              {/* tour d'où viennent les données : celui d'une ancienne observation, sinon le tour consulté */}
+              information tour {staleFromTour === undefined ? rapport.tour : staleFromTour}
+            </span>
+          )}
+        </h3>
+        {rapport && staleFromTour !== undefined && (
+          <div style={{ marginTop: 6, padding: '4px 8px', background: '#332200', color: '#ffcc00', borderLeft: '3px solid #ffb000', fontSize: '0.85em' }}>
+            ⚠ Données affichées provenant {staleFromTour === 'inconnu' ? "d'un tour inconnu" : `du tour ${staleFromTour}`} (dernier {rapport.tour})
+          </div>
+        )}
       </div>
 
       <div className="info-block">
@@ -148,12 +185,10 @@ export default function InfoPanel({ selected }: Props) {
           </thead>
           <tbody>
           {system ? (
-            <tr>
+            <tr style={staleTour !== undefined ? staleRowStyle : undefined}>
               <td>
+                {staleTour !== undefined && <StaleIcon />}
                 {system.nom}
-                {staleTour !== undefined && (
-                  <span title="Information d'un tour précédent, peut-être obsolète" style={{ marginLeft: 6, color: '#ffb000', cursor: 'help' }}>⚠</span>
-                )}
               </td>
               <td style={{ textAlign: 'right' }}>{system.nbPla ?? '—'}</td>
                 <td>{system.pop}/{system.popMax}</td>
@@ -169,14 +204,6 @@ export default function InfoPanel({ selected }: Props) {
           )}
           </tbody>
         </table>
-        {staleTour !== undefined && rapport && (
-          <div style={{ marginTop: 6, padding: '4px 8px', background: '#332200', color: '#ffcc00', borderLeft: '3px solid #ffb000', fontSize: '0.85em' }}>
-            ⚠ {staleTour === 'inconnu'
-              ? <>Tour de la dernière observation inconnu</>
-              : <>Dernière observation au tour {staleTour} ({rapport.tour - staleTour} tour{rapport.tour - staleTour > 1 ? 's' : ''} de retard)</>}
-            {' '}: ces informations peuvent être obsolètes.
-          </div>
-        )}
       </div>
 
       <div className="info-block">
@@ -217,7 +244,15 @@ export default function InfoPanel({ selected }: Props) {
               </tr>
             );
           })}
-          {atPos.fleets.length === 0 && (
+          {pastFleets?.flottes.map((f, i) => (
+            <tr key={`old-${i}`} style={staleRowStyle}>
+              <td><StaleIcon />{f.nom} ({f.num+1})</td>
+              <td style={{ textAlign: 'right' }}><Commandant num={f.proprio} /></td>
+              <td>{f.nbVso}</td>
+              <td style={{ textAlign: 'right' }}>{`${getPuissanceFromString(f.puiss)} - ${f.puiss}`}</td>
+            </tr>
+          ))}
+          {atPos.fleets.length === 0 && !pastFleets && (
             <tr><td colSpan={4} style={{ textAlign: 'center', padding: 8, color: '#aaa' }}>Aucune flotte ici.</td></tr>
           )}
           </tbody>

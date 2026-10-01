@@ -1140,7 +1140,8 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
-            if (!center || e.altKey || isTypingTarget(e.target)) return; // Alt + flèche : navigation dans les tours
+            // Alt + flèche : navigation dans les tours ; Maj + flèche : déplacement de la case sélectionnée
+            if (!center || e.altKey || e.shiftKey || isTypingTarget(e.target)) return;
             const step = e.ctrlKey ? 5 : 1;
             if (e.key === 'ArrowUp') {
                 setCenter({x: wrapX(center.x - step), y: center.y});

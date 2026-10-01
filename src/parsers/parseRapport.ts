@@ -73,6 +73,8 @@ function loadDetectedFromLS(): Map<string, SystemeDetecte> {
                 pos: { x: Number(it.pos.x), y: Number(it.pos.y) },
                 typeEtoile: Number(it.typeEtoile || 0),
                 nbPla: Number(it.nbPla || 0),
+                pop: typeof it.pop === 'number' ? it.pop : undefined,
+                popMax: typeof it.popMax === 'number' ? it.popMax : undefined,
                 proprietaires: Array.isArray(it.proprietaires) ? it.proprietaires.map((n: any) => Number(n)).filter((n: any) => !Number.isNaN(n)) : [],
                 politique: typeof it.politique === 'number' ? it.politique : undefined,
                 entretien: typeof it.entretien === 'number' ? it.entretien : undefined,

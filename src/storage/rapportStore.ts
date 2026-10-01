@@ -1,11 +1,29 @@
-import {Rapport} from '../types';
+import {FlotteDetectee, Rapport, XY} from '../types';
 
 // Stockage des rapports extraits, un par tour, dans IndexedDB (le localStorage est trop petit pour plusieurs tours).
 // Chaque rapport est stocké avec les seules détections de son tour (sans la fusion avec les tours précédents).
 
 const DB_NAME = 'sheril';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = 'rapports'; // clé = numéro de tour
+const FLEETS_STORE = 'flottes'; // résumé léger par tour, pour retrouver les dernières flottes vues sur une case
+
+// Flottes détectées à un tour, et ce que le joueur pouvait voir à ce tour (positions + portée de scan)
+export type FleetSnapshot = {
+    tour: number;
+    flottes: FlotteDetectee[];
+    observateurs: { pos: XY; scan: number }[];
+};
+
+export function fleetSnapshotOf(r: Rapport): FleetSnapshot {
+    return {
+        tour: r.tour,
+        flottes: r.flottesDetectees,
+        observateurs: [...r.systemesJoueur, ...r.flottesJoueur]
+            .filter(o => Number(o.scan) > 0)
+            .map(o => ({pos: o.pos, scan: Number(o.scan)})),
+    };
+}
 
 let dbPromise: Promise<IDBDatabase> | undefined;
 
@@ -17,9 +35,21 @@ function openDb(): Promise<IDBDatabase> {
                 return;
             }
             const req = indexedDB.open(DB_NAME, DB_VERSION);
-            req.onupgradeneeded = () => {
+            req.onupgradeneeded = (event) => {
                 const db = req.result;
                 if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, {keyPath: 'tour'});
+                if (!db.objectStoreNames.contains(FLEETS_STORE)) {
+                    const fleets = db.createObjectStore(FLEETS_STORE, {keyPath: 'tour'});
+                    // Passage de la v1 : on construit le résumé des flottes des rapports déjà stockés
+                    if (event.oldVersion >= 1 && req.transaction) {
+                        req.transaction.objectStore(STORE).openCursor().onsuccess = (e) => {
+                            const cursor = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
+                            if (!cursor) return;
+                            fleets.put(fleetSnapshotOf(cursor.value as Rapport));
+                            cursor.continue();
+                        };
+                    }
+                }
             };
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => reject(req.error);
@@ -37,9 +67,25 @@ function run<T>(mode: IDBTransactionMode, op: (store: IDBObjectStore) => IDBRequ
     }));
 }
 
-// Enregistre (ou remplace) le rapport de son tour
+// Enregistre (ou remplace) le rapport de son tour, avec le résumé de ses flottes
 export function saveRapport(r: Rapport): Promise<void> {
-    return run('readwrite', s => s.put(r)).then(() => undefined);
+    return openDb().then(db => new Promise<void>((resolve, reject) => {
+        const tx = db.transaction([STORE, FLEETS_STORE], 'readwrite');
+        tx.objectStore(STORE).put(r);
+        tx.objectStore(FLEETS_STORE).put(fleetSnapshotOf(r));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    }));
+}
+
+// Résumés des flottes de tous les tours stockés
+export function getFleetSnapshots(): Promise<FleetSnapshot[]> {
+    return openDb().then(db => new Promise<FleetSnapshot[]>((resolve, reject) => {
+        const req = db.transaction(FLEETS_STORE, 'readonly').objectStore(FLEETS_STORE).getAll();
+        req.onsuccess = () => resolve(req.result as FleetSnapshot[]);
+        req.onerror = () => reject(req.error);
+    }));
 }
 
 export function getRapport(tour: number): Promise<Rapport | undefined> {
