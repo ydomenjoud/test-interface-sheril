@@ -365,11 +365,12 @@ export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsF
             ctx.lineTo(cols * cellSize, yPos);
             ctx.stroke();
 
-            // Fond opaque pour l'en-tête de ligne
-            ctx.fillStyle = '#1a1a1a';
+            // Fond opaque pour l'en-tête de ligne (surligné si c'est la ligne de la case sélectionnée)
+            const rowSelected = r > 0 && selected?.x === xCoord;
+            ctx.fillStyle = rowSelected ? '#ffe600' : '#1a1a1a';
             ctx.fillRect(0, yPos, cellSize, cellSize);
 
-            ctx.fillStyle = '#ccc';
+            ctx.fillStyle = rowSelected ? '#000' : '#ccc';
             ctx.font = 'bold 12px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -385,11 +386,12 @@ export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsF
             ctx.lineTo(xPos, rows * cellSize);
             ctx.stroke();
 
-            // Fond opaque pour l'en-tête de colonne
-            ctx.fillStyle = '#1a1a1a';
+            // Fond opaque pour l'en-tête de colonne (surligné si c'est la colonne de la case sélectionnée)
+            const colSelected = c > 0 && selected?.y === yCoord;
+            ctx.fillStyle = colSelected ? '#ffe600' : '#1a1a1a';
             ctx.fillRect(xPos, 0, cellSize, cellSize);
 
-            ctx.fillStyle = '#ccc';
+            ctx.fillStyle = colSelected ? '#000' : '#ccc';
             ctx.font = 'bold 12px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -1015,6 +1017,70 @@ export default function CanvasMap({onSelect, onCreateZone, selected, showFleetsF
             }
 
             cCombat.restore();
+        }
+
+        // CASE SÉLECTIONNÉE (dessinée en dernier pour rester visible au-dessus de tout)
+        if (selected) {
+            const cSel = ctx as CanvasRenderingContext2D;
+            cSel.save();
+            cSel.beginPath();
+            cSel.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
+            cSel.clip();
+
+            let dx = ((selected.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+            const dyBase = ((selected.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+            while (dx < cols) {
+                if (dx === 0) {
+                    dx += BOUNDS.maxY;
+                    continue;
+                }
+                let dy = dyBase;
+                while (dy < rows) {
+                    if (dy === 0) {
+                        dy += BOUNDS.maxX;
+                        continue;
+                    }
+                    const px = dx * cellSize;
+                    const py = dy * cellSize;
+
+                    // Bandes discrètes sur la ligne et la colonne pour repérer la case
+                    cSel.fillStyle = 'rgba(255, 230, 0, 0.08)';
+                    cSel.fillRect(px, cellSize, cellSize, rows * cellSize);
+                    cSel.fillRect(cellSize, py, cols * cellSize, cellSize);
+
+                    // Remplissage léger de la case
+                    cSel.fillStyle = 'rgba(255, 230, 0, 0.18)';
+                    cSel.fillRect(px, py, cellSize, cellSize);
+
+                    // Contour : trait sombre puis trait clair pour être lisible sur tout fond
+                    cSel.lineWidth = 4;
+                    cSel.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+                    cSel.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
+                    cSel.lineWidth = 2;
+                    cSel.strokeStyle = '#ffe600';
+                    cSel.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
+
+                    // Coins en équerre débordant de la case
+                    const m = Math.max(3, Math.round(cellSize * 0.15));
+                    const l = Math.max(5, Math.round(cellSize * 0.35));
+                    cSel.lineWidth = 2;
+                    cSel.strokeStyle = '#ffffff';
+                    cSel.beginPath();
+                    // haut-gauche
+                    cSel.moveTo(px - m, py - m + l); cSel.lineTo(px - m, py - m); cSel.lineTo(px - m + l, py - m);
+                    // haut-droite
+                    cSel.moveTo(px + cellSize + m - l, py - m); cSel.lineTo(px + cellSize + m, py - m); cSel.lineTo(px + cellSize + m, py - m + l);
+                    // bas-droite
+                    cSel.moveTo(px + cellSize + m, py + cellSize + m - l); cSel.lineTo(px + cellSize + m, py + cellSize + m); cSel.lineTo(px + cellSize + m - l, py + cellSize + m);
+                    // bas-gauche
+                    cSel.moveTo(px - m + l, py + cellSize + m); cSel.lineTo(px - m, py + cellSize + m); cSel.lineTo(px - m, py + cellSize + m - l);
+                    cSel.stroke();
+
+                    dy += BOUNDS.maxX;
+                }
+                dx += BOUNDS.maxY;
+            }
+            cSel.restore();
         }
     }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, hiddenZoneLabels]);
 
