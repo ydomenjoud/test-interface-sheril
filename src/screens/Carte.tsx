@@ -67,6 +67,13 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_sectors');
     return saved !== null ? JSON.parse(saved) : false;
   });
+  const [showGlobalSystems, setShowGlobalSystems] = useState(() => {
+    const saved = localStorage.getItem('carte_show_global_systems');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  useEffect(() => {
+    localStorage.setItem('carte_show_global_systems', JSON.stringify(showGlobalSystems));
+  }, [showGlobalSystems]);
   const [showZones, setShowZones] = useState(() => {
     const saved = localStorage.getItem('carte_show_zones');
     return saved !== null ? JSON.parse(saved) : true;
@@ -384,6 +391,7 @@ export default function Carte() {
             selected={selected}
             showFleetsFor={showFleetsFor}
             showSystems={showSystems}
+            showGlobalSystems={showGlobalSystems}
             selectedOwners={selectedOwners}
             showCombatBadges={showCombatBadges}
             showOwnerBadges={showOwnerBadges}
@@ -474,6 +482,18 @@ export default function Carte() {
                               onChange={(e) => setShowSystems(e.target.checked)}
                             />
                             Afficher systèmes
+                          </label>
+                          <label
+                            title="Systèmes connus uniquement par les données publiques (data.xml), jamais détectés dans vos rapports"
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, color: showSystems ? '#eee' : '#777', fontSize: '0.9em', cursor: showSystems ? 'pointer' : 'default', marginLeft: 16 }}
+                          >
+                            <input
+                              type="checkbox"
+                              disabled={!showSystems}
+                              checked={showGlobalSystems}
+                              onChange={(e) => setShowGlobalSystems(e.target.checked)}
+                            />
+                            Carte galactique
                           </label>
                           <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
                             <input

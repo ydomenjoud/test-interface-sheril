@@ -49,6 +49,7 @@ type Props = {
     selected?: XY;
     showFleetsFor?: XY; // Position pour laquelle afficher les flèches de portée
     showSystems: boolean;
+    showGlobalSystems?: boolean; // systèmes connus uniquement par data.xml (jamais détectés)
     selectedOwners?: number[]; // liste des commandants sélectionnés pour filtrage visuel
     showCombatBadges: boolean;
     showOwnerBadges: boolean;
@@ -96,7 +97,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#f80c0c';
 }
 
-export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18}: Props) {
+export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -179,8 +180,8 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             });
         }
 
-        // 3. Systèmes globaux (data.xml) - si pas déjà présent
-        if (global?.systemes) {
+        // 3. Systèmes globaux (data.xml) - si pas déjà présent et non masqués
+        if (showGlobalSystems && global?.systemes) {
             global.systemes.forEach(s => {
                 const key = `${s.pos.x}_${s.pos.y}`;
                 if (!seen.has(key)) {
@@ -196,7 +197,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         }
 
         return list;
-    }, [rapport, global, currentPlayerId]);
+    }, [rapport, global, currentPlayerId, showGlobalSystems]);
 
     const fleets = useMemo(() => {
         if (!rapport) return [];
