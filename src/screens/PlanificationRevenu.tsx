@@ -1,6 +1,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { SystemeJoueur } from '../types';
 import { useReport } from '../context/ReportContext';
 import { posToString } from '../utils/position';
+import { loadPlanificationRevenu, savePlanificationRevenu } from '../utils/planificationRevenuStorage';
 
 interface SystemState {
     taxation: number;
@@ -8,37 +10,86 @@ interface SystemState {
     besp: number;
     bcont: number;
     terraformation: boolean;
+    politique: number | undefined;
 }
+
+// Effets des politiques : bonus/malus de stabilité et de croissance de population (en points de %)
+const EFFETS_POLITIQUES: Record<number, { stab?: number; pop?: number }> = {
+    4: { pop: 5 },             // expansion
+    5: { pop: 10, stab: -2 },  // intégriste
+    6: { stab: 2 },            // totalitaire
+    7: { stab: -2 },           // esclavagiste
+    13: { stab: 2 },           // loisir
+};
+
+const effetPolitique = (code: number | undefined) => ({
+    stab: (code !== undefined && EFFETS_POLITIQUES[code]?.stab) || 0,
+    pop: (code !== undefined && EFFETS_POLITIQUES[code]?.pop) || 0,
+});
+
+const formatEffetPolitique = (code: number | undefined) => {
+    const e = effetPolitique(code);
+    const parts: string[] = [];
+    if (e.stab) parts.push(`stab ${e.stab > 0 ? '+' : ''}${e.stab}`);
+    if (e.pop) parts.push(`pop ${e.pop > 0 ? '+' : ''}${e.pop}%`);
+    return parts.join(', ');
+};
+
+// État d'un système tel que décrit par le rapport
+function etatDuRapport(s: SystemeJoueur): SystemState {
+    // Moyenne des taxations des planètes
+    const avgTax = s.planetes.length > 0
+        ? Math.floor(s.planetes.reduce((acc, p) => acc + p.tax, 0) / s.planetes.length)
+        : 1;
+    return {
+        taxation: Math.max(0, Math.min(5, avgTax)),
+        btech: s.btech ?? 0,
+        besp: s.besp ?? 0,
+        bcont: s.bcont ?? 0,
+        terraformation: false,
+        politique: s.politique,
+    };
+}
+
+const COULEUR_MODIFIE = '#ff9800';
+
+// Style d'un champ dont la valeur diffère du rapport
+const styleModifie = (base: React.CSSProperties, modifie: boolean): React.CSSProperties =>
+    modifie ? { ...base, border: `1px solid ${COULEUR_MODIFIE}`, boxShadow: `0 0 0 1px ${COULEUR_MODIFIE}`, backgroundColor: '#4a3418' } : base;
 
 export default function PlanificationRevenu() {
     const { rapport, global } = useReport();
     const systems = useMemo(() => rapport?.systemesJoueur || [], [rapport]);
 
-    const [states, setStates] = useState<Record<string, SystemState>>({});
+    const tour = rapport?.tour;
+
+    // Les états sont rattachés à un tour : un changement de rapport repart des valeurs du rapport
+    const [store, setStore] = useState<{ tour: number | undefined; states: Record<string, SystemState> }>({ tour: undefined, states: {} });
+    const states = useMemo(() => (store.tour === tour ? store.states : {}), [store, tour]);
+    const setStates = (updater: (prev: Record<string, SystemState>) => Record<string, SystemState>) => {
+        setStore(prev => ({ tour, states: updater(prev.tour === tour ? prev.states : {}) }));
+    };
 
     // Initialisation des états à partir du rapport
     useEffect(() => {
-        if (systems.length > 0 && Object.keys(states).length === 0) {
+        if (tour !== undefined && systems.length > 0) {
             const initialStates: Record<string, SystemState> = {};
             systems.forEach(s => {
-                const key = posToString(s.pos);
-                // Moyenne des taxations des planètes
-                const avgTax = s.planetes.length > 0 
-                    ? Math.floor(s.planetes.reduce((acc, p) => acc + p.tax, 0) / s.planetes.length)
-                    : 1;
-                
-                initialStates[key] = {
-                    taxation: Math.max(0, Math.min(5, avgTax)),
-                    btech: s.btech ?? 0,
-                    besp: s.besp ?? 0,
-                    bcont: s.bcont ?? 0,
-                    terraformation: false,
-                };
+                initialStates[posToString(s.pos)] = etatDuRapport(s);
             });
-            setStates(initialStates);
+            // Choix sauvegardés pour ce tour, par-dessus les valeurs du rapport
+            const saved = loadPlanificationRevenu<SystemState>(tour) || {};
+            Object.keys(initialStates).forEach(k => {
+                if (saved[k]) initialStates[k] = { ...initialStates[k], ...saved[k] };
+            });
+            setStore({ tour, states: initialStates });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [systems]);
+    }, [systems, tour]);
+
+    useEffect(() => {
+        if (tour !== undefined && store.tour === tour) savePlanificationRevenu(tour, store.states);
+    }, [store, tour]);
 
     const handleTaxChange = (key: string, val: number) => {
         setStates(prev => ({
@@ -57,6 +108,13 @@ export default function PlanificationRevenu() {
         }));
     };
 
+    const handlePolitiqueChange = (key: string, val: number) => {
+        setStates(prev => ({
+            ...prev,
+            [key]: { ...prev[key], politique: val }
+        }));
+    };
+
     const handleTerraChange = (key: string, val: boolean) => {
         setStates(prev => ({
             ...prev,
@@ -70,7 +128,13 @@ export default function PlanificationRevenu() {
     const rows = useMemo(() => {
         return systems.map(s => {
             const key = posToString(s.pos);
-            const state = states[key] || { taxation: 1, btech: 0, besp: 0, bcont: 0, terraformation: false };
+            const state = states[key] || etatDuRapport(s);
+
+            // Le rapport reflète déjà la politique actuelle : on n'applique que l'écart avec la politique choisie
+            const effetActuel = effetPolitique(s.politique);
+            const effetChoisi = effetPolitique(state.politique);
+            const deltaStabPolitique = effetChoisi.stab - effetActuel.stab;
+            const deltaPopPolitique = effetChoisi.pop - effetActuel.pop;
             
             // Stabilité = Moyenne des stab des planètes
             const stabilite = s.planetes.length > 0 
@@ -94,6 +158,7 @@ export default function PlanificationRevenu() {
             if (!s.evostab.some(evo => evo.t === 'taxation')) {
                 variation_stab += taxModif;
             }
+            variation_stab += deltaStabPolitique;
 
             // population_variation = SOMME des (population des planètes*augmentation de pop)
             let population = 0;
@@ -105,7 +170,7 @@ export default function PlanificationRevenu() {
                     
                     // L'augmentation de pop de base + terraformation (+3% si activée)
                     // Le calcul doit se faire au niveau de chaque planète et être arrondi à l'inférieur par race
-                    const growthBonus = state.terraformation ? 3 : 0;
+                    const growthBonus = (state.terraformation ? 3 : 0) + deltaPopPolitique;
                     let pGrowth = 0;
                     p.populations.forEach(pop => {
                         const rate = (pop.growth || 0) + growthBonus;
@@ -145,6 +210,7 @@ export default function PlanificationRevenu() {
                 population,
                 population_variation,
                 terraformation: state.terraformation,
+                politique: state.politique,
                 taxation: state.taxation,
                 revenus,
                 btech: state.btech,
@@ -203,6 +269,7 @@ export default function PlanificationRevenu() {
                             <th style={thStyle}>Position</th>
                             <th style={thStyle}>Nom</th>
                             <th style={thStyle}>Stabilité</th>
+                            <th style={thStyle}>Politique</th>
                             <th style={thStyle}>Terra.</th>
                             <th style={thStyle}>Pop</th>
                             <th style={thStyle}>Taxation</th>
@@ -220,7 +287,17 @@ export default function PlanificationRevenu() {
                             const key = posToString(s.pos);
                             const row = rows.find(r => r.key === key);
                             if (!row) return null;
-                            const state = states[key] || { taxation: 1, btech: 0, besp: 0, bcont: 0, terraformation: false };
+                            const state = states[key] || etatDuRapport(s);
+                            const ref = etatDuRapport(s);
+                            const nomPolitique = (c: number | undefined) => (c !== undefined ? global?.politiques[c] ?? c : '?');
+                            const modPolitique = state.politique !== ref.politique;
+                            const modTerra = state.terraformation !== ref.terraformation;
+                            const modTax = state.taxation !== ref.taxation;
+                            const modTech = state.btech !== ref.btech;
+                            const modSS = state.besp !== ref.besp;
+                            const modCE = state.bcont !== ref.bcont;
+                            const marque = (m: boolean) => (m ? <span title="Différent du rapport" style={{ color: COULEUR_MODIFIE, marginLeft: '4px', fontWeight: 'bold' }}>●</span> : null);
+                            const politiqueCodes = Object.keys(global?.politiques || {}).map(Number).sort((a, b) => a - b);
 
                             return (
                                 <tr key={row.key} style={{ borderBottom: '1px solid #333', backgroundColor: idx % 2 === 0 ? '#1e1e1e' : '#252525' }}>
@@ -233,12 +310,29 @@ export default function PlanificationRevenu() {
                                         </span>
                                     </td>
                                     <td style={tdStyle}>
+                                        <select
+                                            value={state.politique ?? ''}
+                                            onChange={(e) => handlePolitiqueChange(row.key, parseInt(e.target.value, 10))}
+                                            style={styleModifie(selectStyle, modPolitique)}
+                                            title={modPolitique ? `Rapport : ${nomPolitique(ref.politique)}` : formatEffetPolitique(state.politique)}
+                                        >
+                                            {state.politique === undefined && <option value="" disabled>?</option>}
+                                            {politiqueCodes.map(c => {
+                                                const eff = formatEffetPolitique(c);
+                                                return <option key={c} value={c}>{global?.politiques[c]}{eff ? ` (${eff})` : ''}</option>;
+                                            })}
+                                        </select>
+                                        {marque(modPolitique)}
+                                    </td>
+                                    <td style={tdStyle}>
                                         <input 
                                             type="checkbox" 
                                             checked={!!state.terraformation}
                                             onChange={(e) => handleTerraChange(row.key, e.target.checked)}
-                                            style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                                            title={modTerra ? 'Rapport : sans terraformation' : undefined}
+                                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: COULEUR_MODIFIE }}
                                         />
+                                        {marque(modTerra)}
                                     </td>
                                     <td style={tdStyle}>
                                         {Math.floor(row.population)}
@@ -250,10 +344,12 @@ export default function PlanificationRevenu() {
                                         <select 
                                             value={row.taxation} 
                                             onChange={(e) => handleTaxChange(row.key, parseInt(e.target.value, 10))}
-                                            style={selectStyle}
+                                            style={styleModifie(selectStyle, modTax)}
+                                            title={modTax ? `Rapport : ${ref.taxation}` : undefined}
                                         >
                                             {[0, 1, 2, 3, 4, 5].map(t => <option key={t} value={t}>{t}</option>)}
                                         </select>
+                                        {marque(modTax)}
                                     </td>
                                     <td style={{ ...tdStyle, color: '#fff', fontWeight: 'bold' }}>{row.revenus.toFixed(1)}</td>
                                     <td style={tdStyle}>
@@ -263,9 +359,11 @@ export default function PlanificationRevenu() {
                                                 min="0" max="100" 
                                                 value={row.btech} 
                                                 onChange={(e) => handleBudgetChange(row.key, 'btech', e.target.value)}
-                                                style={inputStyle}
+                                                style={styleModifie(inputStyle, modTech)}
+                                                title={modTech ? `Rapport : ${ref.btech}%` : undefined}
                                             />
                                             <span style={{ fontSize: '0.8em', color: '#666' }}>%</span>
+                                            {marque(modTech)}
                                         </div>
                                     </td>
                                     <td style={{ ...tdStyle, color: '#4fc3f7' }}>{row.revenu_tech.toFixed(1)}</td>
@@ -276,9 +374,11 @@ export default function PlanificationRevenu() {
                                                 min="0" max="100" 
                                                 value={row.besp} 
                                                 onChange={(e) => handleBudgetChange(row.key, 'besp', e.target.value)}
-                                                style={inputStyle}
+                                                style={styleModifie(inputStyle, modSS)}
+                                                title={modSS ? `Rapport : ${ref.besp}%` : undefined}
                                             />
                                             <span style={{ fontSize: '0.8em', color: '#666' }}>%</span>
+                                            {marque(modSS)}
                                         </div>
                                     </td>
                                     <td style={{ ...tdStyle, color: '#ba68c8' }}>{row.revenu_besp.toFixed(1)}</td>
@@ -289,9 +389,11 @@ export default function PlanificationRevenu() {
                                                 min="0" max="100" 
                                                 value={row.bcont} 
                                                 onChange={(e) => handleBudgetChange(row.key, 'bcont', e.target.value)}
-                                                style={inputStyle}
+                                                style={styleModifie(inputStyle, modCE)}
+                                                title={modCE ? `Rapport : ${ref.bcont}%` : undefined}
                                             />
                                             <span style={{ fontSize: '0.8em', color: '#666' }}>%</span>
+                                            {marque(modCE)}
                                         </div>
                                     </td>
                                     <td style={{ ...tdStyle, color: '#ff8a65' }}>{row.revenu_bcont.toFixed(1)}</td>
