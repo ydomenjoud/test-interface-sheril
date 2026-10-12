@@ -150,7 +150,9 @@ export default function PlanificationRevenu() {
             const taxModif = global?.modificateursStabiliteTaxation?.find(m => m.taxation === state.taxation)?.modif ?? 0;
             
             let variation_stab = 0;
-            s.evostab.forEach(evo => {
+            // Les rapports stockés avant l'ajout d'evostab n'ont pas ce champ
+            const evostab = s.evostab ?? [];
+            evostab.forEach(evo => {
                 if (evo.t === 'taxation') {
                     variation_stab += taxModif;
                 } else {
@@ -159,7 +161,7 @@ export default function PlanificationRevenu() {
             });
             // Si pas d'evostab "taxation" trouvée (peu probable d'après l'énoncé), on ajoute quand même le modif? 
             // L'énoncé dit "lorsque je change une taxation, il faut remplacé le taxation par le modificateur de stab"
-            if (!s.evostab.some(evo => evo.t === 'taxation')) {
+            if (!evostab.some(evo => evo.t === 'taxation')) {
                 variation_stab += taxModif;
             }
             variation_stab += deltaStabPolitique;
@@ -170,13 +172,13 @@ export default function PlanificationRevenu() {
 
             s.planetes.forEach(p => {
                 if (p.proprietaire === rapport?.joueur.numero) {
-                    const pPop = p.populations.reduce((acc, pop) => acc + (pop.nb || 0), 0);
+                    const pPop = (p.populations ?? []).reduce((acc, pop) => acc + (pop.nb || 0), 0);
                     
                     // L'augmentation de pop de base + terraformation (+3% si activée)
                     // Le calcul doit se faire au niveau de chaque planète et être arrondi à l'inférieur par race
                     const growthBonus = (state.terraformation ? 3 : 0) + deltaPopPolitique;
                     let pGrowth = 0;
-                    p.populations.forEach(pop => {
+                    (p.populations ?? []).forEach(pop => {
                         const rate = (pop.growth || 0) + growthBonus;
                         pGrowth += Math.floor((pop.nb || 0) * rate / 100);
                     });
