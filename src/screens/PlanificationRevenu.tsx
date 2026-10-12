@@ -115,6 +115,10 @@ export default function PlanificationRevenu() {
         }));
     };
 
+    const handleReset = (key: string, s: SystemeJoueur) => {
+        setStates(prev => ({ ...prev, [key]: etatDuRapport(s) }));
+    };
+
     const handleTerraChange = (key: string, val: boolean) => {
         setStates(prev => ({
             ...prev,
@@ -280,6 +284,7 @@ export default function PlanificationRevenu() {
                             <th style={thStyle}>Revenu SS</th>
                             <th style={thStyle}>Budget CE</th>
                             <th style={thStyle}>Revenu CE</th>
+                            <th style={thStyle}></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -296,8 +301,12 @@ export default function PlanificationRevenu() {
                             const modTech = state.btech !== ref.btech;
                             const modSS = state.besp !== ref.besp;
                             const modCE = state.bcont !== ref.bcont;
+                            const modifie = modPolitique || modTerra || modTax || modTech || modSS || modCE;
                             const marque = (m: boolean) => (m ? <span title="Différent du rapport" style={{ color: COULEUR_MODIFIE, marginLeft: '4px', fontWeight: 'bold' }}>●</span> : null);
-                            const politiqueCodes = Object.keys(global?.politiques || {}).map(Number).sort((a, b) => a - b);
+                            // Les politiques "anti-*" ne sont pas proposées, sauf si elles sont déjà celle du système (rapport ou choix)
+                            const politiqueCodes = Object.keys(global?.politiques || {}).map(Number)
+                                .filter(c => !global?.politiques[c]?.startsWith('anti-') || c === state.politique || c === ref.politique)
+                                .sort((a, b) => a - b);
 
                             return (
                                 <tr key={row.key} style={{ borderBottom: '1px solid #333', backgroundColor: idx % 2 === 0 ? '#1e1e1e' : '#252525' }}>
@@ -397,6 +406,17 @@ export default function PlanificationRevenu() {
                                         </div>
                                     </td>
                                     <td style={{ ...tdStyle, color: '#ff8a65' }}>{row.revenu_bcont.toFixed(1)}</td>
+                                    <td style={tdStyle}>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleReset(row.key, s)}
+                                            disabled={!modifie}
+                                            title="Revenir aux valeurs du rapport"
+                                            style={{ ...resetButtonStyle, opacity: modifie ? 1 : 0.3, cursor: modifie ? 'pointer' : 'default' }}
+                                        >
+                                            ↺
+                                        </button>
+                                    </td>
                                 </tr>
                             );
                         })}
@@ -440,4 +460,13 @@ const selectStyle: React.CSSProperties = {
     padding: '4px 6px',
     fontSize: '0.9em',
     cursor: 'pointer'
+};
+
+const resetButtonStyle: React.CSSProperties = {
+    backgroundColor: '#333',
+    color: '#fff',
+    border: '1px solid #555',
+    borderRadius: '4px',
+    padding: '2px 8px',
+    fontSize: '1em'
 };
