@@ -50,3 +50,7 @@ export function getTorusDistance(p1: XY, p2: XY): number {
     const ady = Math.min(dy, BOUNDS.maxY - dy);
     return Math.max(adx, ady);
 }
+
+export function posToString(pos: XY): string {
+    return `${pos.x}_${pos.y}`;
+}

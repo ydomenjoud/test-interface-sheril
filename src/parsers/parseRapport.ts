@@ -268,6 +268,7 @@ export function parseRapportXml(text: string): Rapport {
             const temperature = getAttrNum(p, ['temp']) ?? 0;
             const terraformation = getAttrNum(p, ['terra']) ?? 0;
             const size = getAttrNum(p, ['tai']) ?? 0;
+            const stab = getAttrNum(p, ['stab']) ?? 0;
 
 
             planetes.push({
@@ -284,7 +285,8 @@ export function parseRapportXml(text: string): Rapport {
                 radiation,
                 temperature,
                 terraformation,
-                size
+                size,
+                stab
             });
         });
 
@@ -315,6 +317,10 @@ export function parseRapportXml(text: string): Rapport {
             bcont: getAttrNum(s, ['bcont']),
             besp: getAttrNum(s, ['besp']),
             btech: getAttrNum(s, ['btech']),
+            evostab: qAll(s, ['evostab']).map(evo => ({
+                t: getAttr(evo, ['t']) || '',
+                v: getAttrNum(evo, ['v']) || 0
+            })),
             marchandises: marchandiseMap.get(posStr)
         });
     });

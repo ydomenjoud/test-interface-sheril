@@ -10,6 +10,7 @@ import ArbreTechnologies from './screens/ArbreTechnologies';
 import ListePlans from './screens/ListePlans';
 import CreatePlan from './screens/CreatePlan';
 import Planification from './screens/Planification';
+import PlanificationRevenu from './screens/PlanificationRevenu';
 import RechercheTechnologique from './screens/RechercheTechnologique';
 import PlayerSystemDetail from './screens/PlayerSystemDetail';
 import MainLayout from "./components/MainLayout";
@@ -27,6 +28,7 @@ function App() {
                     <Route path="/arbre-technologies" element={<ArbreTechnologies />} />
                     <Route path="/plans" element={<ListePlans />} />
                     <Route path="/planification" element={<Planification />} />
+                    <Route path="/planification-revenu" element={<PlanificationRevenu />} />
                     <Route path="/plans/creer" element={<CreatePlan />} />
                     <Route path="/recherche" element={<RechercheTechnologique />} />
                     <Route path="/player-system-detail/:key" element={<PlayerSystemDetail />} />

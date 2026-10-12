@@ -155,6 +155,14 @@ export function parseDataXml(text: string): GlobalData {
         modificateursStabilite.push({ distance, modif });
     });
     modificateursStabilite.sort((a, b) => a.distance - b.distance);
+    
+    // Modificateurs de stabilité taxation
+    const modificateursStabiliteTaxation: { taxation: number, modif: number }[] = [];
+    doc.querySelectorAll('data > modificateur_stabilite_taxation > m')?.forEach(m => {
+        const taxation = Number(m.getAttribute('taxation') ?? 0);
+        const modif = Number(m.getAttribute('modif') ?? 0);
+        modificateursStabiliteTaxation.push({ taxation, modif });
+    });
 
     const systemes: SystemData[] = [];
     doc.querySelectorAll('data > systemes > s')?.forEach(s => {
@@ -172,6 +180,7 @@ export function parseDataXml(text: string): GlobalData {
         politiques,
         technologies: techs, commandants, races, marchandises, caracteristiquesBatiment, caracteristiquesComposant, plansPublic, tailleVaisseaux,
         modificateursStabilite,
+        modificateursStabiliteTaxation,
         systemes,
     };
 }

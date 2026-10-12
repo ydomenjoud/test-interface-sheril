@@ -106,6 +106,7 @@ export type Planete = {
     temperature: number,
     terraformation: number,
     size: number,
+    stab: number;
 };
 
 export interface SystemBase {
@@ -137,6 +138,7 @@ export interface SystemeJoueur extends SystemBase {
     revenuEstime: number;
     scan: number;
     marchandises?: MarchandiseData[];
+    evostab: { t: string, v: number }[];
 }
 
 export interface SystemeDetecte extends SystemBase {
@@ -239,5 +241,6 @@ export type GlobalData = {
     plansPublic: PlanVaisseau[];
     tailleVaisseaux: VaisseauTailleRule[];
     modificateursStabilite: ModificateurStabilite[];
+    modificateursStabiliteTaxation: { taxation: number, modif: number }[];
     systemes: SystemData[];
 };

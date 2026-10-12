@@ -3226,12 +3226,12 @@
         <m distance="2147483647" modif="-16"/>
     </modificateur_stabilite>
     <modificateur_stabilite_taxation>
-        <m modif="6" taxation="1"/>
-        <m modif="3" taxation="2"/>
-        <m modif="1" taxation="3"/>
-        <m modif="-3" taxation="4"/>
-        <m modif="-7" taxation="5"/>
-        <m modif="-12" taxation="6"/>
+        <m modif="6" taxation="0"/>
+        <m modif="3" taxation="1"/>
+        <m modif="1" taxation="2"/>
+        <m modif="-3" taxation="3"/>
+        <m modif="-7" taxation="4"/>
+        <m modif="-12" taxation="5"/>
     </modificateur_stabilite_taxation>
     <taille_vaisseaux>
         <t max="3" min="1" taille="1" vitesse="9"/>
