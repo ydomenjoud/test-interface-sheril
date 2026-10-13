@@ -79,6 +79,7 @@ const MARCH_MEDICAMENTS = 5;
 const MARCH_LUXE = 2;
 const MARCH_METAUX_PRECIEUX = 12;
 const SEUIL_STOCK_IMPORTANT = 100;
+const CROISSANCE_MIN_PLANETE = 10;
 // Bonus de croissance de population (en points de %) d'un stock important, absents du rapport
 const BONUS_POP_ALIMENTAIRE = 5;
 const BONUS_POP_MEDICAMENTS = 10;
@@ -329,6 +330,8 @@ export default function PlanificationRevenu() {
                     pGrowth += Math.min(Math.floor(nb * rate / 100), Math.max(0, (pop.max || 0) - nb));
                     pMax += pop.max || 0;
                 });
+                // Une planète peuplée gagne au moins CROISSANCE_MIN_PLANETE habitants par tour, dans la limite de sa pop max
+                if (pPop > 0) pGrowth = Math.min(Math.max(pGrowth, CROISSANCE_MIN_PLANETE), Math.max(0, pMax - pPop));
 
                 // Taxation du système si l'utilisateur l'a modifiée, sinon celle de la planète dans le rapport
                 const taxPlanete = taxationModifiee ? state.taxation : p.tax;
@@ -344,7 +347,7 @@ export default function PlanificationRevenu() {
             });
 
             const detailPopulation = `Population totale des planètes du joueur : ${population} / pop max ${populationMax}`;
-            const detailVariationPop = `Croissance par tour (par race et par planète, arrondie à l'inférieur, limitée par la pop max) :\n${detailPop.join('\n')}\nBonus appliqués au taux : terraformation ${state.terraformation ? '+3' : '0'} %, politique ${signe(bonusPopPolitique)} %, produits alimentaires ${signe(bonusPopAlimentaire)} %, médicaments ${signe(bonusPopMedicaments)} %\n= +${population_variation}`;
+            const detailVariationPop = `Croissance par tour (par race et par planète, arrondie à l'inférieur, minimum ${CROISSANCE_MIN_PLANETE} par planète, limitée par la pop max) :\n${detailPop.join('\n')}\nBonus appliqués au taux : terraformation ${state.terraformation ? '+3' : '0'} %, politique ${signe(bonusPopPolitique)} %, produits alimentaires ${signe(bonusPopAlimentaire)} %, médicaments ${signe(bonusPopMedicaments)} %\n= +${population_variation}`;
 
             // Bonus gouverneur (finance) puis modificateur de politique (impôts / loisir) : base du revenu technologique
             const revenuTechBase = revenuPlanetes
