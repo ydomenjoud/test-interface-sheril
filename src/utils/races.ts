@@ -28,6 +28,7 @@ export const raceIndexToNameMap: ReadonlyMap<RacesEnum, string> = new Map([
     [RacesEnum.CYBORG, 'Cyborg'],
 ]);
 
+/** plus utilisé car c'est 0 par tout **/
 const RACES_CARACTERISTIQUES = [
     {
         growth: 0,
@@ -72,7 +73,4 @@ const RACES_CARACTERISTIQUES = [
         planetFight:100
     },
 ] as const;
-// Bonus (en %) à la production technologique de la race
-export function bonusTechRace(raceId: number): number {
-    return RACES_CARACTERISTIQUES[raceId]?.techBonus ?? 0;
-}
+

@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Lieutenant, SystemeJoueur } from '../types';
 import { useReport } from '../context/ReportContext';
-import { bonusTechRace } from '../utils/races';
 import { isPos, parsePosString, posToString } from '../utils/position';
 import { loadPlanificationRevenu, savePlanificationRevenu } from '../utils/planificationRevenuStorage';
 
@@ -333,13 +332,14 @@ export default function PlanificationRevenu() {
 
                 // Taxation du système si l'utilisateur l'a modifiée, sinon celle de la planète dans le rapport
                 const taxPlanete = taxationModifiee ? state.taxation : p.tax;
-                const revenuPlanete = Math.floor((pPop + pGrowth) * taxPlanete / 10);
+                // Pas d'arrondi : le revenu du rapport est exactement la somme de pop × taxation / 10
+                const revenuPlanete = (pPop + pGrowth) * taxPlanete / 10;
 
                 population += pPop;
                 populationMax += pMax;
                 population_variation += pGrowth;
                 revenuPlanetes += revenuPlanete;
-                detailPop.push(`planète ${p.num ?? ''} : pop ${pPop}/${pMax}, croissance +${pGrowth} (marge avant pop max : ${Math.max(0, pMax - pPop)}), revenu ${revenuPlanete} (taxation ${taxPlanete})`);
+                detailPop.push(`planète ${p.num ?? ''} : pop ${pPop}/${pMax}, croissance +${pGrowth} (marge avant pop max : ${Math.max(0, pMax - pPop)}), revenu ${revenuPlanete.toFixed(1)} (taxation ${taxPlanete})`);
 
             });
 
@@ -358,7 +358,6 @@ export default function PlanificationRevenu() {
                 * (stockImportant(MARCH_METAUX_PRECIEUX) ? 1.05 : 1);
 
             // +25 % en dernier pour logiciels (tech) / composants électroniques (SS et CE)
-            const bonusRace = (100 + bonusTechRace(rapport?.joueur.raceId ?? -1)) / 100;
             const bonusLogiciels = stockImportant(MARCH_LOGICIELS) ? BONUS_STOCK_BUDGET : 1;
             const bonusComposants = stockImportant(MARCH_COMPOSANTS_ELECTRONIQUES) ? BONUS_STOCK_BUDGET : 1;
 
@@ -366,27 +365,26 @@ export default function PlanificationRevenu() {
             const coefPol = modificateurRevenuPolitique(state.politique);
             const fmt = (n: number) => n.toFixed(2);
             const detailRevenuBase = [
-                `somme par planète de (pop + croissance, plafonnée à la pop max) × taxation / 10, arrondie à l'inférieur = ${revenuPlanetes}`,
+                `somme par planète de (pop + croissance, plafonnée à la pop max) × taxation / 10, sans arrondi = ${fmt(revenuPlanetes)}`,
                 `× gouverneur (finance niv. ${niveauCompetence(gouverneur, COMP_FINANCE)}) : ${fmt(coefGouv)}`,
                 `× politique : ${fmt(coefPol)}`,
             ];
             const detailRevenus = `Revenu :\n${detailRevenuBase.join('\n')}\n× luxe (stock ≥ ${SEUIL_STOCK_IMPORTANT}) : ${stockImportant(MARCH_LUXE) ? '1,10' : '1'}\n× métaux précieux (stock ≥ ${SEUIL_STOCK_IMPORTANT}) : ${stockImportant(MARCH_METAUX_PRECIEUX) ? '1,05' : '1'}\n= ${fmt(revenus)}`;
-            const detailTech = `Budget tech :\n${detailRevenuBase.join('\n')}\n(sans luxe ni métaux précieux) = ${fmt(revenuTechBase)}\n× budget tech ${state.btech} %\n× race (${bonusTechRace(rapport?.joueur.raceId ?? -1) >= 0 ? '+' : ''}${bonusTechRace(rapport?.joueur.raceId ?? -1)} %) : ${fmt(bonusRace)}\n× logiciels (stock ≥ ${SEUIL_STOCK_IMPORTANT}) : ${fmt(bonusLogiciels)}\n= ${fmt((state.btech / 100) * revenuTechBase * bonusRace * bonusLogiciels)}`;
+            const detailTech = `Budget tech :\n${detailRevenuBase.join('\n')}\n(sans luxe ni métaux précieux) = ${fmt(revenuTechBase)}\n× budget tech ${state.btech} %\n× logiciels (stock ≥ ${SEUIL_STOCK_IMPORTANT}) : ${fmt(bonusLogiciels)}\n= ${fmt((state.btech / 100) * revenuTechBase * bonusLogiciels)}`;
             const detailBudget = (nom: string, pct: number) => `Budget ${nom} :\nrevenu ${fmt(revenus)}\n× ${pct} %\n× composants électroniques (stock ≥ ${SEUIL_STOCK_IMPORTANT}) : ${fmt(bonusComposants)}\n= ${fmt((pct / 100) * revenus * bonusComposants)}`;
 
-            const revenu_tech = (state.btech / 100) * revenuTechBase * bonusRace * bonusLogiciels;
+            const revenu_tech = (state.btech / 100) * revenuTechBase * bonusLogiciels;
             const revenu_besp = (state.besp / 100) * revenus * bonusComposants;
             const revenu_bcont = (state.bcont / 100) * revenus * bonusComposants;
 
             // Bénéfice = revenus - ce que coûtent les budgets au joueur (% des revenus) - terraformation.
-            // Les bonus (race, logiciels, composants) augmentent la valeur d'un budget mais pas son coût : ils ne sont pas imputés ici.
+            // Les bonus (logiciels, composants) augmentent la valeur d'un budget mais pas son coût : ils ne sont pas imputés ici.
             const coutBudgets = (state.btech + state.besp + state.bcont) / 100 * revenus;
             // Coût de la terraformation (planètes du joueur) si elle est cochée
             const coutTerra = state.terraformation
                 ? mesPlanetes.reduce((acc, p) => acc + coutTerraformationPlanete(p.terraformation ?? 0), 0)
                 : 0;
             const benefice = revenus - coutBudgets - coutTerra;
-            const detailBenefice = `Bénéfice :\nrevenus ${fmt(revenus)}\n− budgets (tech ${state.btech} % + SS ${state.besp} % + CE ${state.bcont} % = ${state.btech + state.besp + state.bcont} % des revenus) : ${fmt(coutBudgets)}\n(les bonus race / logiciels / composants ne changent pas le coût)\n− terraformation : ${coutTerra}\n= ${fmt(benefice)}`;
 
             return {
                 key,
@@ -409,7 +407,7 @@ export default function PlanificationRevenu() {
                 bcont: state.bcont,
                 revenu_bcont,
                 detailStabilite, detailVariationStab, detailPopulation, detailPopMax: `Population maximale des planètes du joueur (somme des pop max par race) : ${populationMax}`, detailVariationPop,
-                detailRevenus, detailBenefice, detailTech,
+                detailRevenus, detailTech,
                 detailSS: detailBudget('services spéciaux', state.besp),
                 detailCE: detailBudget('contre-espionnage', state.bcont),
             };
@@ -573,7 +571,6 @@ export default function PlanificationRevenu() {
                             <th style={thStyle}>Pop / max</th>
                             <th style={thStyle}>Taxation</th>
                             <th style={thStyle}>Revenus</th>
-                            <th style={thStyle}>Bénéfice</th>
                             <th style={thStyle}>Budget Tech</th>
                             <th style={thStyle}>Revenu Tech</th>
                             <th style={thStyle}>Budget SS</th>
@@ -683,7 +680,6 @@ export default function PlanificationRevenu() {
                                         )}
                                     </td>
                                     <td style={{ ...tdStyle, color: '#fff', fontWeight: 'bold' }}><Change detail={row.detailRevenus} rapport={row.rapport.revenus.toFixed(1)}>{row.revenus.toFixed(1)}</Change></td>
-                                    <td style={{ ...tdStyle, color: '#81c784', fontWeight: 'bold' }}><Change detail={row.detailBenefice} rapport={row.rapport.benefice.toFixed(1)}>{row.benefice.toFixed(1)}</Change></td>
                                     <td style={tdStyle}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                             <input 
