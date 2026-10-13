@@ -79,6 +79,17 @@ const MARCH_MEDICAMENTS = 5;
 const MARCH_LUXE = 2;
 const MARCH_METAUX_PRECIEUX = 12;
 const SEUIL_STOCK_IMPORTANT = 100;
+
+// Ordres du jeu (php/ordres) : domaines de budget (table z_budgets) et position « en réserve » d'un gouverneur
+const BUDGET_TECH = 0;
+const BUDGET_SS = 1;
+const BUDGET_CE = 2;
+const POSITION_RESERVE = '0_0_0';
+// Un système est désigné dans les ordres par « 0_x_y »
+const codePositionOrdre = (pos: { x: number; y: number }) => `0_${pos.x}_${pos.y}`;
+const SEPARATEUR_SCHEMA = '%#!%';
+// Types d'ordres dans l'ordre de résolution du tour (php/ordres/fr/ordres.txt) ; les budgets sont distingués par domaine
+const ORDRE_GROUPES = ['gouverneur', 'politique', 'budget_tech', 'budget_ss', 'budget_ce', 'taxation', 'terraformation'];
 const CROISSANCE_MIN_PLANETE = 10;
 // Bonus de croissance de population (en points de %) d'un stock important, absents du rapport
 const BONUS_POP_ALIMENTAIRE = 5;
@@ -230,6 +241,8 @@ export default function PlanificationRevenu() {
     const handleReset = (key: string, s: SystemeJoueur) => {
         setStates(prev => ({ ...prev, [key]: etatDuRapport(s, gouverneurs, numeroJoueur) }));
     };
+
+    const [schemaCopie, setSchemaCopie] = useState(false);
 
     const handleResetAll = () => {
         const etats: Record<string, SystemState> = {};
@@ -440,38 +453,81 @@ export default function PlanificationRevenu() {
         return { total, nb: details.length, details };
     }, [systems, states, numeroJoueur]);
 
-    // Ordres correspondant aux écarts entre la saisie et le rapport
-    const ordres = useMemo(() => {
-        const lignes: string[] = [];
+    // Ordres correspondant aux écarts entre la saisie et le rapport :
+    // `lignes` pour l'affichage, `serveur` pour le schéma (table d'ordre du jeu + paramètres dans l'ordre des colonnes)
+    const { lignes: ordres, serveur: ordresServeur } = useMemo(() => {
+        // Regroupés par type d'ordre, dans l'ordre de résolution du tour (puis dans l'ordre des systèmes)
+        const groupes: Record<string, { lignes: string[]; serveur: string[][] }> = {};
+        ORDRE_GROUPES.forEach(g => { groupes[g] = { lignes: [], serveur: [] }; });
+        const ajoute = (groupe: string, ligne: string, ordre?: string[]) => {
+            groupes[groupe].lignes.push(ligne);
+            if (ordre) groupes[groupe].serveur.push(ordre);
+        };
         systems.forEach(s => {
             const etat = states[posToString(s.pos)];
             if (!etat) return;
             const ref = etatDuRapport(s, gouverneurs, numeroJoueur);
             const pos = `[${s.pos.x}-${s.pos.y}] ${s.nom}`;
-            if (etat.terraformation !== ref.terraformation) lignes.push(`${pos} ${etat.terraformation ? 'terraformation' : 'sans terraformation'}`);
-            if (etat.taxation !== ref.taxation) lignes.push(`${pos} taxation ${etat.taxation}`);
-            if (etat.politique !== ref.politique) lignes.push(`${pos} politique ${etat.politique !== undefined ? global?.politiques[etat.politique] ?? etat.politique : '?'}`);
-            if (etat.btech !== ref.btech) lignes.push(`${pos} budget tech ${etat.btech}%`);
-            if (etat.besp !== ref.besp) lignes.push(`${pos} budget SS ${etat.besp}%`);
-            if (etat.bcont !== ref.bcont) lignes.push(`${pos} budget CE ${etat.bcont}%`);
+            const codePos = codePositionOrdre(s.pos);
+            if (etat.terraformation !== ref.terraformation) {
+                // pas d'ordre pour annuler une terraformation : le rapport ne la contient jamais
+                ajoute('terraformation', `${pos} ${etat.terraformation ? 'terraformation' : 'sans terraformation'}`, etat.terraformation ? ['terraformer_systeme', codePos] : undefined);
+            }
+            if (etat.taxation !== ref.taxation) {
+                ajoute('taxation', `${pos} taxation ${etat.taxation}`, ['modifier_taxation_systeme', codePos, String(etat.taxation)]);
+            }
+            if (etat.politique !== ref.politique) {
+                ajoute('politique', `${pos} politique ${etat.politique !== undefined ? global?.politiques[etat.politique] ?? etat.politique : '?'}`,
+                    etat.politique !== undefined ? ['modifier_politique', codePos, String(etat.politique)] : undefined);
+            }
+            if (etat.btech !== ref.btech) {
+                ajoute('budget_tech', `${pos} budget tech ${etat.btech}%`, ['modifier_budget', codePos, String(BUDGET_TECH), String(etat.btech)]);
+            }
+            if (etat.besp !== ref.besp) {
+                ajoute('budget_ss', `${pos} budget SS ${etat.besp}%`, ['modifier_budget', codePos, String(BUDGET_SS), String(etat.besp)]);
+            }
+            if (etat.bcont !== ref.bcont) {
+                ajoute('budget_ce', `${pos} budget CE ${etat.bcont}%`, ['modifier_budget', codePos, String(BUDGET_CE), String(etat.bcont)]);
+            }
         });
         // Changements d'affectation : on ne donne que la nouvelle affectation du lieutenant
-        const affectation = (etats: (s: SystemeJoueur) => string | null) => {
+        const affectation = (etats: (s: SystemeJoueur) => string | null, format: (s: SystemeJoueur) => string = s => `[${s.pos.x}-${s.pos.y}] ${s.nom}`) => {
             const m: Record<string, string> = {};
             systems.forEach(s => {
                 const nom = etats(s);
-                if (nom) m[nom] = `[${s.pos.x}-${s.pos.y}] ${s.nom}`;
+                if (nom) m[nom] = format(s);
             });
             return m;
         };
+        const apresCode = affectation(s => (states[posToString(s.pos)] ?? etatDuRapport(s, gouverneurs, numeroJoueur)).gouverneur, s => codePositionOrdre(s.pos));
         const avant = affectation(s => etatDuRapport(s, gouverneurs, numeroJoueur).gouverneur);
         const apres = affectation(s => (states[posToString(s.pos)] ?? etatDuRapport(s, gouverneurs, numeroJoueur)).gouverneur);
         gouverneursDuRapport.forEach(l => {
             const nouvelle = apres[l.nom] ?? 'réserve';
-            if (nouvelle !== (avant[l.nom] ?? 'réserve')) lignes.push(`${l.nom} ${nouvelle}`);
+            if (nouvelle !== (avant[l.nom] ?? 'réserve')) {
+                ajoute('gouverneur', `${l.nom} ${nouvelle}`, ['affecter_gouverneur', l.nom, apresCode[l.nom] ?? POSITION_RESERVE]);
+            }
         });
-        return lignes;
+        return {
+            lignes: ORDRE_GROUPES.flatMap(g => groupes[g].lignes),
+            serveur: ORDRE_GROUPES.flatMap(g => groupes[g].serveur),
+        };
     }, [systems, states, gouverneurs, gouverneursDuRapport, global, numeroJoueur]);
+    // Schéma à coller dans la console d'ordres : « table:param:param » par ordre, séparés par %#!%, le tout en base64 (UTF-8)
+    const schema = useMemo(() => {
+        if (ordresServeur.length === 0) return '';
+        const octets = new TextEncoder().encode(ordresServeur.map(o => o.join(':')).join(SEPARATEUR_SCHEMA));
+        return btoa(octets.reduce((acc, byte) => acc + String.fromCharCode(byte), ''));
+    }, [ordresServeur]);
+
+    const copierSchema = () => {
+        navigator.clipboard.writeText(schema)
+            .then(() => {
+                setSchemaCopie(true);
+                setTimeout(() => setSchemaCopie(false), 2000);
+            })
+            .catch(err => console.error('Erreur copie du schéma', err));
+    };
     const totalsRapport = useMemo(() => additionne(rows.map(r => r.rapport)), [rows]);
 
     // Totaux serrés pour laisser la place au tableau
@@ -483,6 +539,16 @@ export default function PlanificationRevenu() {
             <style>{`@keyframes revenuChange { 0% { background-color: #ffd54f; color: #000; } 100% { background-color: transparent; } }`}</style>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #444', paddingBottom: '4px', marginBottom: '8px', flexShrink: 0 }}>
                 <h2 style={{ color: '#fff', margin: 0, fontSize: '1.1em' }}>Planification des Revenus</h2>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                    type="button"
+                    onClick={copierSchema}
+                    disabled={!schema}
+                    title="Copier le schéma des ordres (taxation, politique, budgets, terraformation, gouverneurs) à coller dans la console d'ordres"
+                    style={{ ...resetButtonStyle, padding: '6px 12px', opacity: schema ? 1 : 0.3, cursor: schema ? 'pointer' : 'default' }}
+                >
+                    {schemaCopie ? '✓ Schéma copié' : 'Copier le schéma des ordres'}
+                </button>
                 <button
                     type="button"
                     onClick={handleResetAll}
@@ -492,6 +558,7 @@ export default function PlanificationRevenu() {
                 >
                     ↺ Tout réinitialiser
                 </button>
+                </div>
             </div>
             
             <div style={{ display: 'flex', gap: '20px', marginBottom: '8px', alignItems: 'stretch', flexShrink: 0 }}>
