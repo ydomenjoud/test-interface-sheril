@@ -28,8 +28,26 @@ jobs:
           node-version: 24
           cache: npm
 
+      # Cache de node_modules (clé = lockfile + version de Node) : en cas de hit, on saute l'installation
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
+
+      # Cache de build de react-scripts (babel-loader, eslint, terser) pour accélérer les builds suivants
+      - name: Cache build de react-scripts
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.cache
+          key: cra-cache-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            cra-cache-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
 
       - name: Build
         run: npm run build

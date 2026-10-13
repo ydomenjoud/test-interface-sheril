@@ -75,9 +75,14 @@ const COMP_FINANCE = 14;
 // Codes des marchandises (data.xml > marchandises) et des politiques de revenu
 const MARCH_LOGICIELS = 6;
 const MARCH_COMPOSANTS_ELECTRONIQUES = 8;
+const MARCH_PRODUITS_ALIMENTAIRES = 0;
+const MARCH_MEDICAMENTS = 5;
 const MARCH_LUXE = 2;
 const MARCH_METAUX_PRECIEUX = 12;
 const SEUIL_STOCK_IMPORTANT = 100;
+// Bonus de croissance de population (en points de %) d'un stock important, absents du rapport
+const BONUS_POP_ALIMENTAIRE = 5;
+const BONUS_POP_MEDICAMENTS = 10;
 const BONUS_STOCK_BUDGET = 1.25;
 const POLITIQUE_IMPOTS = 0;
 const POLITIQUE_LOISIR = 13;
@@ -243,7 +248,8 @@ export default function PlanificationRevenu() {
             const effetActuel = effetPolitique(s.politique);
             const effetChoisi = effetPolitique(state.politique);
             const deltaStabPolitique = effetChoisi.stab - effetActuel.stab;
-            const deltaPopPolitique = effetChoisi.pop - effetActuel.pop;
+            // Le taux de croissance du rapport n'inclut pas le bonus de population de la politique : on l'applique en entier
+            const bonusPopPolitique = effetChoisi.pop;
             
             // Stabilité = Moyenne des stab des planètes
             const mesPlanetes = planetesDuJoueur(s, numeroJoueur);
@@ -287,7 +293,13 @@ export default function PlanificationRevenu() {
             const detailStabilite = `Stabilité actuelle : moyenne de ${mesPlanetes.length} planète(s) du joueur`;
             const detailVariationStab = `Variation de stabilité par tour :\n${detailStab.join('\n')}\n= ${signe(variation_stab)}`;
 
+            // Un stock important (100+) donne un bonus propre au système qui le détient
+            const stockImportant = (code: number) =>
+                (s.marchandises ?? []).some(m => m.code === code && m.stock >= SEUIL_STOCK_IMPORTANT);
+
             // population_variation = SOMME des (population des planètes*augmentation de pop)
+            const bonusPopAlimentaire = stockImportant(MARCH_PRODUITS_ALIMENTAIRES) ? BONUS_POP_ALIMENTAIRE : 0;
+            const bonusPopMedicaments = stockImportant(MARCH_MEDICAMENTS) ? BONUS_POP_MEDICAMENTS : 0;
             let population = 0;
             let population_variation = 0;
             const detailPop: string[] = [];
@@ -301,7 +313,7 @@ export default function PlanificationRevenu() {
 
                 // L'augmentation de pop de base + terraformation (+3% si activée)
                 // Calcul par planète et par race, arrondi à l'inférieur, et limité par la pop max
-                const growthBonus = (state.terraformation ? 3 : 0) + deltaPopPolitique;
+                const growthBonus = (state.terraformation ? 3 : 0) + bonusPopPolitique + bonusPopAlimentaire + bonusPopMedicaments;
                 let pGrowth = 0;
                 let pMax = 0;
                 (p.populations ?? []).forEach(pop => {
@@ -324,16 +336,12 @@ export default function PlanificationRevenu() {
             });
 
             const detailPopulation = `Population totale des planètes du joueur : ${population} / pop max ${populationMax}`;
-            const detailVariationPop = `Croissance par tour (par race et par planète, arrondie à l'inférieur, limitée par la pop max) :\n${detailPop.join('\n')}\nBonus appliqués au taux : terraformation ${state.terraformation ? '+3' : '0'} %, politique ${signe(deltaPopPolitique)} %\n= +${population_variation}`;
+            const detailVariationPop = `Croissance par tour (par race et par planète, arrondie à l'inférieur, limitée par la pop max) :\n${detailPop.join('\n')}\nBonus appliqués au taux : terraformation ${state.terraformation ? '+3' : '0'} %, politique ${signe(bonusPopPolitique)} %, produits alimentaires ${signe(bonusPopAlimentaire)} %, médicaments ${signe(bonusPopMedicaments)} %\n= +${population_variation}`;
 
             // Bonus gouverneur (finance) puis modificateur de politique (impôts / loisir) : base du revenu technologique
             const revenuTechBase = revenuPlanetes
                 * (1 + bonusRevenuGouverneur(gouverneur))
                 * modificateurRevenuPolitique(state.politique);
-
-            // Un stock important (100+) donne un bonus propre au système qui le détient
-            const stockImportant = (code: number) =>
-                (s.marchandises ?? []).some(m => m.code === code && m.stock >= SEUIL_STOCK_IMPORTANT);
 
             // Revenu normal : luxe (+10 %) et métaux précieux (+5 %) se multiplient, sans arrondi intermédiaire.
             // Ils n'entrent pas dans le revenu technologique.
