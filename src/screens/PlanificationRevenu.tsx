@@ -231,6 +231,12 @@ export default function PlanificationRevenu() {
         setStates(prev => ({ ...prev, [key]: etatDuRapport(s, gouverneurs, numeroJoueur) }));
     };
 
+    const handleResetAll = () => {
+        const etats: Record<string, SystemState> = {};
+        systems.forEach(s => { etats[posToString(s.pos)] = etatDuRapport(s, gouverneurs, numeroJoueur); });
+        setStates(() => etats);
+    };
+
     const handleTerraChange = (key: string, val: boolean) => {
         setStates(prev => ({
             ...prev,
@@ -470,7 +476,18 @@ export default function PlanificationRevenu() {
     return (
         <div className="planification-revenu" style={{ padding: '20px', color: '#e0e0e0', flex: 1, overflowY: 'auto' }}>
             <style>{`@keyframes revenuChange { 0% { background-color: #ffd54f; color: #000; } 100% { background-color: transparent; } }`}</style>
-            <h2 style={{ color: '#fff', borderBottom: '1px solid #444', paddingBottom: '10px' }}>Planification des Revenus</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #444', paddingBottom: '10px', marginBottom: '20px' }}>
+                <h2 style={{ color: '#fff', margin: 0 }}>Planification des Revenus</h2>
+                <button
+                    type="button"
+                    onClick={handleResetAll}
+                    disabled={ordres.length === 0}
+                    title="Revenir aux valeurs du rapport pour tous les systèmes"
+                    style={{ ...resetButtonStyle, padding: '6px 12px', opacity: ordres.length === 0 ? 0.3 : 1, cursor: ordres.length === 0 ? 'default' : 'pointer' }}
+                >
+                    ↺ Tout réinitialiser
+                </button>
+            </div>
             
             <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', alignItems: 'stretch' }}>
             <div style={{
@@ -573,6 +590,10 @@ export default function PlanificationRevenu() {
                             const modTerra = state.terraformation !== ref.terraformation;
                             const modGouv = state.gouverneur !== ref.gouverneur;
                             const modTax = state.taxation !== ref.taxation;
+                            // Taxations différentes entre les planètes du joueur : la valeur affichée n'est qu'une moyenne
+                            const planetesTax = planetesDuJoueur(s, numeroJoueur);
+                            const taxationsHeterogenes = new Set(planetesTax.map(p => p.tax)).size > 1;
+                            const detailTaxHeterogene = `Taxations différentes selon les planètes (moyenne arrondie à l'inférieur : ${ref.taxation}) :\n${planetesTax.map(p => `planète ${p.num ?? ''} : ${p.tax}`).join('\n')}${modTax ? '\nLa taxation saisie remplace celle de toutes les planètes.' : ''}`;
                             const modTech = state.btech !== ref.btech;
                             const modSS = state.besp !== ref.besp;
                             const modCE = state.bcont !== ref.bcont;
@@ -652,6 +673,9 @@ export default function PlanificationRevenu() {
                                             {[0, 1, 2, 3, 4, 5].map(t => <option key={t} value={t}>{t}</option>)}
                                         </select>
                                         {marque(modTax)}
+                                        {taxationsHeterogenes && (
+                                            <span title={detailTaxHeterogene} style={{ marginLeft: '4px', color: COULEUR_MODIFIE, cursor: 'help' }}>⚠</span>
+                                        )}
                                     </td>
                                     <td style={{ ...tdStyle, color: '#fff', fontWeight: 'bold' }}><Change detail={row.detailRevenus} rapport={row.rapport.revenus.toFixed(1)}>{row.revenus.toFixed(1)}</Change></td>
                                     <td style={{ ...tdStyle, color: '#81c784', fontWeight: 'bold' }}><Change detail={row.detailBenefice} rapport={row.rapport.benefice.toFixed(1)}>{row.benefice.toFixed(1)}</Change></td>
