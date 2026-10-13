@@ -72,3 +72,7 @@ const RACES_CARACTERISTIQUES = [
         planetFight:100
     },
 ] as const;
+// Bonus (en %) à la production technologique de la race
+export function bonusTechRace(raceId: number): number {
+    return RACES_CARACTERISTIQUES[raceId]?.techBonus ?? 0;
+}

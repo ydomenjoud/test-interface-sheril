@@ -1,4 +1,4 @@
-import {Alliance, FlotteDetectee, FlotteJoueur, Rapport, SystemeDetecte, SystemeJoueur, PlanVaisseau, MarchandiseData} from '../types';
+import {Alliance, FlotteDetectee, FlotteJoueur, Rapport, SystemeDetecte, SystemeJoueur, PlanVaisseau, MarchandiseData, Lieutenant} from '../types';
 import {isPos, parsePosString} from '../utils/position';
 import {parseCombatMessages, RawMessage} from './parseCombatMessages';
 
@@ -454,6 +454,22 @@ export function parseRapportXml(text: string): Rapport {
         }
     });
 
+    const lieutenants: Lieutenant[] = qAll(joueurNode, ['lieutenants > l']).map(l => ({
+        nom: getAttr(l, ['nom']),
+        type: getAttrNum(l, ['type']) === 1 ? 1 : 0,
+        pos: getAttr(l, ['pos']) || '-1',
+        raceId: getAttrNum(l, ['race']),
+        niv: getAttrNum(l, ['niv']),
+        exp: getAttrNum(l, ['exp']),
+        valeur: getAttrNum(l, ['valeur']),
+        att: getAttrNum(l, ['att']),
+        def: getAttrNum(l, ['def']),
+        mar: getAttrNum(l, ['mar']),
+        mor: getAttrNum(l, ['mor']),
+        vit: getAttrNum(l, ['vit']),
+        competences: qAll(l, ['competence']).map(c => ({ comp: getAttrNum(c, ['comp']), val: getAttrNum(c, ['val']) })),
+    }));
+
     const rawMessages: RawMessage[] = qAll(joueurNode, ['messages > m', 'command > messages > m']).map((m, index) => ({
         type: getAttr(m, ['type']) || 'EVT',
         text: m.textContent || '',
@@ -467,6 +483,7 @@ export function parseRapportXml(text: string): Rapport {
         technologiesAtteignables,
         technologiesConnues, joueur, systemesJoueur, systemesDetectes: mergedSystemesDetectes, systemesDetectesDuTour: systemesDetectes, flottesJoueur, flottesDetectees, plansVaisseaux,
         budgetTechnologique,
+        lieutenants,
         combats,
     };
 

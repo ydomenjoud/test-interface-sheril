@@ -110,6 +110,11 @@ export function parseDataXml(text: string): GlobalData {
         politiques[code] = nom;
     });
 
+    const competencesLieutenants: Record<number, string> = {};
+    doc.querySelectorAll('data > leader_competences > c')?.forEach(c => {
+        competencesLieutenants[Number(c.getAttribute('code') || 0)] = c.getAttribute('nom') || '';
+    });
+
     // Plans de vaisseaux publics
     const plansPublic: PlanVaisseau[] = [];
     doc.querySelectorAll('data > planpublic > p')?.forEach(p => {
@@ -178,6 +183,7 @@ export function parseDataXml(text: string): GlobalData {
 
     return {
         politiques,
+        competencesLieutenants,
         technologies: techs, commandants, races, marchandises, caracteristiquesBatiment, caracteristiquesComposant, plansPublic, tailleVaisseaux,
         modificateursStabilite,
         modificateursStabiliteTaxation,

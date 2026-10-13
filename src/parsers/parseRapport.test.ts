@@ -158,3 +158,28 @@ describe('parseRapportXml - conservation des systèmes détectés entre tours', 
     expect(res.systemesDetectesDuTour[0]).toMatchObject({ nom: 'Plus ancien', tour: 29 });
   });
 });
+
+describe('parseRapportXml - lieutenants', () => {
+  const xml = `
+    <rapport numtour="8">
+      <commandant numero="1" nom="mab">
+        <lieutenants>
+          <l att="4" def="2" exp="4480" mar="2" mor="2" niv="5" nom="Typhon" pos="0" race="1" type="0" valeur="4200.0" vit="4">
+            <competence comp="6" val="0"/>
+          </l>
+          <l att="2" def="2" exp="3417" mar="2" mor="3" niv="4" nom="Altos" pos="0_12_10" race="1" type="1" valeur="3650.0" vit="4">
+            <competence comp="2" val="0"/>
+            <competence comp="7" val="1"/>
+          </l>
+        </lieutenants>
+      </commandant>
+    </rapport>`;
+
+  it('extrait les lieutenants, leur type, leur position et leurs compétences', () => {
+    const r = parseRapportXml(xml);
+    expect(r.lieutenants).toHaveLength(2);
+    expect(r.lieutenants[0]).toMatchObject({ nom: 'Typhon', type: 0, pos: '0', niv: 5 });
+    expect(r.lieutenants[1]).toMatchObject({ nom: 'Altos', type: 1, pos: '0_12_10' });
+    expect(r.lieutenants[1].competences).toEqual([{ comp: 2, val: 0 }, { comp: 7, val: 1 }]);
+  });
+});

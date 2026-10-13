@@ -33,6 +33,20 @@ export type Race = {
 export type Marchandise = { code: number; nom: string };
 export type Commandant = { numero?: number; nom?: string; raceId?: number; }
 
+export type TypeLieutenant = 0 | 1; // 0 = héros (flotte), 1 = gouverneur (système)
+export type CompetenceLieutenant = { comp: number; val: number };
+export type Lieutenant = {
+    nom: string;
+    type: TypeLieutenant;
+    pos: string; // "-1" = réserve, "0_X_Y" = système, nombre = numéro de flotte
+    raceId: number;
+    niv: number;
+    exp: number;
+    valeur: number;
+    att: number; def: number; mar: number; mor: number; vit: number;
+    competences: CompetenceLieutenant[];
+};
+
 export type TechCaracteristique = { code: number; value: number };
 export type TechMarchandise = { code: number; nb: number };
 export type TechArme = { degat_bouclier: number; degat_coque: number; degat_sol: number; portee: number; vitesse: number };
@@ -223,6 +237,7 @@ export type Rapport = {
     flottesDetectees: FlotteDetectee[];
     plansVaisseaux: PlanVaisseau[];
     budgetTechnologique: number;
+    lieutenants: Lieutenant[];
     combats: CombatEvent[];
 };
 export type SystemData = {
@@ -236,6 +251,7 @@ export type GlobalData = {
     races: Race[];
     marchandises: Marchandise[];
     politiques: Record<number, string>;
+    competencesLieutenants: Record<number, string>;
     caracteristiquesBatiment: Record<number, string>;
     caracteristiquesComposant: Record<number, string>;
     plansPublic: PlanVaisseau[];
