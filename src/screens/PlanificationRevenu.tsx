@@ -419,7 +419,7 @@ export default function PlanificationRevenu() {
                 rapport: calcul(s, etatDuRapport(s, gouverneurs, numeroJoueur)),
             };
         });
-    }, [systems, states, global, rapport, gouverneursDuRapport, gouverneurs, numeroJoueur]);
+    }, [systems, states, global, gouverneursDuRapport, gouverneurs, numeroJoueur]);
 
     const totals = useMemo(() => additionne(rows), [rows]);
 
@@ -444,7 +444,7 @@ export default function PlanificationRevenu() {
             const etat = states[posToString(s.pos)];
             if (!etat) return;
             const ref = etatDuRapport(s, gouverneurs, numeroJoueur);
-            const pos = `[${s.pos.x}-${s.pos.y}]`;
+            const pos = `[${s.pos.x}-${s.pos.y}] ${s.nom}`;
             if (etat.terraformation !== ref.terraformation) lignes.push(`${pos} ${etat.terraformation ? 'terraformation' : 'sans terraformation'}`);
             if (etat.taxation !== ref.taxation) lignes.push(`${pos} taxation ${etat.taxation}`);
             if (etat.politique !== ref.politique) lignes.push(`${pos} politique ${etat.politique !== undefined ? global?.politiques[etat.politique] ?? etat.politique : '?'}`);
@@ -457,7 +457,7 @@ export default function PlanificationRevenu() {
             const m: Record<string, string> = {};
             systems.forEach(s => {
                 const nom = etats(s);
-                if (nom) m[nom] = `[${s.pos.x}-${s.pos.y}]`;
+                if (nom) m[nom] = `[${s.pos.x}-${s.pos.y}] ${s.nom}`;
             });
             return m;
         };
