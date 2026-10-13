@@ -131,16 +131,18 @@ function Change({ children, style, detail, rapport }: { children: string; style?
     );
 }
 
-type Revenus = { revenus: number; revenu_tech: number; revenu_besp: number; revenu_bcont: number };
+type Revenus = { revenus: number; benefice: number; revenu_tech: number; revenu_besp: number; revenu_bcont: number };
 const additionne = (lignes: Revenus[]): Revenus => lignes.reduce((acc, l) => ({
     revenus: acc.revenus + l.revenus,
+    benefice: acc.benefice + l.benefice,
     revenu_tech: acc.revenu_tech + l.revenu_tech,
     revenu_besp: acc.revenu_besp + l.revenu_besp,
     revenu_bcont: acc.revenu_bcont + l.revenu_bcont,
-}), { revenus: 0, revenu_tech: 0, revenu_besp: 0, revenu_bcont: 0 });
+}), { revenus: 0, benefice: 0, revenu_tech: 0, revenu_besp: 0, revenu_bcont: 0 });
 
 const CHAMPS_TOTAUX = [
     ['revenus', '#fff'],
+    ['benefice', '#81c784'],
     ['revenu_tech', '#4fc3f7'],
     ['revenu_besp', '#ba68c8'],
     ['revenu_bcont', '#ff8a65'],
@@ -370,6 +372,16 @@ export default function PlanificationRevenu() {
             const revenu_besp = (state.besp / 100) * revenus * bonusComposants;
             const revenu_bcont = (state.bcont / 100) * revenus * bonusComposants;
 
+            // Bénéfice = revenus - ce que coûtent les budgets au joueur (% des revenus) - terraformation.
+            // Les bonus (race, logiciels, composants) augmentent la valeur d'un budget mais pas son coût : ils ne sont pas imputés ici.
+            const coutBudgets = (state.btech + state.besp + state.bcont) / 100 * revenus;
+            // Coût de la terraformation (planètes du joueur) si elle est cochée
+            const coutTerra = state.terraformation
+                ? mesPlanetes.reduce((acc, p) => acc + coutTerraformationPlanete(p.terraformation ?? 0), 0)
+                : 0;
+            const benefice = revenus - coutBudgets - coutTerra;
+            const detailBenefice = `Bénéfice :\nrevenus ${fmt(revenus)}\n− budgets (tech ${state.btech} % + SS ${state.besp} % + CE ${state.bcont} % = ${state.btech + state.besp + state.bcont} % des revenus) : ${fmt(coutBudgets)}\n(les bonus race / logiciels / composants ne changent pas le coût)\n− terraformation : ${coutTerra}\n= ${fmt(benefice)}`;
+
             return {
                 key,
                 pos: `[${s.pos.x}-${s.pos.y}]`,
@@ -383,6 +395,7 @@ export default function PlanificationRevenu() {
                 politique: state.politique,
                 taxation: state.taxation,
                 revenus,
+                benefice,
                 btech: state.btech,
                 revenu_tech,
                 besp: state.besp,
@@ -390,7 +403,7 @@ export default function PlanificationRevenu() {
                 bcont: state.bcont,
                 revenu_bcont,
                 detailStabilite, detailVariationStab, detailPopulation, detailPopMax: `Population maximale des planètes du joueur (somme des pop max par race) : ${populationMax}`, detailVariationPop,
-                detailRevenus, detailTech,
+                detailRevenus, detailBenefice, detailTech,
                 detailSS: detailBudget('services spéciaux', state.besp),
                 detailCE: detailBudget('contre-espionnage', state.bcont),
             };
@@ -474,6 +487,7 @@ export default function PlanificationRevenu() {
                         <tr style={{ color: '#aaa', textAlign: 'right' }}>
                             <th style={{ ...thStyle, textAlign: 'left' }}></th>
                             <th style={thStyle}>Revenus</th>
+                            <th style={{ ...thStyle, color: '#81c784' }}>Bénéfice</th>
                             <th style={{ ...thStyle, color: '#4fc3f7' }}>Tech</th>
                             <th style={{ ...thStyle, color: '#ba68c8' }}>Services Spéciaux</th>
                             <th style={{ ...thStyle, color: '#ff8a65' }}>Contre-Espionnage</th>
@@ -494,9 +508,9 @@ export default function PlanificationRevenu() {
                                     <td key={k} style={{ ...tdStyle, color: couleur, fontWeight: 'bold' }}>
                                         <Change>{totals[k].toFixed(1)}</Change>
                                         {Math.abs(ecart) >= 0.05 && (
-                                            <span style={{ marginLeft: '6px', fontSize: '0.8em', color: ecart > 0 ? '#4caf50' : '#f44336' }}>
+                                            <div style={{ fontSize: '0.8em', color: ecart > 0 ? '#4caf50' : '#f44336' }}>
                                                 ({ecart > 0 ? '+' : ''}{ecart.toFixed(1)})
-                                            </span>
+                                            </div>
                                         )}
                                     </td>
                                 );
@@ -537,6 +551,7 @@ export default function PlanificationRevenu() {
                             <th style={thStyle}>Pop / max</th>
                             <th style={thStyle}>Taxation</th>
                             <th style={thStyle}>Revenus</th>
+                            <th style={thStyle}>Bénéfice</th>
                             <th style={thStyle}>Budget Tech</th>
                             <th style={thStyle}>Revenu Tech</th>
                             <th style={thStyle}>Budget SS</th>
@@ -639,6 +654,7 @@ export default function PlanificationRevenu() {
                                         {marque(modTax)}
                                     </td>
                                     <td style={{ ...tdStyle, color: '#fff', fontWeight: 'bold' }}><Change detail={row.detailRevenus} rapport={row.rapport.revenus.toFixed(1)}>{row.revenus.toFixed(1)}</Change></td>
+                                    <td style={{ ...tdStyle, color: '#81c784', fontWeight: 'bold' }}><Change detail={row.detailBenefice} rapport={row.rapport.benefice.toFixed(1)}>{row.benefice.toFixed(1)}</Change></td>
                                     <td style={tdStyle}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                             <input 
