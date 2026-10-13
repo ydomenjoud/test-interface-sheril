@@ -473,11 +473,15 @@ export default function PlanificationRevenu() {
     }, [systems, states, gouverneurs, gouverneursDuRapport, global, numeroJoueur]);
     const totalsRapport = useMemo(() => additionne(rows.map(r => r.rapport)), [rows]);
 
+    // Totaux serrés pour laisser la place au tableau
+    const thT: React.CSSProperties = { ...thStyle, padding: '3px 8px' };
+    const tdT: React.CSSProperties = { ...tdStyle, padding: '2px 8px' };
+
     return (
-        <div className="planification-revenu" style={{ padding: '20px', color: '#e0e0e0', flex: 1, overflowY: 'auto' }}>
+        <div className="planification-revenu" style={{ padding: '20px', color: '#e0e0e0', flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <style>{`@keyframes revenuChange { 0% { background-color: #ffd54f; color: #000; } 100% { background-color: transparent; } }`}</style>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #444', paddingBottom: '10px', marginBottom: '20px' }}>
-                <h2 style={{ color: '#fff', margin: 0 }}>Planification des Revenus</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #444', paddingBottom: '4px', marginBottom: '8px', flexShrink: 0 }}>
+                <h2 style={{ color: '#fff', margin: 0, fontSize: '1.1em' }}>Planification des Revenus</h2>
                 <button
                     type="button"
                     onClick={handleResetAll}
@@ -489,40 +493,40 @@ export default function PlanificationRevenu() {
                 </button>
             </div>
             
-            <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', alignItems: 'stretch' }}>
+            <div style={{ display: 'flex', gap: '20px', marginBottom: '8px', alignItems: 'stretch', flexShrink: 0 }}>
             <div style={{
                 flex: '0 1 auto',
-                padding: '15px',
+                padding: '8px 12px',
                 backgroundColor: '#2a2a2a',
                 borderRadius: '8px',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
                 overflowX: 'auto'
             }}>
                 <strong style={{ color: '#aaa', textTransform: 'uppercase', fontSize: '0.8em' }}>Totaux Global</strong>
-                <table style={{ borderCollapse: 'collapse', fontSize: '1.1em', marginTop: '8px' }}>
+                <table style={{ borderCollapse: 'collapse', fontSize: '0.9em', marginTop: '2px' }}>
                     <thead>
                         <tr style={{ color: '#aaa', textAlign: 'right' }}>
-                            <th style={{ ...thStyle, textAlign: 'left' }}></th>
-                            <th style={thStyle}>Revenus</th>
-                            <th style={{ ...thStyle, color: '#81c784' }}>Bénéfice</th>
-                            <th style={{ ...thStyle, color: '#4fc3f7' }}>Tech</th>
-                            <th style={{ ...thStyle, color: '#ba68c8' }}>Services Spéciaux</th>
-                            <th style={{ ...thStyle, color: '#ff8a65' }}>Contre-Espionnage</th>
+                            <th style={{ ...thT, textAlign: 'left' }}></th>
+                            <th style={thT}>Revenus</th>
+                            <th style={{ ...thT, color: '#81c784' }}>Bénéfice</th>
+                            <th style={{ ...thT, color: '#4fc3f7' }}>Tech</th>
+                            <th style={{ ...thT, color: '#ba68c8' }}>Services Spéciaux</th>
+                            <th style={{ ...thT, color: '#ff8a65' }}>Contre-Espionnage</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr style={{ textAlign: 'right' }}>
-                            <td style={{ ...tdStyle, textAlign: 'left', color: '#aaa' }}>Rapport (configuration initiale)</td>
+                            <td style={{ ...tdT, textAlign: 'left', color: '#aaa' }}>Rapport (configuration initiale)</td>
                             {CHAMPS_TOTAUX.map(([k, couleur]) => (
-                                <td key={k} style={{ ...tdStyle, color: couleur, fontWeight: 'bold' }}>{totalsRapport[k].toFixed(1)}</td>
+                                <td key={k} style={{ ...tdT, color: couleur, fontWeight: 'bold' }}>{totalsRapport[k].toFixed(1)}</td>
                             ))}
                         </tr>
                         <tr style={{ textAlign: 'right' }}>
-                            <td style={{ ...tdStyle, textAlign: 'left', color: '#aaa' }}>Avec la saisie</td>
+                            <td style={{ ...tdT, textAlign: 'left', color: '#aaa' }}>Avec la saisie</td>
                             {CHAMPS_TOTAUX.map(([k, couleur]) => {
                                 const ecart = totals[k] - totalsRapport[k];
                                 return (
-                                    <td key={k} style={{ ...tdStyle, color: couleur, fontWeight: 'bold' }}>
+                                    <td key={k} style={{ ...tdT, color: couleur, fontWeight: 'bold' }}>
                                         <Change>{totals[k].toFixed(1)}</Change>
                                         {Math.abs(ecart) >= 0.05 && (
                                             <div style={{ fontSize: '0.8em', color: ecart > 0 ? '#4caf50' : '#f44336' }}>
@@ -536,7 +540,7 @@ export default function PlanificationRevenu() {
                     </tbody>
                 </table>
                 <div
-                    style={{ marginTop: '10px', color: '#aaa', cursor: terraformation.nb ? 'help' : undefined }}
+                    style={{ marginTop: '4px', color: '#aaa', cursor: terraformation.nb ? 'help' : undefined }}
                     title={terraformation.nb ? `Coût par planète : 50 + (niveau + 1) × 2\n${terraformation.details.join('\n')}` : 'Cochez « Terra. » sur un système pour voir son coût'}
                 >
                     Coût terraformation : <b style={{ color: '#fff' }}><Change>{String(terraformation.total)}</Change></b>
@@ -555,7 +559,8 @@ export default function PlanificationRevenu() {
                 </div>
             </div>
 
-            <div style={{ overflowX: 'auto' }}>
+            {/* le tableau occupe la hauteur restante et défile seul : une seule barre verticale, barre horizontale visible, en-tête collé en haut */}
+            <div style={{ overflow: 'auto', flex: 1, minHeight: 200 }}>
                 <table className="planification_table" style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: '#1e1e1e', borderRadius: '8px', overflow: 'hidden' }}>
                     <thead>
                         <tr style={{ backgroundColor: '#333', color: '#ccc', textAlign: 'left' }}>
