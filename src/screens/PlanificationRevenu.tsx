@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Lieutenant, SystemeJoueur } from '../types';
 import { useReport } from '../context/ReportContext';
 import { isPos, parsePosString, posToString } from '../utils/position';
@@ -64,6 +65,9 @@ const coutTerraformationPlanete = (niveau: number) => 50 + (niveau + 1) * 2;
 const COULEUR_MODIFIE = '#ff9800';
 
 // Style d'un champ dont la valeur diffère du rapport
+// Souligne en pointillés les éléments qui possèdent une infobulle
+const SOULIGNE_INFOBULLE: React.CSSProperties = { textDecoration: 'underline dotted' };
+
 const styleModifie = (base: React.CSSProperties, modifie: boolean): React.CSSProperties =>
     modifie ? { ...base, border: `1px solid ${COULEUR_MODIFIE}`, boxShadow: `0 0 0 1px ${COULEUR_MODIFIE}`, backgroundColor: '#4a3418' } : base;
 
@@ -137,7 +141,7 @@ function Change({ children, style, detail, rapport }: { children: string; style?
         <span
             key={flash}
             title={titre}
-            style={{ ...style, borderRadius: 3, ...(titre ? { cursor: 'help' } : {}), ...(flash ? { animation: 'revenuChange 2.5s ease-out' } : {}) }}
+            style={{ ...style, borderRadius: 3, ...(titre ? { cursor: 'help', ...SOULIGNE_INFOBULLE } : {}), ...(flash ? { animation: 'revenuChange 2.5s ease-out' } : {}) }}
         >{children}</span>
     );
 }
@@ -209,6 +213,18 @@ export default function PlanificationRevenu() {
             ...prev,
             [key]: { ...prev[key], taxation: val }
         }));
+    };
+
+    // Envoie le budget tech saisi vers la page Recherche (valeur « Budget » saisie manuellement)
+    const navigate = useNavigate();
+    const envoyerBudgetRecherche = (valeur: number) => {
+        if (tour === undefined) return;
+        try {
+            localStorage.setItem(`recherche-technologique-budget-tour-${tour}`, valeur.toFixed(1));
+        } catch (e) {
+            console.error('Impossible de sauvegarder le budget de recherche', e);
+        }
+        navigate('/recherche');
     };
 
     const handleBudgetChange = (key: string, field: 'btech' | 'besp' | 'bcont', val: string) => {
@@ -545,7 +561,7 @@ export default function PlanificationRevenu() {
                     onClick={copierSchema}
                     disabled={!schema}
                     title="Copier le schéma des ordres (taxation, politique, budgets, terraformation, gouverneurs) à coller dans la console d'ordres"
-                    style={{ ...resetButtonStyle, padding: '6px 12px', opacity: schema ? 1 : 0.3, cursor: schema ? 'pointer' : 'default' }}
+                    style={{ ...resetButtonStyle, padding: '6px 12px', ...SOULIGNE_INFOBULLE, opacity: schema ? 1 : 0.3, cursor: schema ? 'pointer' : 'default' }}
                 >
                     {schemaCopie ? '✓ Schéma copié' : 'Copier le schéma des ordres'}
                 </button>
@@ -554,7 +570,7 @@ export default function PlanificationRevenu() {
                     onClick={handleResetAll}
                     disabled={ordres.length === 0}
                     title="Revenir aux valeurs du rapport pour tous les systèmes"
-                    style={{ ...resetButtonStyle, padding: '6px 12px', opacity: ordres.length === 0 ? 0.3 : 1, cursor: ordres.length === 0 ? 'default' : 'pointer' }}
+                    style={{ ...resetButtonStyle, padding: '6px 12px', ...SOULIGNE_INFOBULLE, opacity: ordres.length === 0 ? 0.3 : 1, cursor: ordres.length === 0 ? 'default' : 'pointer' }}
                 >
                     ↺ Tout réinitialiser
                 </button>
@@ -593,8 +609,14 @@ export default function PlanificationRevenu() {
                             <td style={{ ...tdT, textAlign: 'left', color: '#aaa' }}>Avec la saisie</td>
                             {CHAMPS_TOTAUX.map(([k, couleur]) => {
                                 const ecart = totals[k] - totalsRapport[k];
+                                const versRecherche = k === 'revenu_tech';
                                 return (
-                                    <td key={k} style={{ ...tdT, color: couleur, fontWeight: 'bold' }}>
+                                    <td
+                                        key={k}
+                                        style={{ ...tdT, color: couleur, fontWeight: 'bold', ...(versRecherche ? { cursor: 'pointer', ...SOULIGNE_INFOBULLE } : {}) }}
+                                        onClick={versRecherche ? () => envoyerBudgetRecherche(totals[k]) : undefined}
+                                        title={versRecherche ? 'Cliquer pour utiliser ce budget tech dans la page Recherche' : undefined}
+                                    >
                                         <Change>{totals[k].toFixed(1)}</Change>
                                         {Math.abs(ecart) >= 0.05 && (
                                             <div style={{ fontSize: '0.8em', color: ecart > 0 ? '#4caf50' : '#f44336' }}>
@@ -608,7 +630,7 @@ export default function PlanificationRevenu() {
                     </tbody>
                 </table>
                 <div
-                    style={{ marginTop: '4px', color: '#aaa', cursor: terraformation.nb ? 'help' : undefined }}
+                    style={{ marginTop: '4px', color: '#aaa', cursor: terraformation.nb ? 'help' : undefined, ...SOULIGNE_INFOBULLE }}
                     title={terraformation.nb ? `Coût par planète : 50 + (niveau + 1) × 2\n${terraformation.details.join('\n')}` : 'Cochez « Terra. » sur un système pour voir son coût'}
                 >
                     Coût terraformation : <b style={{ color: '#fff' }}><Change>{String(terraformation.total)}</Change></b>
@@ -673,7 +695,7 @@ export default function PlanificationRevenu() {
                             const budgetsEnErreur = totalBudgets > 100;
                             const erreurBudget = `Total des budgets : ${totalBudgets}% (maximum 100%)`;
                             const modifie = modPolitique || modTerra || modGouv || modTax || modTech || modSS || modCE;
-                            const marque = (m: boolean) => (m ? <span title="Différent du rapport" style={{ color: COULEUR_MODIFIE, marginLeft: '4px', fontWeight: 'bold', cursor: 'help' }}>●</span> : null);
+                            const marque = (m: boolean) => (m ? <span title="Différent du rapport" style={{ color: COULEUR_MODIFIE, marginLeft: '4px', fontWeight: 'bold', cursor: 'help', ...SOULIGNE_INFOBULLE }}>●</span> : null);
                             // Les politiques "anti-*" ne sont pas proposées, sauf si elles sont déjà celle du système (rapport ou choix)
                             const politiqueCodes = Object.keys(global?.politiques || {}).map(Number)
                                 .filter(c => !global?.politiques[c]?.startsWith('anti-') || c === state.politique || c === ref.politique)
@@ -693,7 +715,7 @@ export default function PlanificationRevenu() {
                                         <select
                                             value={state.politique ?? ''}
                                             onChange={(e) => handlePolitiqueChange(row.key, parseInt(e.target.value, 10))}
-                                            style={styleModifie(selectStyle, modPolitique)}
+                                            style={{ ...styleModifie(selectStyle, modPolitique), ...SOULIGNE_INFOBULLE }}
                                             title={modPolitique ? `Rapport : ${nomPolitique(ref.politique)}` : formatEffetPolitique(state.politique)}
                                         >
                                             {state.politique === undefined && <option value="" disabled>?</option>}
@@ -708,7 +730,7 @@ export default function PlanificationRevenu() {
                                         <select
                                             value={state.gouverneur ?? ''}
                                             onChange={(e) => handleGouverneurChange(row.key, e.target.value)}
-                                            style={styleModifie(selectStyle, modGouv)}
+                                            style={{ ...styleModifie(selectStyle, modGouv), ...SOULIGNE_INFOBULLE }}
                                             title={modGouv ? `Rapport : ${ref.gouverneur ?? 'aucun'}` : descriptionGouverneur(gouverneursDuRapport.find(l => l.nom === state.gouverneur), global?.competencesLieutenants)}
                                         >
                                             <option value="">aucun</option>
@@ -724,7 +746,7 @@ export default function PlanificationRevenu() {
                                             checked={!!state.terraformation}
                                             onChange={(e) => handleTerraChange(row.key, e.target.checked)}
                                             title={modTerra ? 'Rapport : sans terraformation' : undefined}
-                                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: COULEUR_MODIFIE }}
+                                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: COULEUR_MODIFIE, ...(modTerra ? SOULIGNE_INFOBULLE : {}) }}
                                         />
                                         {marque(modTerra)}
                                     </td>
@@ -739,14 +761,14 @@ export default function PlanificationRevenu() {
                                         <select 
                                             value={row.taxation} 
                                             onChange={(e) => handleTaxChange(row.key, parseInt(e.target.value, 10))}
-                                            style={styleModifie(selectStyle, modTax)}
+                                            style={{ ...styleModifie(selectStyle, modTax), ...(modTax ? SOULIGNE_INFOBULLE : {}) }}
                                             title={modTax ? `Rapport : ${ref.taxation}` : undefined}
                                         >
                                             {[0, 1, 2, 3, 4, 5].map(t => <option key={t} value={t}>{t}</option>)}
                                         </select>
                                         {marque(modTax)}
                                         {taxationsHeterogenes && (
-                                            <span title={detailTaxHeterogene} style={{ marginLeft: '4px', color: COULEUR_MODIFIE, cursor: 'help' }}>⚠</span>
+                                            <span title={detailTaxHeterogene} style={{ marginLeft: '4px', color: COULEUR_MODIFIE, cursor: 'help', ...SOULIGNE_INFOBULLE }}>⚠</span>
                                         )}
                                     </td>
                                     <td style={{ ...tdStyle, color: '#fff', fontWeight: 'bold' }}><Change detail={row.detailRevenus} rapport={row.rapport.revenus.toFixed(1)}>{row.revenus.toFixed(1)}</Change></td>
@@ -757,7 +779,7 @@ export default function PlanificationRevenu() {
                                                 min="0" max="100" 
                                                 value={row.btech} 
                                                 onChange={(e) => handleBudgetChange(row.key, 'btech', e.target.value)}
-                                                style={budgetsEnErreur ? { ...inputStyle, borderColor: '#f44336', color: '#f44336', outline: '1px solid #f44336' } : styleModifie(inputStyle, modTech)}
+                                                style={budgetsEnErreur ? { ...inputStyle, borderColor: '#f44336', color: '#f44336', outline: '1px solid #f44336', ...SOULIGNE_INFOBULLE } : { ...styleModifie(inputStyle, modTech), ...(modTech ? SOULIGNE_INFOBULLE : {}) }}
                                                 title={budgetsEnErreur ? erreurBudget : modTech ? `Rapport : ${ref.btech}%` : undefined}
                                             />
                                             <span style={{ fontSize: '0.8em', color: '#666' }}>%</span>
@@ -772,7 +794,7 @@ export default function PlanificationRevenu() {
                                                 min="0" max="100" 
                                                 value={row.besp} 
                                                 onChange={(e) => handleBudgetChange(row.key, 'besp', e.target.value)}
-                                                style={budgetsEnErreur ? { ...inputStyle, borderColor: '#f44336', color: '#f44336', outline: '1px solid #f44336' } : styleModifie(inputStyle, modSS)}
+                                                style={budgetsEnErreur ? { ...inputStyle, borderColor: '#f44336', color: '#f44336', outline: '1px solid #f44336', ...SOULIGNE_INFOBULLE } : { ...styleModifie(inputStyle, modSS), ...(modSS ? SOULIGNE_INFOBULLE : {}) }}
                                                 title={budgetsEnErreur ? erreurBudget : modSS ? `Rapport : ${ref.besp}%` : undefined}
                                             />
                                             <span style={{ fontSize: '0.8em', color: '#666' }}>%</span>
@@ -787,7 +809,7 @@ export default function PlanificationRevenu() {
                                                 min="0" max="100" 
                                                 value={row.bcont} 
                                                 onChange={(e) => handleBudgetChange(row.key, 'bcont', e.target.value)}
-                                                style={budgetsEnErreur ? { ...inputStyle, borderColor: '#f44336', color: '#f44336', outline: '1px solid #f44336' } : styleModifie(inputStyle, modCE)}
+                                                style={budgetsEnErreur ? { ...inputStyle, borderColor: '#f44336', color: '#f44336', outline: '1px solid #f44336', ...SOULIGNE_INFOBULLE } : { ...styleModifie(inputStyle, modCE), ...(modCE ? SOULIGNE_INFOBULLE : {}) }}
                                                 title={budgetsEnErreur ? erreurBudget : modCE ? `Rapport : ${ref.bcont}%` : undefined}
                                             />
                                             <span style={{ fontSize: '0.8em', color: '#666' }}>%</span>
@@ -801,7 +823,7 @@ export default function PlanificationRevenu() {
                                             onClick={() => handleReset(row.key, s)}
                                             disabled={!modifie}
                                             title="Revenir aux valeurs du rapport"
-                                            style={{ ...resetButtonStyle, opacity: modifie ? 1 : 0.3, cursor: modifie ? 'pointer' : 'default' }}
+                                            style={{ ...resetButtonStyle, ...SOULIGNE_INFOBULLE, opacity: modifie ? 1 : 0.3, cursor: modifie ? 'pointer' : 'default' }}
                                         >
                                             ↺
                                         </button>
