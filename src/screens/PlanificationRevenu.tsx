@@ -220,7 +220,9 @@ export default function PlanificationRevenu() {
     const envoyerBudgetRecherche = (valeur: number) => {
         if (tour === undefined) return;
         try {
-            localStorage.setItem(`recherche-technologique-budget-tour-${tour}`, valeur.toFixed(1));
+            // Arrondi à l'inférieur à 1 décimale (l'epsilon évite de perdre 0,1 sur les erreurs de flottants)
+            const budgetArrondi = Math.floor(valeur * 10 + 1e-9) / 10;
+            localStorage.setItem(`recherche-technologique-budget-tour-${tour}`, budgetArrondi.toFixed(1));
         } catch (e) {
             console.error('Impossible de sauvegarder le budget de recherche', e);
         }
@@ -343,6 +345,7 @@ export default function PlanificationRevenu() {
 
             let populationMax = 0;
             let revenuPlanetes = 0;
+            let revenuPlanetesTech = 0;
             const taxationModifiee = state.taxation !== etatDuRapport(s, gouverneurs, numeroJoueur).taxation;
 
             mesPlanetes.forEach(p => {
@@ -367,10 +370,16 @@ export default function PlanificationRevenu() {
                 // Pas d'arrondi : le revenu du rapport est exactement la somme de pop × taxation / 10
                 const revenuPlanete = (pPop + pGrowth) * taxPlanete / 10;
 
+                // Revenu technologique : le moteur (Planete.getRevenuTechnologique) tronque
+                // int potentiel = (pop * taxation) / 10. Une seule race par planète : troncature par planète,
+                // sur la population après croissance.
+                const revenuPlaneteTech = Math.floor((pPop + pGrowth) * taxPlanete / 10);
+
                 population += pPop;
                 populationMax += pMax;
                 population_variation += pGrowth;
                 revenuPlanetes += revenuPlanete;
+                revenuPlanetesTech += revenuPlaneteTech;
                 detailPop.push(`planète ${p.num ?? ''} : pop ${pPop}/${pMax}, croissance +${pGrowth} (marge avant pop max : ${Math.max(0, pMax - pPop)}), revenu ${revenuPlanete.toFixed(1)} (taxation ${taxPlanete})`);
 
             });
@@ -379,13 +388,15 @@ export default function PlanificationRevenu() {
             const detailVariationPop = `Croissance par tour (par race et par planète, arrondie à l'inférieur, minimum ${CROISSANCE_MIN_PLANETE} par planète, limitée par la pop max) :\n${detailPop.join('\n')}\nBonus appliqués au taux : terraformation ${state.terraformation ? '+3' : '0'} %, politique ${signe(bonusPopPolitique)} %, produits alimentaires ${signe(bonusPopAlimentaire)} %, médicaments ${signe(bonusPopMedicaments)} %\n= +${population_variation}`;
 
             // Bonus gouverneur (finance) puis modificateur de politique (impôts / loisir) : base du revenu technologique
-            const revenuTechBase = revenuPlanetes
+            const revenuTechBase = revenuPlanetesTech
                 * (1 + bonusRevenuGouverneur(gouverneur))
                 * modificateurRevenuPolitique(state.politique);
 
             // Revenu normal : luxe (+10 %) et métaux précieux (+5 %) se multiplient, sans arrondi intermédiaire.
-            // Ils n'entrent pas dans le revenu technologique.
-            const revenus = revenuTechBase
+            // Ils n'entrent pas dans le revenu technologique. Pas de troncature par race (Planete.getRevenu).
+            const revenus = revenuPlanetes
+                * (1 + bonusRevenuGouverneur(gouverneur))
+                * modificateurRevenuPolitique(state.politique)
                 * (stockImportant(MARCH_LUXE) ? 1.1 : 1)
                 * (stockImportant(MARCH_METAUX_PRECIEUX) ? 1.05 : 1);
 
@@ -397,7 +408,7 @@ export default function PlanificationRevenu() {
             const coefPol = modificateurRevenuPolitique(state.politique);
             const fmt = (n: number) => n.toFixed(2);
             const detailRevenuBase = [
-                `somme par planète de (pop + croissance, plafonnée à la pop max) × taxation / 10, sans arrondi = ${fmt(revenuPlanetes)}`,
+                `somme par planète de (pop + croissance, plafonnée à la pop max) × taxation / 10 = ${fmt(revenuPlanetes)} (tech : tronqué par planète =${fmt(revenuPlanetesTech)})`,
                 `× gouverneur (finance niv. ${niveauCompetence(gouverneur, COMP_FINANCE)}) : ${fmt(coefGouv)}`,
                 `× politique : ${fmt(coefPol)}`,
             ];
