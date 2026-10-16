@@ -53,10 +53,20 @@ export default function InfoPanel({ selected }: Props) {
   // Le formulaire d'ajout est replié derrière un bouton pour laisser la place aux notes existantes
   const [showNoteForm, setShowNoteForm] = useState(false);
 
-  const [sortField, setSortField] = useState<'dist' | 'num'>('dist');
+  const [sortField, setSortField] = useState<'dist' | 'num' | 'vitesse' | 'as' | 'ap'>('dist');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  // "Mes flottes" : la liste complète est repliée, seules les flottes de la case et les plus proches sont visibles
-  const [showAllFleets, setShowAllFleets] = useState(false);
+  // En-tête triable de la liste "Mes flottes"
+  const sortTh = (field: 'num' | 'dist' | 'vitesse' | 'as' | 'ap', label: string) => (
+    <th
+      style={{ cursor: 'pointer', userSelect: 'none' }}
+      onClick={() => {
+        if (sortField === field) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+        else { setSortField(field); setSortOrder('asc'); }
+      }}
+    >
+      {label} {sortField === field && (sortOrder === 'asc' ? '▲' : '▼')}
+    </th>
+  );
   const [hoverFleet, setHoverFleet] = useState<{fleet: any; anchor: {top: number; bottom: number; left: number; right: number}} | undefined>(undefined);
   const showFleetHover = (f: any) => (e: React.MouseEvent<HTMLTableRowElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -108,8 +118,8 @@ export default function InfoPanel({ selected }: Props) {
 
     // Tri
     playerFleets.sort((a, b) => {
-      let valA = a[sortField];
-      let valB = b[sortField];
+      let valA = a[sortField] ?? 0;
+      let valB = b[sortField] ?? 0;
 
       if (valA === valB) return 0;
       const res = valA < valB ? -1 : 1;
@@ -174,19 +184,6 @@ export default function InfoPanel({ selected }: Props) {
   const hasCellContent = useMemo(
     () => !!system || atPos.fleets.length > 0 || !!pastFleets || cellCombats.length > 0 || zonesHere.length > 0,
     [system, atPos.fleets.length, pastFleets, cellCombats.length, zonesHere.length]
-  );
-
-  // Mes flottes : celles de la case sélectionnée, puis les plus proches atteignables (récapitulatif)
-  const myFleetsAtCell = useMemo(
-    () => atPos.playerFleets.filter((f: any) => f.pos.x === selected?.x && f.pos.y === selected?.y),
-    [atPos.playerFleets, selected]
-  );
-  const nearestReachableFleets = useMemo(
-    () => atPos.playerFleets
-      .filter((f: any) => !(f.pos.x === selected?.x && f.pos.y === selected?.y) && f.reachable)
-      .sort((a: any, b: any) => a.dist - b.dist)
-      .slice(0, 5),
-    [atPos.playerFleets, selected]
   );
 
   const handleAddNote = (e: React.FormEvent) => {
@@ -318,107 +315,36 @@ export default function InfoPanel({ selected }: Props) {
       {atPos.playerFleets.length > 0 && (
         <div className="info-block">
           <h4>Mes flottes</h4>
-
-          {myFleetsAtCell.length > 0 && (
-            <>
-              <div className="info-sublabel">Sur la case</div>
-              <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                <tr>
-                  <th>Nom</th>
-                  <th>AS / AP</th>
-                </tr>
-                </thead>
-                <tbody>
-                {myFleetsAtCell.map((f: any, i: number) => (
-                  <tr key={`here-${i}`} onMouseEnter={showFleetHover(f)} onMouseLeave={hideFleetHover}>
-                    <td>{f.nom} ({f.num + 1})</td>
-                    <td style={{ textAlign: 'right' }}>{f.as ?? 0} / {f.ap ?? 0}</td>
-                  </tr>
-                ))}
-                </tbody>
-              </table>
-            </>
-          )}
-
-          {nearestReachableFleets.length > 0 && (
-            <>
-              <div className="info-sublabel">Plus proches (atteignables ce tour)</div>
-              <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                <tr>
-                  <th>Nom</th>
-                  <th>Distance</th>
-                  <th>AS / AP</th>
-                </tr>
-                </thead>
-                <tbody>
-                {nearestReachableFleets.map((f: any, i: number) => (
-                  <tr key={`near-${i}`} onMouseEnter={showFleetHover(f)} onMouseLeave={hideFleetHover}>
-                    <td>{f.nom} ({f.num + 1})</td>
-                    <td style={{ textAlign: 'right' }}>{f.dist}</td>
-                    <td style={{ textAlign: 'right' }}>{f.as ?? 0} / {f.ap ?? 0}</td>
-                  </tr>
-                ))}
-                </tbody>
-              </table>
-            </>
-          )}
-
-          {atPos.playerFleets.length > myFleetsAtCell.length + nearestReachableFleets.length && (
-            <button
-              type="button"
-              onClick={() => setShowAllFleets(v => !v)}
-              style={{ marginTop: 6, padding: '3px 8px', cursor: 'pointer', backgroundColor: '#333', color: '#eee', border: '1px solid #555', borderRadius: 4, fontSize: '0.85em' }}
-            >
-              {showAllFleets ? 'Réduire' : `Voir tout (${atPos.playerFleets.length})`}
-            </button>
-          )}
-
-          {showAllFleets && (
           <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
             <tr>
-              <th
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-                onClick={() => {
-                  if (sortField === 'num') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                  else { setSortField('num'); setSortOrder('asc'); }
-                }}
-              >
-                Nom {sortField === 'num' && (sortOrder === 'asc' ? '▲' : '▼')}
-              </th>
-              <th
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-                onClick={() => {
-                  if (sortField === 'dist') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                  else { setSortField('dist'); setSortOrder('asc'); }
-                }}
-              >
-                Distance {sortField === 'dist' && (sortOrder === 'asc' ? '▲' : '▼')}
-              </th>
-              <th>Vitesse</th>
-              <th>AS / AP</th>
+              {sortTh('num', 'Nom')}
+              {sortTh('dist', 'Distance')}
+              {sortTh('vitesse', 'Vitesse')}
+              {sortTh('as', 'AS')}
+              {sortTh('ap', 'AP')}
               <th>Position</th>
             </tr>
             </thead>
             <tbody>
             {atPos.playerFleets.map((f: any, i: number) => {
               const isHere = f.pos.x === selected.x && f.pos.y === selected.y;
+              // Hors de portée ce tour : ligne orangée et estompée
               const rowStyle = !f.reachable && !isHere ? { opacity: 0.5, color: '#ffa500' } : {};
               return (
                 <tr key={`player-flt-${i}`} style={rowStyle} onMouseEnter={showFleetHover(f)} onMouseLeave={hideFleetHover}>
                   <td>{f.nom} ({f.num+1})</td>
                   <td style={{ textAlign: 'right' }}>{isHere ? '—' : f.dist}</td>
                   <td style={{ textAlign: 'right' }}>{f.vitesse}</td>
-                  <td style={{ textAlign: 'right' }}>{f.as ?? 0} / {f.ap ?? 0}</td>
+                  <td style={{ textAlign: 'right' }}>{f.as ?? 0}</td>
+                  <td style={{ textAlign: 'right' }}>{f.ap ?? 0}</td>
                   <td style={{ textAlign: 'right' }}><Position pos={f.pos} /></td>
                 </tr>
               );
             })}
             </tbody>
           </table>
-          )}
+          <div style={{ fontSize: '0.75em', color: '#888', marginTop: 4 }}>orange estompé = hors de portée ce tour</div>
         </div>
       )}
       {cellCombats.length > 0 && (
