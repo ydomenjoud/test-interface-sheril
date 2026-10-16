@@ -312,6 +312,12 @@ export default function InfoPanel({ selected }: Props) {
             <>
               <div className="info-sublabel">Sur la case</div>
               <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>AS / AP</th>
+                </tr>
+                </thead>
                 <tbody>
                 {myFleetsAtCell.map((f: any, i: number) => (
                   <tr key={`here-${i}`}>
@@ -328,12 +334,19 @@ export default function InfoPanel({ selected }: Props) {
             <>
               <div className="info-sublabel">Plus proches (atteignables ce tour)</div>
               <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>Distance</th>
+                  <th>AS / AP</th>
+                </tr>
+                </thead>
                 <tbody>
                 {nearestReachableFleets.map((f: any, i: number) => (
                   <tr key={`near-${i}`}>
                     <td>{f.nom} ({f.num + 1})</td>
-                    <td style={{ textAlign: 'right' }} title="Distance">{f.dist}</td>
-                    <td style={{ textAlign: 'right' }} title="AS / AP">{f.as ?? 0} / {f.ap ?? 0}</td>
+                    <td style={{ textAlign: 'right' }}>{f.dist}</td>
+                    <td style={{ textAlign: 'right' }}>{f.as ?? 0} / {f.ap ?? 0}</td>
                   </tr>
                 ))}
                 </tbody>
