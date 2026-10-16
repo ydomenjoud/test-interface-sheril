@@ -288,16 +288,21 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         }
     }, [cellSize]);
 
-    // Tooltip de survol : récapitulatif de la case sous le curseur, sans avoir à cliquer
-    const updateTooltip = useCallback((clientX: number, clientY: number, xy: XY | undefined) => {
+    // Tooltip : récapitulatif d'une case, sans avoir à cliquer.
+    // Deux ancrages : sous le curseur pendant le survol, ou sur la case sélectionnée
+    // (cadre jaune) lorsque celle-ci bouge au clavier (Maj + flèches) ou par clic.
+    const tooltipModeRef = useRef<'mouse' | 'cell' | 'none'>('none');
+
+    const hideTooltip = useCallback(() => {
+        tooltipModeRef.current = 'none';
         const el = tooltipRef.current;
-        const cvs = canvasRef.current;
+        if (el) el.style.display = 'none';
+    }, []);
+
+    // Remplit le contenu du tooltip pour une case (sans le positionner)
+    const fillTooltip = useCallback((xy: XY) => {
+        const el = tooltipRef.current;
         if (!el) return;
-        if (!xy || !cvs) {
-            el.style.display = 'none';
-            return;
-        }
-        const rect = cvs.getBoundingClientRect();
 
         el.textContent = '';
         const posEl = document.createElement('span');
@@ -334,15 +339,75 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             flEl.style.color = '#9fc6ff';
             el.appendChild(flEl);
         }
+    }, [systems, fleets, global, ownerRaceColor]);
 
+    // Ancré sous le curseur (survol)
+    const showTooltipAtMouse = useCallback((clientX: number, clientY: number, xy: XY | undefined) => {
+        const el = tooltipRef.current;
+        const cvs = canvasRef.current;
+        if (!el) return;
+        if (!xy || !cvs) {
+            hideTooltip();
+            return;
+        }
+        fillTooltip(xy);
         el.style.display = 'block';
+        tooltipModeRef.current = 'mouse';
+        const rect = cvs.getBoundingClientRect();
         let x = clientX - rect.left + 14;
         let y = clientY - rect.top + 14;
         if (x + el.offsetWidth + 4 > rect.width) x = clientX - rect.left - el.offsetWidth - 14;
         if (y + el.offsetHeight + 4 > rect.height) y = clientY - rect.top - el.offsetHeight - 14;
         el.style.left = `${Math.max(4, x)}px`;
         el.style.top = `${Math.max(4, y)}px`;
-    }, [systems, fleets, global, rapport, currentPlayerId, ownerRaceColor]);
+    }, [fillTooltip, hideTooltip]);
+
+    // Ancré sur la case (cadre jaune sélectionné) : au-dessus du cadre, en dessous s'il
+    // n'y a pas de place. Masqué si la case n'est pas visible (bandeaux d'en-tête inclus).
+    const showTooltipForCell = useCallback((xy: XY) => {
+        const el = tooltipRef.current;
+        const cvs = canvasRef.current;
+        const c = centerRef.current;
+        if (!el || !cvs || !c) {
+            hideTooltip();
+            return;
+        }
+        const cols = Math.floor(cvs.clientWidth / cellSize);
+        const rows = Math.floor(cvs.clientHeight / cellSize);
+        const halfCols = Math.floor(cols / 2);
+        const halfRows = Math.floor(rows / 2);
+        const topX = wrapX(c.x - halfRows);
+        const leftY = wrapY(c.y - halfCols);
+        // Même enroulement tore que pour le dessin de la carte
+        const dx = ((xy.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+        const dy = ((xy.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+        if (dx < 1 || dy < 1 || dx >= cols || dy >= rows) {
+            hideTooltip(); // case hors de la zone visible (le cadre jaune n'y est pas dessiné non plus)
+            return;
+        }
+        fillTooltip(xy);
+        el.style.display = 'block';
+        tooltipModeRef.current = 'cell';
+        const px = dx * cellSize;
+        const py = dy * cellSize;
+        let x = px + cellSize / 2 - el.offsetWidth / 2;
+        let y = py - el.offsetHeight - 6;
+        if (y < 4) y = py + cellSize + 6;
+        x = Math.min(Math.max(4, x), cvs.clientWidth - el.offsetWidth - 4);
+        y = Math.min(Math.max(4, y), cvs.clientHeight - el.offsetHeight - 4);
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+    }, [cellSize, fillTooltip, hideTooltip]);
+
+    // La case sélectionnée change (Maj + flèches, clic, « aller à une case ») : le tooltip la
+    // suit, et se repose à chaque recentrage / zoom
+    useEffect(() => {
+        if (selected) {
+            showTooltipForCell(selected);
+        } else if (tooltipModeRef.current === 'cell') {
+            hideTooltip();
+        }
+    }, [selected, center, cellSize, showTooltipForCell, hideTooltip]);
 
 
     useEffect(() => {
@@ -1250,7 +1315,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
-            // Alt + flèche : navigation dans les tours ; Maj + flèche : déplacement de la case sélectionnée
+            // Alt + flèche : navigation dans les tours ; Maj + flèche (Ctrl : pas de 5) : case sélectionnée
             if (!center || e.altKey || e.shiftKey || isTypingTarget(e.target)) return;
             const step = e.ctrlKey ? 5 : 1;
             if (e.key === 'ArrowUp') {
@@ -1288,7 +1353,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         };
     }, [cellSize]);
 
-    // Survol : surligne la case et affiche un récapitulatif (masqué sur les en-têtes et pendant le drag)
+    // Survol : surligne la case et affiche un récapitulatif (masqué sur les en-têtes)
     const handleMouseMove = useCallback((evt: React.MouseEvent<HTMLCanvasElement>) => {
         const cvs = canvasRef.current;
         if (!cvs) return;
@@ -1301,15 +1366,21 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         const prev = hoverRef.current;
         const changed = !!prev !== !!xy || (!!prev && !!xy && (prev.x !== xy.x || prev.y !== xy.y));
         hoverRef.current = xy;
-        updateTooltip(evt.clientX, evt.clientY, xy);
+        // Pendant le drag, le tooltip ancré sur la case sélectionnée suit le cadre jaune
+        // (reposé par l'effet au recentrage) : on ne le remet pas à la souris.
+        if (!dragRef.current.dragging) {
+            showTooltipAtMouse(evt.clientX, evt.clientY, xy);
+        }
         if (changed) redrawHoverOverlay();
-    }, [cellAt, cellSize, updateTooltip, redrawHoverOverlay]);
+    }, [cellAt, cellSize, showTooltipAtMouse, redrawHoverOverlay]);
 
     const handleMouseLeave = useCallback(() => {
         hoverRef.current = undefined;
-        updateTooltip(0, 0, undefined);
+        if (tooltipModeRef.current === 'mouse') {
+            hideTooltip();
+        }
         redrawHoverOverlay();
-    }, [updateTooltip, redrawHoverOverlay]);
+    }, [hideTooltip, redrawHoverOverlay]);
 
     const handleClick = (evt: React.MouseEvent<HTMLCanvasElement>) => {
         if (dragRef.current.moved) {
@@ -1357,6 +1428,11 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         }
 
         dragRef.current.dragging = true;
+        // Le tooltip de survol disparaît au démarrage du drag ; seul celui ancré sur la case
+        // sélectionnée (cadre jaune) est conservé et la suit pendant le pan
+        if (tooltipModeRef.current === 'mouse') {
+            hideTooltip();
+        }
         dragRef.current.lastX = evt.clientX;
         dragRef.current.lastY = evt.clientY;
         dragRef.current.accX = 0;
