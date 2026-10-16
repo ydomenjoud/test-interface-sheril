@@ -10,6 +10,7 @@ import {
 } from '../../parsers/parseCombatMessages';
 import Commandant from "../utils/Commandant";
 import Position from "../utils/Position";
+import {colorForOwnership} from "./CanvasMap";
 import {getDescriptionPuissance, getPuissance, getPuissanceFromString} from "../../utils/puissance";
 import { NavLink } from 'react-router-dom';
 import ZoneEditor from './ZoneEditor';
@@ -20,6 +21,9 @@ import { fleetSnapshotOf } from '../../storage/rapportStore';
 type Props = {
   selected?: XY;
 };
+
+// Formatage des nombres avec séparateur de milliers (ex. 59 485)
+const fmt = (n: number) => n.toLocaleString('fr-FR');
 
 // Ligne issue d'un tour précédent : texte grisé et icône d'avertissement à côté du nom
 const staleRowStyle: React.CSSProperties = { color: '#999' };
@@ -127,6 +131,18 @@ export default function InfoPanel({ selected }: Props) {
 
   const isOwner = useMemo(() => system?.proprietaires?.some((p: any) => p === rapport?.joueur?.numero), [system, rapport])
 
+  // Récapitulatif de la case : total de vaisseaux et couleur de possession
+  const shipsAtCell = useMemo(
+    () => (atPos.fleets as any[]).reduce((sum: number, f: any) => sum + (typeof f.nbVso === 'number' ? f.nbVso : 0), 0),
+    [atPos.fleets]
+  );
+  const summaryColor = useMemo(() => {
+    if (system?.proprietaires?.length) {
+      return colorForOwnership(rapport?.joueur?.numero, system.proprietaires, rapport?.joueur?.alliances, rapport?.joueur?.pna) || '#555';
+    }
+    return '#555';
+  }, [system, rapport]);
+
   const currentNotes = useMemo(() => {
     if (!selected) return [];
     return notes[`${selected.x}_${selected.y}`] || [];
@@ -183,6 +199,39 @@ export default function InfoPanel({ selected }: Props) {
         </div>
       )}
 
+      {/* Récapitulatif : l'essentiel de la case en un coup d'œil */}
+      {(system || atPos.fleets.length > 0) && (
+        <div className="info-block" style={{ borderLeft: `4px solid ${summaryColor}`, paddingLeft: 10 }}>
+          {system && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                <strong style={{ fontSize: '1.05em' }}>
+                  {staleTour !== undefined && <StaleIcon />}
+                  {system.nom}
+                </strong>
+                {isOwner && (
+                  <NavLink to={`/player-system-detail/${selected.x}-${selected.y}`} style={{ fontSize: '0.85em' }}>
+                    détails
+                  </NavLink>
+                )}
+              </div>
+              <div style={{ fontSize: '0.9em', color: '#ccc' }}>
+                {Array.isArray(system.proprietaires) && system.proprietaires.length
+                  ? system.proprietaires.map((p: number, key: number) => <Commandant num={p} key={key} />)
+                  : null}
+              </div>
+            </>
+          )}
+          <div style={{ fontSize: '0.85em', color: '#bbb' }}>
+            {system?.nbPla != null && <>{fmt(system.nbPla)} planètes</>}
+            {system?.pop != null && system?.popMax != null && <> · pop {fmt(system.pop)}/{fmt(system.popMax)}</>}
+            {atPos.fleets.length > 0 && (
+              <> · <strong style={{ color: '#eee' }}>{atPos.fleets.length} flotte{atPos.fleets.length > 1 ? 's' : ''}</strong>{shipsAtCell > 0 && <> ({fmt(shipsAtCell)} vaisseaux)</>}</>
+            )}
+          </div>
+        </div>
+      )}
+
       {system && (
       <div className="info-block">
         <h4>Systèmes</h4>
@@ -193,7 +242,6 @@ export default function InfoPanel({ selected }: Props) {
             <th>Planètes</th>
             <th>Population</th>
             <th>Commandants</th>
-            { isOwner &&<th></th>}
           </tr>
           </thead>
           <tbody>
@@ -209,7 +257,6 @@ export default function InfoPanel({ selected }: Props) {
                 ? system.proprietaires.map((p: number, key: number) => <Commandant num={p} key={key} />)
                 : '—'}
             </td>
-            { isOwner && <td className='app-nav'><NavLink  to={`/player-system-detail/${selected.x}-${selected.y}`}>détails {isOwner}</NavLink></td> }
           </tr>
           </tbody>
         </table>
