@@ -67,14 +67,30 @@ Une légende compacte des couleurs de possession (moi / alliance / PNA / ennemi 
 bas à gauche de la carte, en mode de couleur "Alliés/Ennemis".
 
 Les portées radar (systèmes et flottes) sont désactivées par défaut pour ne pas voiler la carte ; elles peuvent
-être activées dans les Filtres.
+être activées par les boutons ◎ et ◉ de la barre d'outils (filtres rapides).
+
+#### barre d'outils
+
+La barre d'outils (en haut de l'écran) est regroupée : vue (taille des cases, position), filtres rapides,
+historique (tours) et actions (minimap, import).
+
+Le groupe de filtres rapides est une barre d'icônes discrète :
+
+* ✦ : afficher / masquer les systèmes
+* ◎ : portée radar des systèmes (désactivée par défaut)
+* ◉ : portée radar des flottes (désactivée par défaut)
+* ? : aide et raccourcis (touche `?`)
+* ⚙ : ouvre / ferme le panneau "Filtres" (options avancées, fermé par défaut) : Commandants, Tags, Carte
+  galactique, Secteurs, Influence (+ opacité), Minimap, Mode de couleur, Badges (combats / propriétaires /
+  flottes), Zones manuelles, Distance Capitale (zones de stabilité et choix du système de référence)
 
 #### interaction
 
 - Clic: lorsqu'on clique sur une position de la carte, la carte affiche les informations de la position cliquée dans la
   partie "information".
 - Survol (sans clic) : la case sous le curseur est surlignée et un encart récapitulatif s'affiche à proximité du
-  curseur (coordonnées, nom du système, possesseurs, nombre de flottes).
+  curseur (coordonnées, nom du système, possesseurs — chaque nom affiché à sa couleur de race, le neutre affiché
+  "Neutre (0)" —, nombre de flottes).
 - Clavier: flèches directionnelles (gauche, droite, haut, bas) déplacent le centre d'une case; avec Ctrl, déplacement
   par pas de 5 cases.
 - Drag souris: en maintenant le bouton gauche, on peut "panner" la carte; le centre se décale au rythme d'un pas de
@@ -111,20 +127,30 @@ Si le système est :
 * possédé par un autre joueur qui ne rentre pas dans les autres cas : bordure rouge.
 * sans propriétaire connu: bordure grise.
 
+Deux modes de couleur existent (boutons "Alliés/Ennemis" / "Par Joueur", mode par défaut "Alliés/Ennemis") :
+
+* Alliés/Ennemis : les règles ci-dessus ; un système à plusieurs propriétaires de couleurs différentes est partagé
+  en parts.
+* Par Joueur : chaque système est coloré à la couleur de la race de son propriétaire (le même code couleur que les
+  noms de joueurs) ; les systèmes du joueur courant restent verts. La mini-carte et les flottes suivent le même mode.
+
 #### flotte
 
-l'image de la flotte s'affiche en haut à droite de la case de la grille, elle est donc plus petite que la case.
+une flotte s'affiche par un disque blanc au centre de la case de la grille, cerclé de la couleur de possession.
 
-il faut utiliser une image de vaisseau : public/img/flotte.png.
 Si la flotte est :
 
-* complètement possédée par le joueur courant: bordure verte.
-* alliance: bordure bleue.
-* PNA: bordure jaune.
-* autre: bordure rouge.
+* possédée par le joueur courant: cerclage vert.
+* alliance: cerclage bleu.
+* PNA: cerclage jaune.
+* autre: cerclage rouge.
 
-Pour les flottes du joueur uniquement: si l'attribut "direction" est défini (format "galaxie_Y_X"), afficher une flèche
-orange allant du centre de la case actuelle vers le centre de la case cible (visible), en tenant compte du viewport.
+Plusieurs flottes sur la même case n'affichent qu'un seul marqueur : l'étiquette au centre du disque indique le
+nombre total de flottes sur la case (toujours un nombre, pour rester lisible d'un coup d'œil).
+
+Pour les flottes du joueur uniquement: si l'attribut "direction" est défini (format "galaxie_Y_X"), afficher une
+flèche orange allant du centre de la case actuelle vers le centre de la case cible (visible), en tenant compte du
+viewport.
 
 ### partie information
 
@@ -145,7 +171,9 @@ une case sans aucun contenu (ni système, ni flotte, ni combat, ni zone) affiche
   - propriétaire
   - nombre de vaisseaux
   - puissance
-- mes flottes : les flottes du joueur situées sur la case, puis les plus proches atteignables ce tour ; la liste
+- mes flottes : les flottes du joueur situées sur la case, puis les plus proches atteignables ce tour, avec des
+  en-têtes de colonnes (Nom / Distance / AS / AP) ; survoler une ligne affiche le détail de la flotte (position,
+  direction, vitesse, directive, AS / AP, scan, nombre et composition des vaisseaux, distance et portée) ; la liste
   complète (tri par nom ou distance, position) s'affiche sur demande
 - combats sur la case (cartes dépliables avec les détails)
 - zones couvrant la case (éditables)
