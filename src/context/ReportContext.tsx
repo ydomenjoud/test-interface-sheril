@@ -6,7 +6,7 @@ import {parsePublicCombatsHtml} from '../parsers/parsePublicCombats';
 import {parseManualDetectedSystems} from '../parsers/parseManualSystems';
 import {parseDataXml} from '../parsers/parseData';
 import {CENTER} from '../utils/position';
-import {FleetSnapshot, fleetSnapshotOf, getFleetSnapshots, getLatestRapport, getRapport, getRapportsUpTo, listTours, saveRapport} from '../storage/rapportStore';
+import {FleetSnapshot, SystemSnapshot, fleetSnapshotOf, getFleetSnapshots, getLatestRapport, getRapport, getRapportsUpTo, getSystemSnapshots, listTours, saveRapport, systemSnapshotOf} from '../storage/rapportStore';
 
 export type ImportResult = { tour: number; affiche: boolean };
 
@@ -22,6 +22,7 @@ type ReportContextType = {
     getRapportForTour: (tour: number) => Promise<Rapport | undefined>;
     selectTour: (tour: number) => Promise<void>; // affiche la carte telle qu'elle était à ce tour
     fleetSnapshots: FleetSnapshot[]; // flottes détectées et zones observées, par tour stocké
+    systemSnapshots: SystemSnapshot[]; // systèmes détectés, par tour stocké
     addDetectedSystemsFromText: (text: string) => { added: number; errors: { line: number; message: string }[] };
     ready: boolean;
     cellSize: number;
@@ -54,6 +55,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
     const [rapport, setRapport] = useState<Rapport | undefined>(undefined);
     const [tours, setTours] = useState<number[]>([]);
     const [fleetSnapshots, setFleetSnapshots] = useState<FleetSnapshot[]>([]);
+    const [systemSnapshots, setSystemSnapshots] = useState<SystemSnapshot[]>([]);
     // Tour du rapport affiché et plus récent tour connu, lisibles de façon synchrone pendant un import
     const displayedTourRef = useRef<number | undefined>(undefined);
     const latestTourRef = useRef<number | undefined>(undefined);
@@ -216,6 +218,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         try {
             await saveRapport({...r, systemesDetectes: r.systemesDetectesDuTour});
             setFleetSnapshots(prev => [...prev.filter(f => f.tour !== r.tour), fleetSnapshotOf(r)]);
+            setSystemSnapshots(prev => [...prev.filter(s => s.tour !== r.tour), systemSnapshotOf(r)]);
             const list = await listTours();
             setTours(list);
             if (list.length) noteLatestTour(list[list.length - 1]);
@@ -425,6 +428,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
                 setTours(list);
                 if (list.length) noteLatestTour(list[list.length - 1]);
                 setFleetSnapshots(await getFleetSnapshots());
+                setSystemSnapshots(await getSystemSnapshots());
                 const latest = await getLatestRapport();
                 if (latest) displayRapport(latest);
                 else if (legacy) displayRapport(legacy);
@@ -450,6 +454,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         getRapportForTour,
         selectTour,
         fleetSnapshots,
+        systemSnapshots,
         cellSize,
         setCellSize,
         center,
@@ -470,7 +475,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         addZone,
         deleteZone,
         updateZone,
-    }), [rapport, global, tours, getRapportForTour, selectTour, fleetSnapshots, publicCombats, refreshStats, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, allTags, selectedTags, addNote, deleteNote, zones, zoneLabels, hiddenZoneLabels, addZone, deleteZone, updateZone]);
+    }), [rapport, global, tours, getRapportForTour, selectTour, fleetSnapshots, systemSnapshots, publicCombats, refreshStats, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, allTags, selectedTags, addNote, deleteNote, zones, zoneLabels, hiddenZoneLabels, addZone, deleteZone, updateZone]);
 
     return <ReportContext.Provider value={value}>{children}</ReportContext.Provider>;
 }

@@ -419,6 +419,14 @@ export function parseRapportXml(text: string): Rapport {
 
     joueur.alliances = alliances;
 
+    // PNA : commandants en non-agression avec le joueur (<pna><p com="N"/></pna>)
+    const pna: number[] = [];
+    qAll(joueurNode, ['pna > p']).forEach((n) => {
+        const com = getAttrNum(n, ['com']);
+        if (com > 0) pna.push(com);
+    });
+    joueur.pna = pna;
+
     // Plans privés du commandant
     const plansVaisseaux: PlanVaisseau[] = [];
     qAll(joueurNode, ['plans > p']).forEach((p) => {

@@ -29,6 +29,7 @@ const SECTIONS: { title: string; items: Shortcut[] }[] = [
         items: [
             {keys: [['Clic']], description: 'Sélectionner une case et afficher son contenu (systèmes, flottes, zones, notes) dans le panneau de droite'},
             {keys: [['Maj', 'Flèche']], description: "Déplacer la case sélectionnée d'une case"},
+            {keys: [['Ctrl', 'Maj', 'Flèche']], description: "Déplacer la case sélectionnée de 5 cases"},
             {keys: [['Ctrl', 'Clic']], description: 'Sélectionner une case et tracer les flèches de mes flottes vers elle (vert : atteignable ce tour, orange : trop loin)'},
         ],
     },
@@ -58,7 +59,7 @@ const kbdStyle: React.CSSProperties = {
 const MODIFIER_KEYS = ['Alt', 'Ctrl', 'Maj'];
 const modifierKbdStyle: React.CSSProperties = {...kbdStyle, background: '#2a3550', borderColor: '#4a6090', color: '#cfe0ff'};
 
-export default function MapHelp() {
+export default function MapHelp({renderTrigger}: {renderTrigger?: (open: () => void) => React.ReactNode} = {}) {
     const [open, setOpen] = useState(false);
 
     useEffect(() => {
@@ -75,18 +76,22 @@ export default function MapHelp() {
 
     return (
         <>
-            <button
-                type="button"
-                onClick={() => setOpen(true)}
-                title="Aide et raccourcis (?)"
-                style={{
-                    position: 'absolute', left: 20, bottom: 20, zIndex: 100, width: 32, height: 32, borderRadius: '50%',
-                    background: '#222', color: '#eee', border: '2px solid #ffe600', boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-                    fontWeight: 'bold', fontSize: '1.1em', cursor: 'pointer',
-                }}
-            >
-                ?
-            </button>
+            {renderTrigger
+                ? renderTrigger(() => setOpen(true))
+                : (
+                    <button
+                        type="button"
+                        onClick={() => setOpen(true)}
+                        title="Aide et raccourcis (?)"
+                        style={{
+                            position: 'absolute', left: 20, bottom: 20, zIndex: 100, width: 32, height: 32, borderRadius: '50%',
+                            background: '#222', color: '#eee', border: '2px solid #ffe600', boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                            fontWeight: 'bold', fontSize: '1.1em', cursor: 'pointer',
+                        }}
+                    >
+                        ?
+                    </button>
+                )}
 
             {open && (
                 <Modal title="Aide de la carte" showCloseButton onClose={() => setOpen(false)} panelStyle={{width: 520}}>

@@ -1,12 +1,13 @@
-import {FlotteDetectee, Rapport, XY} from '../types';
+import {FlotteDetectee, Rapport, SystemeDetecte, XY} from '../types';
 
 // Stockage des rapports extraits, un par tour, dans IndexedDB (le localStorage est trop petit pour plusieurs tours).
 // Chaque rapport est stocké avec les seules détections de son tour (sans la fusion avec les tours précédents).
 
 const DB_NAME = 'sheril';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE = 'rapports'; // clé = numéro de tour
 const FLEETS_STORE = 'flottes'; // résumé léger par tour, pour retrouver les dernières flottes vues sur une case
+const SYSTEMS_STORE = 'systemes'; // résumé léger par tour, pour retrouver le dernier système vu sur une case
 
 // Flottes détectées à un tour, et ce que le joueur pouvait voir à ce tour (positions + portée de scan)
 export type FleetSnapshot = {
@@ -23,6 +24,16 @@ export function fleetSnapshotOf(r: Rapport): FleetSnapshot {
             .filter(o => Number(o.scan) > 0)
             .map(o => ({pos: o.pos, scan: Number(o.scan)})),
     };
+}
+
+// Systèmes détectés à un tour (seules les détections de ce tour)
+export type SystemSnapshot = {
+    tour: number;
+    systemes: SystemeDetecte[];
+};
+
+export function systemSnapshotOf(r: Rapport): SystemSnapshot {
+    return { tour: r.tour, systemes: r.systemesDetectesDuTour ?? [] };
 }
 
 let dbPromise: Promise<IDBDatabase> | undefined;
@@ -50,6 +61,18 @@ function openDb(): Promise<IDBDatabase> {
                         };
                     }
                 }
+                if (!db.objectStoreNames.contains(SYSTEMS_STORE)) {
+                    const systems = db.createObjectStore(SYSTEMS_STORE, {keyPath: 'tour'});
+                    // Passage de la v2 : on construit le résumé des systèmes des rapports déjà stockés
+                    if (event.oldVersion >= 2 && req.transaction) {
+                        req.transaction.objectStore(STORE).openCursor().onsuccess = (e) => {
+                            const cursor = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
+                            if (!cursor) return;
+                            systems.put(systemSnapshotOf(cursor.value as Rapport));
+                            cursor.continue();
+                        };
+                    }
+                }
             };
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => reject(req.error);
@@ -67,12 +90,13 @@ function run<T>(mode: IDBTransactionMode, op: (store: IDBObjectStore) => IDBRequ
     }));
 }
 
-// Enregistre (ou remplace) le rapport de son tour, avec le résumé de ses flottes
+// Enregistre (ou remplace) le rapport de son tour, avec les résumés de ses flottes et de ses systèmes
 export function saveRapport(r: Rapport): Promise<void> {
     return openDb().then(db => new Promise<void>((resolve, reject) => {
-        const tx = db.transaction([STORE, FLEETS_STORE], 'readwrite');
+        const tx = db.transaction([STORE, FLEETS_STORE, SYSTEMS_STORE], 'readwrite');
         tx.objectStore(STORE).put(r);
         tx.objectStore(FLEETS_STORE).put(fleetSnapshotOf(r));
+        tx.objectStore(SYSTEMS_STORE).put(systemSnapshotOf(r));
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(tx.error);
@@ -84,6 +108,15 @@ export function getFleetSnapshots(): Promise<FleetSnapshot[]> {
     return openDb().then(db => new Promise<FleetSnapshot[]>((resolve, reject) => {
         const req = db.transaction(FLEETS_STORE, 'readonly').objectStore(FLEETS_STORE).getAll();
         req.onsuccess = () => resolve(req.result as FleetSnapshot[]);
+        req.onerror = () => reject(req.error);
+    }));
+}
+
+// Résumés des systèmes de tous les tours stockés
+export function getSystemSnapshots(): Promise<SystemSnapshot[]> {
+    return openDb().then(db => new Promise<SystemSnapshot[]>((resolve, reject) => {
+        const req = db.transaction(SYSTEMS_STORE, 'readonly').objectStore(SYSTEMS_STORE).getAll();
+        req.onsuccess = () => resolve(req.result as SystemSnapshot[]);
         req.onerror = () => reject(req.error);
     }));
 }

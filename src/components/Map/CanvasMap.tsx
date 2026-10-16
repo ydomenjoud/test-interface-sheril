@@ -4,7 +4,7 @@ import {BOUNDS, CENTER, getTorusDistance, torusDelta, wrapX, wrapY} from '../../
 import {getSectorNumber, isSectorLabelCell, sectorBackgroundColor, sectorLabelColor} from '../../utils/sectors';
 import {countCombatsByKind} from '../../parsers/parseCombatMessages';
 import {drawCombatMarkers} from '../../utils/combatMarkers';
-import {Alliance, XY, Zone} from '../../types';
+import {Alliance, GlobalData, XY, Zone} from '../../types';
 import {lightenHexColor, getColorForPlayer} from "../../utils/global";
 import {isTypingTarget} from '../../utils/keyboard';
 
@@ -23,6 +23,47 @@ const RACE_BADGE_COLORS: Record<number, string> = {
     4: '#009933',
     5: '#777777',
 };
+
+// Couleur de la race d'un commandant (même code couleur que les noms de joueurs)
+export function raceColorForOwner(globalData?: GlobalData, owner?: number): string | undefined {
+    if (owner == null) return undefined;
+    if (owner === 0) return 'grey';
+    if (!globalData) return undefined;
+    const commandant = globalData.commandants?.find(c => c.numero === owner);
+    if (commandant) {
+        const raceId = commandant.raceId;
+        const raceColor = globalData.races?.find(r => r.id === raceId)?.couleur;
+        if (raceColor && raceColor.trim() && raceColor.toLowerCase() !== 'white') {
+            return raceColor;
+        }
+        if (raceId != null) {
+            return RACE_BADGE_COLORS[raceId] || OWNER_BADGE_COLORS[owner];
+        }
+    }
+    return OWNER_BADGE_COLORS[owner];
+}
+
+// Rend une couleur semi-transparente (opacité 0..1) : gère HSL, hexadécimal et quelques couleurs nommées
+function withOpacity(color: string, opacity: number): string {
+    if (color.startsWith('hsl')) {
+        return color.replace(')', `, ${opacity})`).replace('hsl', 'hsla');
+    }
+    const named: Record<string, string> = { grey: '#808080', gray: '#808080', yellow: '#ffff00' };
+    const hex = (named[color] || (color.startsWith('#') ? color : '')).replace('#', '');
+    if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+        const r = parseInt(hex.slice(0, 2), 16);
+        const g = parseInt(hex.slice(2, 4), 16);
+        const b = parseInt(hex.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
+    if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+        const r = parseInt(hex[0] + hex[0], 16);
+        const g = parseInt(hex[1] + hex[1], 16);
+        const b = parseInt(hex[2] + hex[2], 16);
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
+    return color;
+}
 
 export type ZoneRect = { x: number; y: number; width: number; height: number };
 
@@ -65,7 +106,7 @@ type Props = {
     influenceOpacity?: number;
 };
 
-export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[], colorMode: 'status' | 'player' = 'status') {
+export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[], colorMode: 'status' | 'player' = 'status', globalData?: GlobalData) {
     if (owners && owners?.length === 1 && owners[0] === 0) return 'grey';
     if (!owners || owners.length === 0) return '#999';
 
@@ -74,7 +115,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
         const withoutNeutral = owners.filter(o => o !== 0);
         // si tous pareil, on renvoit la couleur,
         const colors: Set<string> = new Set(withoutNeutral
-            .map(o => colorForOwnership(currentPlayerId, [o], alliances, pna, colorMode))
+            .map(o => colorForOwnership(currentPlayerId, [o], alliances, pna, colorMode, globalData))
             .filter((s): s is string => !!s)
         );
         if(colors.size === 1) {
@@ -89,7 +130,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     if (currentPlayerId && owners.includes(currentPlayerId)) return '#09ca31';
 
     if (colorMode === 'player') {
-        return getColorForPlayer(owner);
+        return raceColorForOwner(globalData, owner) || getColorForPlayer(owner);
     }
 
     if (alliances && alliances.some(a => a.commandants.includes(owner))) return '#224eff';
@@ -100,6 +141,10 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
 export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    // Case survolée : dessinée sur un canvas séparé pour ne pas redessiner toute la carte à chaque mouvement de souris
+    const hoverCanvasRef = useRef<HTMLCanvasElement>(null);
+    const tooltipRef = useRef<HTMLDivElement>(null);
+    const hoverRef = useRef<XY | undefined>(undefined);
 
     // Ref sur le center pour des mises à jour synchrones dans le drag
     const centerRef = useRef<XY | undefined>(center);
@@ -129,25 +174,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
     const currentPlayerId = rapport?.joueur.numero || 0; // placeholder si besoin d'ID joueur
 
     const ownerRaceColor = useCallback((owner?: number): string | undefined => {
-        if (owner == null) return undefined;
-        if (owner === 0) return 'grey';
-        if (!global) return undefined;
-
-        const commandant = global.commandants?.find(c => c.numero === owner);
-        if (commandant) {
-            const raceId = commandant.raceId;
-            const raceColor = global.races?.find(r => r.id === raceId)?.couleur;
-            // some data.xml files may omit color or use generic 'white' — prefer our mapping in that case
-            if (raceColor && raceColor.trim() && raceColor.toLowerCase() !== 'white') {
-                return raceColor;
-            }
-            // For commandants, use race mapping. Race 0 is a valid race color and is not the neutral owner.
-            if (raceId != null) {
-                return RACE_BADGE_COLORS[raceId] || OWNER_BADGE_COLORS[owner];
-            }
-        }
-
-        return OWNER_BADGE_COLORS[owner];
+        return raceColorForOwner(global, owner);
     }, [global]);
 
     const systems = useMemo(() => {
@@ -204,7 +231,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         return [...rapport.flottesJoueur.map(f => ({
             ...f, owner: currentPlayerId,
         })), ...rapport.flottesDetectees.map(f => ({
-            ...f, owner: f.proprio,
+            ...f, owner: f.proprio || 0,
         })),];
     }, [rapport, currentPlayerId]);
 
@@ -213,6 +240,174 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         const fromPublic = publicCombats ?? [];
         return [...fromRapport, ...fromPublic];
     }, [rapport, publicCombats]);
+
+    // Redessine uniquement le contour de la case survolée (sur le canvas dédié).
+    // La géométrie est recalculée pour rester alignée avec la carte principale (tore, centre, taille de case).
+    const redrawHoverOverlay = useCallback(() => {
+        const cvs = canvasRef.current;
+        const hov = hoverCanvasRef.current;
+        if (!cvs || !hov) return;
+        const dpr = window.devicePixelRatio || 1;
+        const w = Math.round(cvs.clientWidth * dpr);
+        const h = Math.round(cvs.clientHeight * dpr);
+        if (hov.width !== w) hov.width = w;
+        if (hov.height !== h) hov.height = h;
+        const ctx = hov.getContext('2d');
+        if (!ctx) return;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, cvs.clientWidth, cvs.clientHeight);
+
+        const cell = hoverRef.current;
+        const c = centerRef.current;
+        if (!cell || !c) return;
+
+        const cols = Math.floor(cvs.clientWidth / cellSize);
+        const rows = Math.floor(cvs.clientHeight / cellSize);
+        const halfCols = Math.floor(cols / 2);
+        const halfRows = Math.floor(rows / 2);
+        const topX = wrapX(c.x - halfRows);
+        const leftY = wrapY(c.y - halfCols);
+
+        // Même enroulement tore que pour le dessin des systèmes
+        let dx = ((cell.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+        let dyBase = ((cell.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.lineWidth = 2;
+        while (dx < cols) {
+            if (dx === 0) { dx += BOUNDS.maxY; continue; }
+            let dy = dyBase;
+            while (dy < rows) {
+                if (dy === 0) { dy += BOUNDS.maxX; continue; }
+                const px = dx * cellSize;
+                const py = dy * cellSize;
+                ctx.strokeRect(px + 2, py + 2, cellSize - 4, cellSize - 4);
+                dy += BOUNDS.maxX;
+            }
+            dx += BOUNDS.maxY;
+        }
+    }, [cellSize]);
+
+    // Tooltip : récapitulatif d'une case, sans avoir à cliquer.
+    // Deux ancrages : sous le curseur pendant le survol, ou sur la case sélectionnée
+    // (cadre jaune) lorsque celle-ci bouge au clavier (Maj + flèches) ou par clic.
+    const tooltipModeRef = useRef<'mouse' | 'cell' | 'none'>('none');
+
+    const hideTooltip = useCallback(() => {
+        tooltipModeRef.current = 'none';
+        const el = tooltipRef.current;
+        if (el) el.style.display = 'none';
+    }, []);
+
+    // Remplit le contenu du tooltip pour une case (sans le positionner)
+    const fillTooltip = useCallback((xy: XY) => {
+        const el = tooltipRef.current;
+        if (!el) return;
+
+        el.textContent = '';
+        const posEl = document.createElement('span');
+        posEl.textContent = `${xy.x}-${xy.y}`;
+        posEl.style.cssText = 'font-weight:bold;color:#ffe600;';
+        el.appendChild(posEl);
+
+        const sys = systems.find(s => s.pos.x === xy.x && s.pos.y === xy.y);
+        if (sys) {
+            const nameEl = document.createElement('span');
+            nameEl.textContent = `  ${sys.nom}`;
+            el.appendChild(nameEl);
+            const owners = (sys as any).owners as number[] | undefined;
+            if (owners && owners.length > 0) {
+                owners.forEach((o, i) => {
+                    if (i > 0) {
+                        const sep = document.createElement('span');
+                        sep.textContent = ', ';
+                        sep.style.color = '#888';
+                        el.appendChild(sep);
+                    }
+                    const span = document.createElement('span');
+                    const cmd = o === 0 ? undefined : global?.commandants?.find(c2 => c2.numero === o);
+                    span.textContent = (i === 0 ? '  ' : '') + (o === 0 ? 'Neutre (0)' : cmd ? `${cmd.nom} (${o})` : `#${o}`);
+                    span.style.color = o === 0 ? '#999' : (ownerRaceColor(o) || '#ddd');
+                    el.appendChild(span);
+                });
+            }
+        }
+        const nf = fleets.filter(f => f.pos.x === xy.x && f.pos.y === xy.y).length;
+        if (nf > 0) {
+            const flEl = document.createElement('span');
+            flEl.textContent = `  ${nf} flotte${nf > 1 ? 's' : ''}`;
+            flEl.style.color = '#9fc6ff';
+            el.appendChild(flEl);
+        }
+    }, [systems, fleets, global, ownerRaceColor]);
+
+    // Ancré sous le curseur (survol)
+    const showTooltipAtMouse = useCallback((clientX: number, clientY: number, xy: XY | undefined) => {
+        const el = tooltipRef.current;
+        const cvs = canvasRef.current;
+        if (!el) return;
+        if (!xy || !cvs) {
+            hideTooltip();
+            return;
+        }
+        fillTooltip(xy);
+        el.style.display = 'block';
+        tooltipModeRef.current = 'mouse';
+        const rect = cvs.getBoundingClientRect();
+        let x = clientX - rect.left + 14;
+        let y = clientY - rect.top + 14;
+        if (x + el.offsetWidth + 4 > rect.width) x = clientX - rect.left - el.offsetWidth - 14;
+        if (y + el.offsetHeight + 4 > rect.height) y = clientY - rect.top - el.offsetHeight - 14;
+        el.style.left = `${Math.max(4, x)}px`;
+        el.style.top = `${Math.max(4, y)}px`;
+    }, [fillTooltip, hideTooltip]);
+
+    // Ancré sur la case (cadre jaune sélectionné) : au-dessus du cadre, en dessous s'il
+    // n'y a pas de place. Masqué si la case n'est pas visible (bandeaux d'en-tête inclus).
+    const showTooltipForCell = useCallback((xy: XY) => {
+        const el = tooltipRef.current;
+        const cvs = canvasRef.current;
+        const c = centerRef.current;
+        if (!el || !cvs || !c) {
+            hideTooltip();
+            return;
+        }
+        const cols = Math.floor(cvs.clientWidth / cellSize);
+        const rows = Math.floor(cvs.clientHeight / cellSize);
+        const halfCols = Math.floor(cols / 2);
+        const halfRows = Math.floor(rows / 2);
+        const topX = wrapX(c.x - halfRows);
+        const leftY = wrapY(c.y - halfCols);
+        // Même enroulement tore que pour le dessin de la carte
+        const dx = ((xy.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+        const dy = ((xy.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+        if (dx < 1 || dy < 1 || dx >= cols || dy >= rows) {
+            hideTooltip(); // case hors de la zone visible (le cadre jaune n'y est pas dessiné non plus)
+            return;
+        }
+        fillTooltip(xy);
+        el.style.display = 'block';
+        tooltipModeRef.current = 'cell';
+        const px = dx * cellSize;
+        const py = dy * cellSize;
+        let x = px + cellSize / 2 - el.offsetWidth / 2;
+        let y = py - el.offsetHeight - 6;
+        if (y < 4) y = py + cellSize + 6;
+        x = Math.min(Math.max(4, x), cvs.clientWidth - el.offsetWidth - 4);
+        y = Math.min(Math.max(4, y), cvs.clientHeight - el.offsetHeight - 4);
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+    }, [cellSize, fillTooltip, hideTooltip]);
+
+    // La case sélectionnée change (Maj + flèches, clic, « aller à une case ») : le tooltip la
+    // suit, et se repose à chaque recentrage / zoom
+    useEffect(() => {
+        if (selected) {
+            showTooltipForCell(selected);
+        } else if (tooltipModeRef.current === 'cell') {
+            hideTooltip();
+        }
+    }, [selected, center, cellSize, showTooltipForCell, hideTooltip]);
 
 
     useEffect(() => {
@@ -326,9 +521,9 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 // Couche Influence - dessinée après le damier pour plus de clarté
                 if (showInfluence && influenceGrid[r] && influenceGrid[r][c] !== -1) {
                     const closestOwner = influenceGrid[r][c];
-                    const baseColor = getColorForPlayer(closestOwner);
-                    // On convertit HSL en HSLA un peu plus marqué
-                    ctx.fillStyle = baseColor.replace(')', `, ${influenceOpacity})`).replace('hsl', 'hsla');
+                    const baseColor = colorMode === 'player' ? (ownerRaceColor(closestOwner) || getColorForPlayer(closestOwner)) : getColorForPlayer(closestOwner);
+                    // Rend la couleur semi-transparente (couleurs HSL des joueurs ou hexa des races)
+                    ctx.fillStyle = withOpacity(baseColor, influenceOpacity);
                     ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
                 }
 
@@ -714,7 +909,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             // Couleur(s) en fonction de la possession
             const owners = s.owners as number[] | undefined;
             const isGlobalOnly = s.isGlobalOnly;
-            let col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode);
+            let col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global);
             if (isGlobalOnly) col = '#333'; // Plus sombre pour les systèmes non détectés
 
             // Taille du disque en fonction du nombre de planètes:
@@ -759,7 +954,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 }
                 const total = weights.reduce((a, b) => a + b, 0);
                 // Préparer les couleurs par propriétaire
-                const colors = multiOwners.map(o => colorForOwnership(currentPlayerId, [o], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode));
+                const colors = multiOwners.map(o => colorForOwnership(currentPlayerId, [o], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global));
 
                 // Dessiner les parts: une par owner, angle proportionnel au poids
                 let angle = -Math.PI / 2; // démarrage en haut, pour stabilité visuelle
@@ -782,22 +977,17 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
             c2d.restore();
 
-            // HALO de sélection pour les systèmes (couleur via colorForOwnership)
+            // Contour fin autour du disque (remplace l'ancien halo lumineux, plus lisible et plus léger)
             if (isSystemSelected(owners)) {
-                const haloColor = lightenHexColor(col || '#000000', 100);
-                const lineW = 2;
-                const blur = Math.max(10, Math.floor(lineW * 1.5));
-                const rHalo = radius + lineW / 2; // halo juste à l'extérieur du disque
-                const cHalo = ctx as CanvasRenderingContext2D;
-                cHalo.save();
-                cHalo.strokeStyle = haloColor;
-                cHalo.lineWidth = lineW;
-                cHalo.shadowColor = haloColor;
-                cHalo.shadowBlur = blur;
-                cHalo.beginPath();
-                cHalo.arc(cx, cy, rHalo, 0, Math.PI * 2);
-                cHalo.stroke();
-                cHalo.restore();
+                const ringColor = lightenHexColor(col || '#000000', 100);
+                const cRing = ctx as CanvasRenderingContext2D;
+                cRing.save();
+                cRing.strokeStyle = ringColor;
+                cRing.lineWidth = 1.5;
+                cRing.beginPath();
+                cRing.arc(cx, cy, radius + 1, 0, Math.PI * 2);
+                cRing.stroke();
+                cRing.restore();
             }
 
             // Badges propriétaires en bas à droite de la case
@@ -849,12 +1039,19 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
         }
 
-        // flottes
+        // flottes : un seul marqueur par case, étiqueté au nombre total de flottes sur la case
         if (showFleetBadges) {
+            const fleetCells = new Map<string, any[]>();
             fleets.forEach(f => {
-                let dx = ((f.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
-                let dy = ((f.pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+                const k = `${f.pos.x}_${f.pos.y}`;
+                const arr = fleetCells.get(k);
+                if (arr) arr.push(f); else fleetCells.set(k, [f]);
+            });
 
+            fleetCells.forEach(fGroup => {
+                const pos = fGroup[0].pos;
+                let dx = ((pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+                let dy = ((pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
                 while (dx < cols) {
                     if (dx === 0) {
                         dx += BOUNDS.maxY;
@@ -866,10 +1063,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                             currentDy += BOUNDS.maxX;
                             continue;
                         }
-                        const px = dx * cellSize;
-                        const py = currentDy * cellSize;
-
-                        renderFleet(f, px, py);
+                        renderFleetCell(fGroup, dx * cellSize, currentDy * cellSize);
                         currentDy += BOUNDS.maxX;
                     }
                     dx += BOUNDS.maxY;
@@ -877,110 +1071,93 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             });
         }
 
-        function renderFleet(f: any, px: number, py: number) {
+        function renderFleetCell(fGroup: any[], px: number, py: number) {
+            const count = fGroup.length;
             const diameter = Math.max(10, Math.floor(cellSize / 3));
             const cx = px + cellSize / 2;
             const cy = py + cellSize / 2;
             const c2d = ctx as CanvasRenderingContext2D;
+            const owners = Array.from(new Set(fGroup.map(f => f.owner)));
+            const isSelected = fGroup.some(f => isFleetSelected(f.owner));
+
             c2d.save();
-            if (!isFleetSelected((f as any).owner)) {
+            if (!isSelected) {
                 c2d.filter = 'grayscale(1)';
             }
 
-            const ownerColor = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode) || '#000000';
-            const badgeColor = '#ffffff';
-            const textColor = '#000000';
-            const strokeColor = ownerColor;
-
-            c2d.fillStyle = badgeColor;
+            const ownerColor = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global) || '#000000';
+            c2d.fillStyle = '#ffffff';
             c2d.beginPath();
             c2d.arc(cx, cy, diameter / 2, 0, Math.PI * 2);
             c2d.fill();
 
-            c2d.strokeStyle = strokeColor;
+            c2d.strokeStyle = ownerColor;
             c2d.lineWidth = Math.max(1, Math.floor(cellSize * 0.06));
             c2d.stroke();
 
-            const ships = typeof (f as any).nbVso === 'number' ? (f as any).nbVso : undefined;
-            const label = ships && ships > 1 ? String(ships) : 'F';
-            c2d.fillStyle = textColor;
-            c2d.font = `bold ${Math.max(8, Math.floor(diameter * 0.55))}px sans-serif`;
+            // Étiquette : nombre total de flottes sur la case (toujours le même type d'information)
+            const label = String(count);
+            c2d.fillStyle = '#000000';
+            c2d.font = `bold ${Math.max(8, Math.floor(diameter * (label.length > 1 ? 0.45 : 0.55)))}px sans-serif`;
             c2d.textAlign = 'center';
             c2d.textBaseline = 'middle';
             c2d.fillText(label, cx, cy + 0.5);
 
-            // Flèche de direction (flottes du joueur uniquement, si "direction" est défini)
-            const t = (f as any).direction;
-            if (t) {
-                const tdx = ((t.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
-                const tdy = ((t.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
-                const tx = tdx * cellSize + cellSize / 2;
-                const ty = tdy * cellSize + cellSize / 2;
-
-                // ne tracer que si la cible est dans le viewport
-                if (tx >= 0 && ty >= 0 && tx <= cols * cellSize && ty <= rows * cellSize) {
-                    const sx = px + cellSize / 2;
-                    const sy = py + cellSize / 2;
-
-                    // dessiner une flèche orange
-                    const drawArrow = (c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) => {
-                        const headLen = Math.max(6, Math.floor(cellSize * 0.25));
-                        const angle = Math.atan2(y2 - y1, x2 - x1);
-                        c.save();
-
-                        // Clip pour éviter de dessiner sur les en-têtes (colonne 0 et ligne 0)
-                        c.beginPath();
-                        c.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
-                        c.clip();
-
-                        c.strokeStyle = '#ff9800';
-                        c.fillStyle = '#ff9800';
-                        c.lineWidth = 2;
-                        c.beginPath();
-                        c.moveTo(x1, y1);
-                        c.lineTo(x2, y2);
-                        c.stroke();
-                        // pointe de flèche
-                        c.beginPath();
-                        c.moveTo(x2, y2);
-                        c.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
-                        c.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
-                        c.closePath();
-                        c.fill();
-                        c.restore();
-                    };
-
-                    drawArrow(c2d as CanvasRenderingContext2D, sx, sy, tx, ty);
+            // Flèches de direction (une par flotte du groupe qui en a une, flottes du joueur uniquement)
+            fGroup.forEach(f => {
+                const t = f.direction;
+                if (t) {
+                    const tdx = ((t.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+                    const tdy = ((t.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+                    const tx = tdx * cellSize + cellSize / 2;
+                    const ty = tdy * cellSize + cellSize / 2;
+                    if (tx >= 0 && ty >= 0 && tx <= cols * cellSize && ty <= rows * cellSize) {
+                        const drawArrow = (c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) => {
+                            const headLen = Math.max(6, Math.floor(cellSize * 0.25));
+                            const angle = Math.atan2(y2 - y1, x2 - x1);
+                            c.save();
+                            c.beginPath();
+                            c.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
+                            c.clip();
+                            c.strokeStyle = '#ff9800';
+                            c.fillStyle = '#ff9800';
+                            c.lineWidth = 2;
+                            c.beginPath();
+                            c.moveTo(x1, y1);
+                            c.lineTo(x2, y2);
+                            c.stroke();
+                            c.beginPath();
+                            c.moveTo(x2, y2);
+                            c.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+                            c.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+                            c.closePath();
+                            c.fill();
+                            c.restore();
+                        };
+                        drawArrow(c2d, cx, cy, tx, ty);
+                    }
                 }
-            }
+            });
             c2d.restore();
 
-            // HALO de sélection pour les flottes (autour du badge circulaire)
-            if (isFleetSelected((f as any).owner)) {
-                const col = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode);
-                const haloColor = col || '#000000';
-                const lineW = 2;
-                const blur = Math.max(10, Math.floor(lineW * 1.5));
-                const radius = diameter / 2 + lineW + 1;
-                const cHalo = ctx as CanvasRenderingContext2D;
-                cHalo.save();
-                cHalo.strokeStyle = haloColor;
-                cHalo.lineWidth = lineW;
-                cHalo.shadowColor = haloColor;
-                cHalo.shadowBlur = blur;
-                cHalo.beginPath();
-                cHalo.arc(cx, cy, radius, 0, Math.PI * 2);
-                cHalo.stroke();
-                cHalo.restore();
+            // Contour fin si la flotte correspond au filtre (remplace l'ancien halo lumineux)
+            if (isSelected) {
+                const col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global);
+                const cRing = ctx as CanvasRenderingContext2D;
+                cRing.save();
+                cRing.strokeStyle = col || '#000000';
+                cRing.lineWidth = 1;
+                cRing.beginPath();
+                cRing.arc(cx, cy, diameter / 2 + 2, 0, Math.PI * 2);
+                cRing.stroke();
+                cRing.restore();
             }
         }
 
         // Marqueurs de combat au-dessus des systèmes (S = spatial, P = planétaire)
         if (showCombatBadges && combats.length > 0) {
-            try { console.debug(`[CanvasMap] total combats: ${combats.length}`); } catch (e) { }
             const cCombat = ctx as CanvasRenderingContext2D;
             cCombat.save();
-            let combatLogCount = 0;
             for (let r = 0; r < rows; r++) {
                 if (r === 0) continue;
                 const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
@@ -989,15 +1166,9 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
                     const counts = countCombatsByKind(combats, {x: xCoord, y: yCoord});
                     if (counts.spatial <= 0 && counts.planetary <= 0) continue;
-                    if (combatLogCount < 50) {
-                        try { console.debug(`[CanvasMap] combat at ${xCoord}-${yCoord}`, counts); } catch (e) { }
-                        combatLogCount += 1;
-                    }
                     drawCombatMarkers(cCombat, c * cellSize, r * cellSize, cellSize, counts.spatial, counts.planetary);
                 }
             }
-            try { if (combatLogCount > 0) console.info(`[CanvasMap] logged ${combatLogCount} combat positions`); } catch (e) { }
-
             cCombat.restore();
         }
 
@@ -1137,11 +1308,14 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
             cSel.restore();
         }
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone]);
+
+        // Le survol dépend de la géométrie (centre, taille de case) : on resynchronise l'overlay après chaque dessin
+        redrawHoverOverlay();
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
-            // Alt + flèche : navigation dans les tours ; Maj + flèche : déplacement de la case sélectionnée
+            // Alt + flèche : navigation dans les tours ; Maj + flèche (Ctrl : pas de 5) : case sélectionnée
             if (!center || e.altKey || e.shiftKey || isTypingTarget(e.target)) return;
             const step = e.ctrlKey ? 5 : 1;
             if (e.key === 'ArrowUp') {
@@ -1178,6 +1352,35 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             y: torusDelta(c.y, col - Math.floor(cols / 2), BOUNDS.maxY),
         };
     }, [cellSize]);
+
+    // Survol : surligne la case et affiche un récapitulatif (masqué sur les en-têtes)
+    const handleMouseMove = useCallback((evt: React.MouseEvent<HTMLCanvasElement>) => {
+        const cvs = canvasRef.current;
+        if (!cvs) return;
+        const rect = cvs.getBoundingClientRect();
+        let xy: XY | undefined;
+        const inGrid = evt.clientX - rect.left >= cellSize && evt.clientY - rect.top >= cellSize;
+        if (!dragRef.current.dragging && inGrid) {
+            xy = cellAt(evt.clientX, evt.clientY);
+        }
+        const prev = hoverRef.current;
+        const changed = !!prev !== !!xy || (!!prev && !!xy && (prev.x !== xy.x || prev.y !== xy.y));
+        hoverRef.current = xy;
+        // Pendant le drag, le tooltip ancré sur la case sélectionnée suit le cadre jaune
+        // (reposé par l'effet au recentrage) : on ne le remet pas à la souris.
+        if (!dragRef.current.dragging) {
+            showTooltipAtMouse(evt.clientX, evt.clientY, xy);
+        }
+        if (changed) redrawHoverOverlay();
+    }, [cellAt, cellSize, showTooltipAtMouse, redrawHoverOverlay]);
+
+    const handleMouseLeave = useCallback(() => {
+        hoverRef.current = undefined;
+        if (tooltipModeRef.current === 'mouse') {
+            hideTooltip();
+        }
+        redrawHoverOverlay();
+    }, [hideTooltip, redrawHoverOverlay]);
 
     const handleClick = (evt: React.MouseEvent<HTMLCanvasElement>) => {
         if (dragRef.current.moved) {
@@ -1225,6 +1428,11 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         }
 
         dragRef.current.dragging = true;
+        // Le tooltip de survol disparaît au démarrage du drag ; seul celui ancré sur la case
+        // sélectionnée (cadre jaune) est conservé et la suit pendant le pan
+        if (tooltipModeRef.current === 'mouse') {
+            hideTooltip();
+        }
         dragRef.current.lastX = evt.clientX;
         dragRef.current.lastY = evt.clientY;
         dragRef.current.accX = 0;
@@ -1303,6 +1511,23 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 onClick={handleClick}
                 onMouseDown={handleMouseDown}
                 onWheel={handleWheel}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
+            />
+            {/* Surcouche transparente : contour de la case survolée */}
+            <canvas
+                ref={hoverCanvasRef}
+                style={{position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none'}}
+            />
+            {/* Récapitulatif de la case survolée */}
+            <div
+                ref={tooltipRef}
+                style={{
+                    position: 'absolute', display: 'none', pointerEvents: 'none', zIndex: 200,
+                    background: 'rgba(15, 15, 20, 0.95)', border: '1px solid #555', borderRadius: 4,
+                    padding: '4px 8px', fontSize: '0.8em', color: '#ddd', whiteSpace: 'nowrap',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                }}
             />
         </div>);
 }

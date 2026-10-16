@@ -31,7 +31,7 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_selected_owners');
     return saved ? JSON.parse(saved) : [];
   });
-  const [showSystems, setShowSystems] = useState(() => {
+  const [showSystems, setShowSystems] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_show_systems');
     return saved !== null ? JSON.parse(saved) : true;
   });
@@ -47,15 +47,16 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_fleet_badges');
     return saved !== null ? JSON.parse(saved) : true;
   });
-  const [showSystemRadar, setShowSystemRadar] = useState(() => {
+  // Portées radar : désactivées par défaut (voile bleu sur la carte) ; à activer dans les Filtres si besoin
+  const [showSystemRadar, setShowSystemRadar] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_show_system_radar');
-    return saved !== null ? JSON.parse(saved) : true;
+    return saved !== null ? JSON.parse(saved) : false;
   });
-  const [showFleetRadar, setShowFleetRadar] = useState(() => {
+  const [showFleetRadar, setShowFleetRadar] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_show_fleet_radar');
-    return saved !== null ? JSON.parse(saved) : true;
+    return saved !== null ? JSON.parse(saved) : false;
   });
-  const [showMiniMap, setShowMiniMap] = useState(() => {
+  const [showMiniMap, setShowMiniMap] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_show_minimap');
     return saved !== null ? JSON.parse(saved) : true;
   });
@@ -98,9 +99,9 @@ export default function Carte() {
   const [pasteText, setPasteText] = useState('');
   const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
 
-  const [filtersExpanded, setFiltersExpanded] = useState(() => {
+  const [filtersExpanded, setFiltersExpanded] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_filters_expanded');
-    return saved !== null ? JSON.parse(saved) : true;
+    return saved !== null ? JSON.parse(saved) : false;
   });
 
   useEffect(() => {
@@ -241,16 +242,18 @@ export default function Carte() {
 
   const remainingMs = playing ? Math.max(0, playStepMs - (now - stepStart)) : 0;
 
-  // Raccourci : Maj + flèche déplace la case sélectionnée (depuis le centre si aucune case n'est sélectionnée)
+  // Raccourci : Maj + flèche déplace la case sélectionnée d'une case, Ctrl + Maj + flèche par pas de 5
+  // (depuis le centre si aucune case n'est sélectionnée)
   useEffect(() => {
     const moves: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
     function onKey(e: KeyboardEvent) {
-      if (!e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || isTypingTarget(e.target)) return;
+      if (!e.shiftKey || e.altKey || e.metaKey || isTypingTarget(e.target)) return;
       const move = moves[e.key];
       const from = selected ?? center;
       if (!move || !from) return;
       e.preventDefault();
-      setSelected({ x: wrapX(from.x + move[0]), y: wrapY(from.y + move[1]) });
+      const step = e.ctrlKey ? 5 : 1;
+      setSelected({ x: wrapX(from.x + move[0] * step), y: wrapY(from.y + move[1] * step) });
       setShowFleetsFor(undefined); // comme un clic simple
     }
     window.addEventListener('keydown', onKey);
@@ -280,8 +283,9 @@ export default function Carte() {
   return (
     <div className="carte-wrap">
       <div className="carte-toolbar">
-        <div>
-          Taille des cases:
+        {/* Vue : taille des cases + position */}
+        <div className="carte-toolbar-group">
+          <span className="carte-toolbar-label">Taille des cases</span>
           <input
             type="range"
             min={16}
@@ -289,54 +293,60 @@ export default function Carte() {
             step={2}
             value={cellSize}
             onChange={(e) => setCellSize(parseInt(e.target.value, 10))}
-            style={{ marginLeft: 8 }}
           />
-          <span style={{ marginLeft: 8 }}>{cellSize}px</span>
+          <span className="carte-toolbar-value">{cellSize}px</span>
         </div>
         <div
+          className="carte-toolbar-group carte-goto"
           onClick={() => setShowGoto(true)}
           title="Aller à une case (Alt + G)"
-          style={{ marginLeft: 20, cursor: 'pointer', textDecoration: 'underline dotted' }}
         >
-          Centre: {center ? `${center.x}-${center.y}` : '—'}
+          Centre : {center ? `${center.x}-${center.y}` : '—'}
         </div>
         {!global && (
-          <div style={{ marginLeft: 20, color: '#a66' }}>
-            Données globales en chargement…
+          <div className="carte-toolbar-status">Données globales en chargement…</div>
+        )}
+        {/* Filtres rapides : icônes discrètes, les options avancées sont dans le panneau Filtres (⚙) */}
+        <div className="carte-toolbar-group" role="group" aria-label="Filtres rapides">
+          <button type="button" className={showSystems ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Afficher / masquer les systèmes" onClick={() => setShowSystems(v => !v)}>✦</button>
+          <button type="button" className={showSystemRadar ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Portée radar des systèmes" onClick={() => setShowSystemRadar(v => !v)}>◎</button>
+          <button type="button" className={showFleetRadar ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Portée radar des flottes" onClick={() => setShowFleetRadar(v => !v)}>◉</button>
+          <button type="button" className={showMiniMap ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Afficher / masquer la mini-carte" onClick={() => setShowMiniMap(v => !v)}>▣</button>
+          <MapHelp renderTrigger={open => (
+            <button type="button" className="carte-icon-btn" title="Aide et raccourcis (?)" onClick={open}>?</button>
+          )} />
+          <button type="button" className={filtersExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Filtres avancés" onClick={() => setFiltersExpanded(v => !v)}>⚙</button>
+        </div>
+        {/* Historique : tour affiché + lecture */}
+        {tourOptions.length > 0 && (
+          <div className="carte-toolbar-group">
+            <label className="carte-toolbar-label" title="Afficher la carte telle qu'elle était à ce tour">
+              Tour :
+              <select
+                value={rapport?.tour ?? ''}
+                onChange={(e) => { stopPlay(); selectTour(Number(e.target.value)); }}
+                className="carte-select"
+                style={{ border: viewingPastTour ? '2px solid #ffe600' : undefined }}
+                title={viewingPastTour ? 'Tour passé : les données ne sont pas celles du dernier tour' : undefined}
+              >
+                {tourOptions.map(t => (
+                  <option key={t} value={t}>{t === latestTour ? `${t} (dernier)` : t}</option>
+                ))}
+              </select>
+            </label>
           </div>
         )}
-        {tourOptions.length > 0 && (
-          <label style={{ marginLeft: 20 }} title="Afficher la carte telle qu'elle était à ce tour">
-            Tour :
-            <select
-              value={rapport?.tour ?? ''}
-              onChange={(e) => { stopPlay(); selectTour(Number(e.target.value)); }}
-              style={{
-                marginLeft: 8,
-                background: '#333',
-                color: '#eee',
-                padding: '2px 4px',
-                // tour passé : bordure jaune pour rappeler qu'on ne regarde pas les données actuelles
-                border: viewingPastTour ? '2px solid #ffe600' : '1px solid #555',
-              }}
-            >
-              {tourOptions.map(t => (
-                <option key={t} value={t}>{t === latestTour ? `${t} (dernier)` : t}</option>
-              ))}
-            </select>
-          </label>
-        )}
         {tourOptions.length > 1 && (
-          <div style={{ marginLeft: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div className="carte-toolbar-group">
             <button
               type="button"
+              className="carte-btn"
               onClick={playing ? stopPlay : startPlay}
               title={playing ? 'Arrêter la lecture' : `Rejouer tous les tours depuis le premier (un tour toutes les ${playStepS} s, zones masquées)`}
-              style={{ padding: '2px 8px', cursor: 'pointer', backgroundColor: '#444', color: '#eee', border: '1px solid #666', borderRadius: 4 }}
             >
               {playing ? '■' : '▶'}
             </button>
-            <label title="Durée d'affichage de chaque tour pendant la lecture" style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: '0.85em', color: '#aaa' }}>
+            <label title="Durée d'affichage de chaque tour pendant la lecture" className="carte-toolbar-label">
               <input
                 type="number"
                 min={1}
@@ -346,13 +356,13 @@ export default function Carte() {
                   const v = parseInt(e.target.value, 10);
                   if (v >= 1 && v <= MAX_PLAY_STEP_S) setPlayStepS(v);
                 }}
-                style={{ width: 40, background: '#333', color: '#eee', border: '1px solid #555', padding: '1px 3px' }}
+                className="carte-input-num"
               />
               s
             </label>
             {playing && (
               // Temps restant avant le tour suivant
-              <div title="Temps avant le tour suivant" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.85em', color: '#aaa' }}>
+              <div title="Temps avant le tour suivant" className="carte-toolbar-label" style={{ gap: 4 }}>
                 <div style={{ width: 50, height: 4, background: '#333', borderRadius: 2, overflow: 'hidden' }}>
                   <div style={{ width: `${(remainingMs / playStepMs) * 100}%`, height: '100%', background: '#ffe600', transition: 'width 0.2s linear' }} />
                 </div>
@@ -362,10 +372,11 @@ export default function Carte() {
           </div>
         )}
 
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            <button onClick={() => setShowPaste(true)} style={{ padding: '4px 8px', cursor: 'pointer', backgroundColor: '#444', color: '#eee', border: '1px solid #666', borderRadius: 4 }}>
-                Importer systèmes
-            </button>
+        {/* Actions : import */}
+        <div className="carte-toolbar-group" style={{ marginLeft: 'auto' }}>
+          <button onClick={() => setShowPaste(true)} className="carte-btn">
+            Importer systèmes
+          </button>
         </div>
       </div>
       {noRapportMessage}
@@ -407,13 +418,22 @@ export default function Carte() {
             stabilitySystemPos={stabilitySystemPos}
           />
           {showMiniMap && <MiniMap onCenter={(x, y) => setCenter({ x, y })} colorMode={colorMode} />}
-          <MapHelp />
-
-          {/* Filtres Popup en bas à droite */}
+          {/* Légende des couleurs (mode Alliés/Ennemis) : la carte se suffit à elle-même au coup d'œil */}
+          {colorMode === 'status' && (
+            <div className="map-legend" title="Couleurs de possession des systèmes et des flottes">
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#09ca31' }} /> moi</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#224eff' }} /> alliance</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#ffff00' }} /> PNA</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#f80c0c' }} /> ennemi</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#999999' }} /> neutre</span>
+              <span className="map-legend-item"><span className="map-legend-dot map-legend-fleet" /> flotte</span>
+            </div>
+          )}
+          {/* Filtres Popup en haut à droite (la mini-carte occupe le bas à droite) */}
           <div style={{
               position: 'absolute',
-              bottom: 20,
-              right: 20,
+              top: 8,
+              right: 8,
               width: filtersExpanded ? 280 : 120,
               backgroundColor: '#222',
               border: '1px solid #444',
@@ -422,8 +442,8 @@ export default function Carte() {
               zIndex: 100,
               display: 'flex',
               flexDirection: 'column',
-              // Sur les petits écrans, le panneau ne dépasse pas la hauteur visible : l'en-tête reste accessible et le contenu défile
-              maxHeight: 'min(calc(100% - 40px), calc(100vh - 160px))',
+              // Le panneau ne dépasse pas la zone de la carte : l'en-tête reste accessible et le contenu défile
+              maxHeight: 'calc(100% - 16px)',
               transition: 'width 0.3s ease'
           }}>
               <div

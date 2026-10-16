@@ -10,16 +10,21 @@ import {
 } from '../../parsers/parseCombatMessages';
 import Commandant from "../utils/Commandant";
 import Position from "../utils/Position";
+import {colorForOwnership} from "./CanvasMap";
 import {getDescriptionPuissance, getPuissance, getPuissanceFromString} from "../../utils/puissance";
 import { NavLink } from 'react-router-dom';
 import ZoneEditor from './ZoneEditor';
 import { zoneCovers } from '../../utils/zones';
 import { isObserved, lastKnownFleets } from '../../utils/fleetHistory';
+import { lastKnownSystem } from '../../utils/systemHistory';
 import { fleetSnapshotOf } from '../../storage/rapportStore';
 
 type Props = {
   selected?: XY;
 };
+
+// Formatage des nombres avec séparateur de milliers (ex. 59 485)
+const fmt = (n: number) => n.toLocaleString('fr-FR');
 
 // Ligne issue d'un tour précédent : texte grisé et icône d'avertissement à côté du nom
 const staleRowStyle: React.CSSProperties = { color: '#999' };
@@ -30,7 +35,7 @@ const StaleIcon = () => (
 
 
 export default function InfoPanel({ selected }: Props) {
-  const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats, zones, zoneLabels, fleetSnapshots } = useReport();
+  const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats, zones, zoneLabels, fleetSnapshots, systemSnapshots } = useReport();
 
   // Zones affichées : celles qui couvrent la case, plus celles déjà listées pour cette sélection
   // (une zone déplacée ou réduite hors de la case reste éditable jusqu'au prochain clic)
@@ -46,9 +51,34 @@ export default function InfoPanel({ selected }: Props) {
   const [noteText, setNoteText] = useState('');
   const [noteColor, setNoteColor] = useState('#ffcc00');
   const [noteTag, setNoteTag] = useState('');
+  // Le formulaire d'ajout est replié derrière un bouton pour laisser la place aux notes existantes
+  const [showNoteForm, setShowNoteForm] = useState(false);
 
-  const [sortField, setSortField] = useState<'dist' | 'num'>('dist');
+  const [sortField, setSortField] = useState<'dist' | 'num' | 'vitesse' | 'as' | 'ap'>('dist');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  // En-tête triable de la liste "Mes flottes"
+  const sortTh = (field: 'num' | 'dist' | 'vitesse' | 'as' | 'ap', label: string) => (
+    <th
+      style={{ cursor: 'pointer', userSelect: 'none' }}
+      onClick={() => {
+        if (sortField === field) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+        else { setSortField(field); setSortOrder('asc'); }
+      }}
+    >
+      {label} {sortField === field && (sortOrder === 'asc' ? '▲' : '▼')}
+    </th>
+  );
+  const [hoverFleet, setHoverFleet] = useState<{fleet: any; anchor: {top: number; bottom: number; left: number; right: number}} | undefined>(undefined);
+  const showFleetHover = (f: any) => (e: React.MouseEvent<HTMLTableRowElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setHoverFleet({fleet: f, anchor: {top: r.top, bottom: r.bottom, left: r.left, right: r.right}});
+  };
+  const hideFleetHover = () => setHoverFleet(undefined);
+  // Changement de sélection : ne pas garder le détail de la flotte de l'ancienne case
+  useEffect(() => {
+    setHoverFleet(undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.x, selected?.y]);
 
   const atPos = useMemo(() => {
     if (!selected) return { systems: [], fleets: [] as any[], playerFleets: [] as any[] };
@@ -66,6 +96,16 @@ export default function InfoPanel({ selected }: Props) {
           seen.add(`${s.pos.x}_${s.pos.y}`);
         }
       });
+    }
+
+    // Système vu sur la case dans un tour précédent mais plus dans les données actuelles :
+    // on affiche la dernière détection stockée (avec son tour) plutôt que le simple nom de data.xml
+    if (systems.length === 0 && rapport) {
+      const last = lastKnownSystem(systemSnapshots, selected, rapport.tour);
+      if (last) {
+        systems.push(last.systeme);
+        seen.add(`${last.systeme.pos.x}_${last.systeme.pos.y}`);
+      }
     }
 
     if (global?.systemes) {
@@ -89,8 +129,8 @@ export default function InfoPanel({ selected }: Props) {
 
     // Tri
     playerFleets.sort((a, b) => {
-      let valA = a[sortField];
-      let valB = b[sortField];
+      let valA = a[sortField] ?? 0;
+      let valB = b[sortField] ?? 0;
 
       if (valA === valB) return 0;
       const res = valA < valB ? -1 : 1;
@@ -98,7 +138,7 @@ export default function InfoPanel({ selected }: Props) {
     });
 
     return { systems, fleets, playerFleets };
-  }, [selected, rapport, global, sortField, sortOrder]);
+  }, [selected, rapport, global, systemSnapshots, sortField, sortOrder]);
 
   const system = useMemo(() => {
     return atPos.systems[0];
@@ -127,6 +167,14 @@ export default function InfoPanel({ selected }: Props) {
 
   const isOwner = useMemo(() => system?.proprietaires?.some((p: any) => p === rapport?.joueur?.numero), [system, rapport])
 
+  // Couleur de possession du système (bordure du récapitulatif de case)
+  const summaryColor = useMemo(() => {
+    if (system?.proprietaires?.length) {
+      return colorForOwnership(rapport?.joueur?.numero, system.proprietaires, rapport?.joueur?.alliances, rapport?.joueur?.pna) || '#555';
+    }
+    return '#555';
+  }, [system, rapport]);
+
   const currentNotes = useMemo(() => {
     if (!selected) return [];
     return notes[`${selected.x}_${selected.y}`] || [];
@@ -139,12 +187,19 @@ export default function InfoPanel({ selected }: Props) {
     return [...rapportCombats, ...publicCombatsAt];
   }, [selected, rapport, publicCombats]);
 
+  // La case a-t-elle du contenu (système, flottes actuelles/connues, combats, zones) ?
+  const hasCellContent = useMemo(
+    () => !!system || atPos.fleets.length > 0 || !!pastFleets || cellCombats.length > 0 || zonesHere.length > 0,
+    [system, atPos.fleets.length, pastFleets, cellCombats.length, zonesHere.length]
+  );
+
   const handleAddNote = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected || !noteText.trim()) return;
     addNote(selected, noteText, noteColor, noteTag.trim() || undefined);
     setNoteText('');
     setNoteTag('');
+    setShowNoteForm(false);
   };
 
   if (!selected) {
@@ -171,41 +226,46 @@ export default function InfoPanel({ selected }: Props) {
         )}
       </div>
 
-      <div className="info-block">
-        <h4>Systèmes</h4>
-        <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-          <tr>
-            <th>Nom</th>
-            <th>Planètes</th>
-            <th>Population</th>
-            <th>Commandants</th>
-            { isOwner &&<th></th>}
-          </tr>
-          </thead>
-          <tbody>
-          {system ? (
-            <tr style={staleTour !== undefined ? staleRowStyle : undefined}>
-              <td>
-                {staleTour !== undefined && <StaleIcon />}
-                {system.nom}
-              </td>
-              <td style={{ textAlign: 'right' }}>{system.nbPla ?? '—'}</td>
-                <td>{system.pop}/{system.popMax}</td>
-              <td style={{ textAlign: 'right' }}>
+      {!hasCellContent && (
+        <div className="info-block" style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em' }}>
+          Case vide.
+        </div>
+      )}
+
+      {/* Récapitulatif du système de la case (affiché seulement s'il y a un système : sans système,
+      les sections ci-dessous suffisent) */}
+      {system && (
+        <div className="info-block" style={{ borderLeft: `4px solid ${summaryColor}`, paddingLeft: 10 }}>
+          {system && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                <strong style={{ fontSize: '1.05em' }}>
+                  {staleTour !== undefined && <StaleIcon />}
+                  {system.nom}
+                </strong>
+                {isOwner && (
+                  <NavLink to={`/player-system-detail/${selected.x}-${selected.y}`} style={{ fontSize: '0.85em' }}>
+                    détails
+                  </NavLink>
+                )}
+              </div>
+              <div style={{ fontSize: '0.9em', color: '#ccc' }}>
                 {Array.isArray(system.proprietaires) && system.proprietaires.length
                   ? system.proprietaires.map((p: number, key: number) => <Commandant num={p} key={key} />)
-                  : '—'}
-              </td>
-              { isOwner && <td className='app-nav'><NavLink  to={`/player-system-detail/${selected.x}-${selected.y}`}>détails {isOwner}</NavLink></td> }
-            </tr>
-          ) : (
-            <tr><td colSpan={3} style={{ textAlign: 'center', padding: 8, color: '#aaa' }}>Aucun système ici.</td></tr>
+                  : null}
+              </div>
+            </>
           )}
-          </tbody>
-        </table>
-      </div>
+          <div style={{ fontSize: '0.85em', color: '#bbb' }}>
+            {system?.nbPla != null && <>{fmt(system.nbPla)} planètes</>}
+            {system?.pop != null && system?.popMax != null && <> · pop {fmt(system.pop)}/{fmt(system.popMax)}</>}
+          </div>
+        </div>
+      )}
 
+      {/* Le détail système (nom, possesseurs, planètes, population) est dans le récapitulatif en tête de panneau */}
+
+      {(atPos.fleets.length > 0 || pastFleets) && (
       <div className="info-block">
         <h4>Flottes</h4>
         <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -234,7 +294,7 @@ export default function InfoPanel({ selected }: Props) {
 
             }
             return (
-              <tr key={`flt-${i}`}>
+              <tr key={`flt-${i}`} {...(f.type === 'joueur' ? { onMouseEnter: showFleetHover(f), onMouseLeave: hideFleetHover } : {})}>
                 <td>{f.nom} ({f.num+1})</td>
                 <td style={{ textAlign: 'right' }}>
                   {typeof owner === 'number' ? <Commandant num={owner} /> : '—'}
@@ -252,12 +312,10 @@ export default function InfoPanel({ selected }: Props) {
               <td style={{ textAlign: 'right' }}>{`${getPuissanceFromString(f.puiss)} - ${f.puiss}`}</td>
             </tr>
           ))}
-          {atPos.fleets.length === 0 && !pastFleets && (
-            <tr><td colSpan={4} style={{ textAlign: 'center', padding: 8, color: '#aaa' }}>Aucune flotte ici.</td></tr>
-          )}
           </tbody>
         </table>
       </div>
+      )}
 
       {atPos.playerFleets.length > 0 && (
         <div className="info-block">
@@ -265,117 +323,67 @@ export default function InfoPanel({ selected }: Props) {
           <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
             <tr>
-              <th
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-                onClick={() => {
-                  if (sortField === 'num') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                  else { setSortField('num'); setSortOrder('asc'); }
-                }}
-              >
-                Nom {sortField === 'num' && (sortOrder === 'asc' ? '▲' : '▼')}
-              </th>
-              <th
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-                onClick={() => {
-                  if (sortField === 'dist') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                  else { setSortField('dist'); setSortOrder('asc'); }
-                }}
-              >
-                Distance {sortField === 'dist' && (sortOrder === 'asc' ? '▲' : '▼')}
-              </th>
-              <th>Vitesse</th>
-              <th>AS / AP</th>
+              {sortTh('num', 'Nom')}
+              {sortTh('dist', 'Distance')}
+              {sortTh('vitesse', 'Vitesse')}
+              {sortTh('as', 'AS')}
+              {sortTh('ap', 'AP')}
               <th>Position</th>
             </tr>
             </thead>
             <tbody>
             {atPos.playerFleets.map((f: any, i: number) => {
               const isHere = f.pos.x === selected.x && f.pos.y === selected.y;
+              // Hors de portée ce tour : ligne orangée et estompée
               const rowStyle = !f.reachable && !isHere ? { opacity: 0.5, color: '#ffa500' } : {};
               return (
-                <tr key={`player-flt-${i}`} style={rowStyle}>
+                <tr key={`player-flt-${i}`} style={rowStyle} onMouseEnter={showFleetHover(f)} onMouseLeave={hideFleetHover}>
                   <td>{f.nom} ({f.num+1})</td>
                   <td style={{ textAlign: 'right' }}>{isHere ? '—' : f.dist}</td>
                   <td style={{ textAlign: 'right' }}>{f.vitesse}</td>
-                  <td style={{ textAlign: 'right' }}>{f.as ?? 0} / {f.ap ?? 0}</td>
+                  <td style={{ textAlign: 'right' }}>{f.as ?? 0}</td>
+                  <td style={{ textAlign: 'right' }}>{f.ap ?? 0}</td>
                   <td style={{ textAlign: 'right' }}><Position pos={f.pos} /></td>
                 </tr>
               );
             })}
             </tbody>
           </table>
+          <div style={{ fontSize: '0.75em', color: '#888', marginTop: 4 }}>orange estompé = hors de portée ce tour</div>
         </div>
       )}
+      {cellCombats.length > 0 && (
       <div className="info-block">
         <h4>Combats</h4>
         <p className="combat-legend">
           <span className="combat-legend-spatial">S</span> spatial (bas-gauche)
           <span className="combat-legend-planetary">P</span> planétaire (haut-gauche)
         </p>
-        {cellCombats.length > 0 ? (
-          <div className="combat-list">
-            {cellCombats.map((combat) => (
-              <CombatCard key={combat.id} combat={combat} />
-            ))}
-          </div>
-        ) : (
-          <div style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em' }}>
-            Aucun combat signalé sur cette case.
-          </div>
-        )}
+        <div className="combat-list">
+          {cellCombats.map((combat) => (
+            <CombatCard key={combat.id} combat={combat} />
+          ))}
+        </div>
       </div>
+      )}
 
+      {zonesHere.length > 0 && (
       <div className="info-block">
         <h4>Zones</h4>
-        {zonesHere.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {zonesHere.map(z => <ZoneEditor key={z.id} zone={z} />)}
-            <datalist id="zone-editor-labels">
-              {zoneLabels.map(l => <option key={l} value={l} />)}
-            </datalist>
-          </div>
-        ) : (
-          <div style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em' }}>Aucune zone sur cette case (Alt + clic + glisser pour en tracer une).</div>
-        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {zonesHere.map(z => <ZoneEditor key={z.id} zone={z} />)}
+          <datalist id="zone-editor-labels">
+            {zoneLabels.map(l => <option key={l} value={l} />)}
+          </datalist>
+        </div>
       </div>
+      )}
 
       <div className="info-block">
         <h4>Notes</h4>
-        <form onSubmit={handleAddNote} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              type="color"
-              value={noteColor}
-              onChange={(e) => setNoteColor(e.target.value)}
-              style={{ width: 40, height: 30, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
-              title="Choisir une couleur"
-            />
-            <input
-              type="text"
-              value={noteTag}
-              onChange={(e) => setNoteTag(e.target.value)}
-              placeholder="Tag..."
-              list="tags-list"
-              style={{ width: 80, padding: '4px 8px', background: '#123', color: '#eee', border: '1px solid #345' }}
-            />
-            <datalist id="tags-list">
-              {allTags.map(tag => (
-                <option key={tag} value={tag} />
-              ))}
-            </datalist>
-            <input
-              type="text"
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Ajouter une note..."
-              style={{ flex: 1, padding: '4px 8px', background: '#123', color: '#eee', border: '1px solid #345' }}
-            />
-            <button type="submit" style={{ padding: '4px 12px' }}>Ajouter</button>
-          </div>
-        </form>
 
         {currentNotes.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
             {currentNotes.map((note: Note) => (
               <div
                 key={note.id}
@@ -424,9 +432,101 @@ export default function InfoPanel({ selected }: Props) {
             ))}
           </div>
         ) : (
-          <div style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em' }}>Aucune note pour cette case.</div>
+          <div style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em', marginBottom: 8 }}>Aucune note pour cette case.</div>
+        )}
+
+        {showNoteForm ? (
+          <form onSubmit={handleAddNote} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="color"
+                value={noteColor}
+                onChange={(e) => setNoteColor(e.target.value)}
+                style={{ width: 40, height: 30, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                title="Choisir une couleur"
+              />
+              <input
+                type="text"
+                value={noteTag}
+                onChange={(e) => setNoteTag(e.target.value)}
+                placeholder="Tag..."
+                list="tags-list"
+                style={{ width: 80, padding: '4px 8px', background: '#123', color: '#eee', border: '1px solid #345' }}
+              />
+              <datalist id="tags-list">
+                {allTags.map(tag => (
+                  <option key={tag} value={tag} />
+                ))}
+              </datalist>
+              <input
+                type="text"
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="Ajouter une note..."
+                style={{ flex: 1, padding: '4px 8px', background: '#123', color: '#eee', border: '1px solid #345' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="submit" style={{ padding: '4px 12px' }}>Ajouter</button>
+              <button type="button" onClick={() => setShowNoteForm(false)} style={{ padding: '4px 12px', background: 'transparent', color: '#aaa', border: '1px solid #555', borderRadius: 4 }}>
+                Annuler
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowNoteForm(true)}
+            style={{ padding: '4px 12px', cursor: 'pointer', backgroundColor: '#333', color: '#eee', border: '1px solid #555', borderRadius: 4, fontSize: '0.85em' }}
+          >
+            + Ajouter une note
+          </button>
         )}
       </div>
+
+      {hoverFleet && (() => {
+        const f = hoverFleet.fleet as any;
+        const width = 280;
+        // À droite de la ligne si la place existe, sinon à gauche ; alignée sur la ligne
+        const left = hoverFleet.anchor.right + 8 + width < window.innerWidth
+            ? hoverFleet.anchor.right + 8
+            : Math.max(8, hoverFleet.anchor.left - width - 8);
+        const estHeight = 240;
+        let top = hoverFleet.anchor.top;
+        if (top + estHeight > window.innerHeight - 8) top = Math.max(8, window.innerHeight - estHeight - 8);
+        // Composition des vaisseaux : type × nombre
+        const comp: Record<string, number> = {};
+        (f.vaisseaux || []).forEach((v: any) => { comp[v.type] = (comp[v.type] || 0) + 1; });
+        const compEntries = Object.entries(comp);
+        const lbl: React.CSSProperties = { color: '#999', paddingRight: 12, whiteSpace: 'nowrap' };
+        return (
+          <div style={{ position: 'fixed', left, top, width, zIndex: 300, pointerEvents: 'none', background: 'rgba(15,15,20,0.97)', border: '1px solid #555', borderRadius: 6, padding: '8px 10px', fontSize: '0.82em', color: '#ddd', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+            <div style={{ fontWeight: 'bold', color: '#eee', marginBottom: 6 }}>{f.nom} ({f.num + 1})</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                <tr><td style={lbl}>Position</td><td style={{ textAlign: 'right' }}><Position pos={f.pos} /></td></tr>
+                {f.direction && <tr><td style={lbl}>Direction</td><td style={{ textAlign: 'right' }}><Position pos={f.direction} /></td></tr>}
+                <tr><td style={lbl}>Vitesse</td><td style={{ textAlign: 'right' }}>{f.vitesse}</td></tr>
+                {f.directive ? <tr><td style={lbl}>Directive</td><td style={{ textAlign: 'right' }}>{String(f.directive)}</td></tr> : null}
+                <tr><td style={lbl}>AS / AP</td><td style={{ textAlign: 'right' }}>{f.as ?? 0} / {f.ap ?? 0}</td></tr>
+                <tr><td style={lbl}>Scan</td><td style={{ textAlign: 'right' }}>{f.scan}</td></tr>
+                <tr><td style={lbl}>Vaisseaux</td><td style={{ textAlign: 'right' }}>{f.nbVso}</td></tr>
+                {typeof f.dist === 'number' && f.dist > 0 && (
+                  <tr><td style={lbl}>Distance</td><td style={{ textAlign: 'right' }}>{f.dist} {f.reachable ? '(atteignable ce tour)' : '(hors de portée)'}</td></tr>
+                )}
+              </tbody>
+            </table>
+            {compEntries.length > 0 && (
+              <div style={{ marginTop: 6, borderTop: '1px solid #333', paddingTop: 6 }}>
+                {compEntries.slice(0, 8).map(([type, nb]) => (
+                  <div key={type} style={{ display: 'flex', justifyContent: 'space-between' }}><span>{type}</span><span>× {nb}</span></div>
+                ))}
+                {compEntries.length > 8 && <div style={{ color: '#888' }}>… +{compEntries.length - 8} autres</div>}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
