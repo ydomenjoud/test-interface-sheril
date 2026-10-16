@@ -58,7 +58,7 @@ export function parseDataXml(text: string): GlobalData {
         races.push({
             id: Number(r.getAttribute('code') || r.getAttribute('id') || idx + 1),
             nom: r.getAttribute('nom') || `Race ${idx + 1}`,
-            couleur: r.getAttribute('color') || 'white',
+            couleur: r.getAttribute('color') || r.getAttribute('couleur') || 'white',
             graviteSupporte: {
                 min: +(r.getAttribute('grav_min') || 0),
                 max: +(r.getAttribute('grav_max') || 0),
