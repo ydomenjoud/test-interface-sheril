@@ -1067,10 +1067,8 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         // Marqueurs de combat au-dessus des systèmes (S = spatial, P = planétaire)
         if (showCombatBadges && combats.length > 0) {
-            try { console.debug(`[CanvasMap] total combats: ${combats.length}`); } catch (e) { }
             const cCombat = ctx as CanvasRenderingContext2D;
             cCombat.save();
-            let combatLogCount = 0;
             for (let r = 0; r < rows; r++) {
                 if (r === 0) continue;
                 const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
@@ -1079,15 +1077,9 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
                     const counts = countCombatsByKind(combats, {x: xCoord, y: yCoord});
                     if (counts.spatial <= 0 && counts.planetary <= 0) continue;
-                    if (combatLogCount < 50) {
-                        try { console.debug(`[CanvasMap] combat at ${xCoord}-${yCoord}`, counts); } catch (e) { }
-                        combatLogCount += 1;
-                    }
                     drawCombatMarkers(cCombat, c * cellSize, r * cellSize, cellSize, counts.spatial, counts.planetary);
                 }
             }
-            try { if (combatLogCount > 0) console.info(`[CanvasMap] logged ${combatLogCount} combat positions`); } catch (e) { }
-
             cCombat.restore();
         }
 
