@@ -883,22 +883,17 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
             c2d.restore();
 
-            // HALO de sélection pour les systèmes (couleur via colorForOwnership)
+            // Contour fin autour du disque (remplace l'ancien halo lumineux, plus lisible et plus léger)
             if (isSystemSelected(owners)) {
-                const haloColor = lightenHexColor(col || '#000000', 100);
-                const lineW = 2;
-                const blur = Math.max(10, Math.floor(lineW * 1.5));
-                const rHalo = radius + lineW / 2; // halo juste à l'extérieur du disque
-                const cHalo = ctx as CanvasRenderingContext2D;
-                cHalo.save();
-                cHalo.strokeStyle = haloColor;
-                cHalo.lineWidth = lineW;
-                cHalo.shadowColor = haloColor;
-                cHalo.shadowBlur = blur;
-                cHalo.beginPath();
-                cHalo.arc(cx, cy, rHalo, 0, Math.PI * 2);
-                cHalo.stroke();
-                cHalo.restore();
+                const ringColor = lightenHexColor(col || '#000000', 100);
+                const cRing = ctx as CanvasRenderingContext2D;
+                cRing.save();
+                cRing.strokeStyle = ringColor;
+                cRing.lineWidth = 1.5;
+                cRing.beginPath();
+                cRing.arc(cx, cy, radius + 1, 0, Math.PI * 2);
+                cRing.stroke();
+                cRing.restore();
             }
 
             // Badges propriétaires en bas à droite de la case
@@ -1056,23 +1051,17 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
             c2d.restore();
 
-            // HALO de sélection pour les flottes (autour du badge circulaire)
+            // Contour fin autour du badge de flotte (remplace l'ancien halo lumineux)
             if (isFleetSelected((f as any).owner)) {
                 const col = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode);
-                const haloColor = col || '#000000';
-                const lineW = 2;
-                const blur = Math.max(10, Math.floor(lineW * 1.5));
-                const radius = diameter / 2 + lineW + 1;
-                const cHalo = ctx as CanvasRenderingContext2D;
-                cHalo.save();
-                cHalo.strokeStyle = haloColor;
-                cHalo.lineWidth = lineW;
-                cHalo.shadowColor = haloColor;
-                cHalo.shadowBlur = blur;
-                cHalo.beginPath();
-                cHalo.arc(cx, cy, radius, 0, Math.PI * 2);
-                cHalo.stroke();
-                cHalo.restore();
+                const cRing = ctx as CanvasRenderingContext2D;
+                cRing.save();
+                cRing.strokeStyle = col || '#000000';
+                cRing.lineWidth = 1;
+                cRing.beginPath();
+                cRing.arc(cx, cy, diameter / 2 + 2, 0, Math.PI * 2);
+                cRing.stroke();
+                cRing.restore();
             }
         }
 
