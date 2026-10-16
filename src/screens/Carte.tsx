@@ -31,7 +31,7 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_selected_owners');
     return saved ? JSON.parse(saved) : [];
   });
-  const [showSystems, setShowSystems] = useState(() => {
+  const [showSystems, setShowSystems] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_show_systems');
     return saved !== null ? JSON.parse(saved) : true;
   });
@@ -48,11 +48,11 @@ export default function Carte() {
     return saved !== null ? JSON.parse(saved) : true;
   });
   // Portées radar : désactivées par défaut (voile bleu sur la carte) ; à activer dans les Filtres si besoin
-  const [showSystemRadar, setShowSystemRadar] = useState(() => {
+  const [showSystemRadar, setShowSystemRadar] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_show_system_radar');
     return saved !== null ? JSON.parse(saved) : false;
   });
-  const [showFleetRadar, setShowFleetRadar] = useState(() => {
+  const [showFleetRadar, setShowFleetRadar] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_show_fleet_radar');
     return saved !== null ? JSON.parse(saved) : false;
   });
@@ -99,9 +99,9 @@ export default function Carte() {
   const [pasteText, setPasteText] = useState('');
   const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
 
-  const [filtersExpanded, setFiltersExpanded] = useState(() => {
+  const [filtersExpanded, setFiltersExpanded] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_filters_expanded');
-    return saved !== null ? JSON.parse(saved) : true;
+    return saved !== null ? JSON.parse(saved) : false;
   });
 
   useEffect(() => {
@@ -304,6 +304,16 @@ export default function Carte() {
         {!global && (
           <div className="carte-toolbar-status">Données globales en chargement…</div>
         )}
+        {/* Filtres rapides : icônes discrètes, les options avancées sont dans le panneau Filtres (⚙) */}
+        <div className="carte-toolbar-group" role="group" aria-label="Filtres rapides">
+          <button type="button" className={showSystems ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Afficher / masquer les systèmes" onClick={() => setShowSystems(v => !v)}>✦</button>
+          <button type="button" className={showSystemRadar ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Portée radar des systèmes" onClick={() => setShowSystemRadar(v => !v)}>◎</button>
+          <button type="button" className={showFleetRadar ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Portée radar des flottes" onClick={() => setShowFleetRadar(v => !v)}>◉</button>
+          <MapHelp renderTrigger={open => (
+            <button type="button" className="carte-icon-btn" title="Aide et raccourcis (?)" onClick={open}>?</button>
+          )} />
+          <button type="button" className={filtersExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Filtres avancés" onClick={() => setFiltersExpanded(v => !v)}>⚙</button>
+        </div>
         {/* Historique : tour affiché + lecture */}
         {tourOptions.length > 0 && (
           <div className="carte-toolbar-group">
@@ -424,8 +434,6 @@ export default function Carte() {
               <span className="map-legend-item"><span className="map-legend-dot map-legend-fleet" /> flotte</span>
             </div>
           )}
-          <MapHelp />
-
           {/* Filtres Popup en haut à droite (la mini-carte occupe le bas à droite) */}
           <div style={{
               position: 'absolute',
@@ -492,14 +500,6 @@ export default function Carte() {
                       )}
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #444', paddingTop: 8 }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={showSystems}
-                              onChange={(e) => setShowSystems(e.target.checked)}
-                            />
-                            Afficher systèmes
-                          </label>
                           <label
                             title="Systèmes connus uniquement par les données publiques (data.xml), jamais détectés dans vos rapports"
                             style={{ display: 'flex', alignItems: 'center', gap: 6, color: showSystems ? '#eee' : '#777', fontSize: '0.9em', cursor: showSystems ? 'pointer' : 'default', marginLeft: 16 }}
@@ -645,26 +645,6 @@ export default function Carte() {
                               ))}
                           </div>
                       )}
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #444', paddingTop: 8 }}>
-                          <span style={{ fontSize: '0.85em', color: '#aaa' }}>Portées Radar</span>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={showSystemRadar}
-                              onChange={(e) => setShowSystemRadar(e.target.checked)}
-                            />
-                            Systèmes
-                          </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={showFleetRadar}
-                              onChange={(e) => setShowFleetRadar(e.target.checked)}
-                            />
-                            Flottes
-                          </label>
-                      </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #444', paddingTop: 8 }}>
                           <span style={{ fontSize: '0.85em', color: '#aaa' }}>Distance Capitale</span>

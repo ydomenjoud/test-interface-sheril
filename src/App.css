@@ -203,6 +203,33 @@ a {
     border-color: #71deff;
 }
 
+/* Bouton-icône discret de la barre d'outils (filtres rapides) */
+.carte-icon-btn {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #2a2a2a;
+    color: #aaa;
+    border: 1px solid #3a3a3a;
+    border-radius: 5px;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.carte-icon-btn:hover {
+    color: #eee;
+    border-color: #555;
+}
+.carte-icon-btn.active {
+    background: #24435c;
+    color: #71deff;
+    border-color: #71deff;
+}
+
 .carte-canvas-area {
     grid-area: canvas;
     position: relative;
