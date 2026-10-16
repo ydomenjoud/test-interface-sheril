@@ -17,6 +17,10 @@ type SystemQueue = Record<string, PlannedItem[]>; // Key = x_y
 
 const construireBluePrintSeparator = '%#!%';
 
+const stockClass = (total: number, final: number) =>
+    `stockInfo ${final < 0 ? 'stockOver' : (total > 0 ? 'stockPositive' : 'stockEmpty')}`;
+const spentClass = (final: number) => (final < 0 ? 'stockOver' : 'stockSpent');
+
 export default function Planification() {
     const { global, rapport } = useReport();
     const [sortBy, setSortBy] = useState<'nom' | 'pos' | 'pdc' | 'nbConstructions' | ''>('nom');
@@ -72,6 +76,30 @@ export default function Planification() {
     }, [queues]);
 
     const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+    const [isMultiModalOpen, setIsMultiModalOpen] = useState(false);
+    const [showBuilt, setShowBuilt] = useState(() => localStorage.getItem('planification_show_built') === 'true');
+
+    useEffect(() => {
+        localStorage.setItem('planification_show_built', String(showBuilt));
+    }, [showBuilt]);
+    const [multiChoice, setMultiChoice] = useState('');
+    const [multiMax, setMultiMax] = useState(''); // plafond ajouté par système (vide = pas de limite)
+    const [multiOnlyMissing, setMultiOnlyMissing] = useState(false); // ignore les systèmes qui ont déjà cette construction
+    const [multiIgnoreLimits, setMultiIgnoreLimits] = useState(false); // ignore les ressources des systèmes (le maximum saisi devient la quantité)
+    // Sans limite de ressources, une quantité est obligatoire
+    const canAddMulti = !!multiChoice && (!multiIgnoreLimits || parseInt(multiMax, 10) > 0);
+
+    // Raccourci Alt+A : ouvre la popup « Action multiple »
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'a') {
+                e.preventDefault();
+                setIsMultiModalOpen(true);
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
     const [confirmText, setConfirmText] = useState('');
 
     const clearAllQueues = () => {
@@ -207,6 +235,61 @@ export default function Planification() {
                     idx === itemIndex ? { ...item, quantity: maxPossible } : item
                 )
             };
+        });
+    };
+
+    // Ajoute (ou augmente) le maximum possible de la construction choisie dans chaque système
+    const addMaxToConstructingSystems = (choice: string, limit: number | undefined, onlyMissing: boolean, ignoreLimits: boolean) => {
+        const [type, ...rest] = choice.split(':');
+        const code = rest.join(':');
+        if (!code || (type !== 'building' && type !== 'ship')) return;
+        const unit = getItemData({ id: '', type, code, quantity: 1 });
+
+        setQueues(prev => {
+            const next: SystemQueue = { ...prev };
+            systems.forEach(system => {
+                const key = `${system.pos.x}_${system.pos.y}`;
+                const queue = prev[key] || [];
+                const existing = queue.findIndex(i => i.type === type && i.code === code);
+                if (onlyMissing && type === 'building' && system.planetes.some(pl =>
+                    pl.proprietaire === rapport?.joueur?.numero && pl.batiments?.some(b => b.techCode === code && b.count > 0)
+                )) return;
+
+                const initial = getSystemResources(system);
+                let remPc = initial.pc || 0;
+                let remMin = initial.minerai;
+                const remMarch: Record<number, number> = { ...initial.initialMarchandises };
+                queue.forEach(item => {
+                    const data = getItemData(item);
+                    remPc -= data.pc * item.quantity;
+                    remMin -= data.minerai * item.quantity;
+                    data.marchandises.forEach(m => {
+                        remMarch[m.code] = (remMarch[m.code] || 0) - m.nb * item.quantity;
+                    });
+                });
+
+                let max = Infinity;
+                if (!ignoreLimits) {
+                    if (unit.pc > 0) max = Math.min(max, Math.floor(Math.max(0, remPc) / unit.pc));
+                    if (unit.minerai > 0) max = Math.min(max, Math.floor(Math.max(0, remMin) / unit.minerai));
+                    unit.marchandises.forEach(m => {
+                        if (m.nb > 0) max = Math.min(max, Math.floor(Math.max(0, remMarch[m.code] || 0) / m.nb));
+                    });
+                }
+                if (limit !== undefined) max = Math.min(max, limit);
+                if (max === Infinity || max <= 0) return;
+
+                // Si la construction est déjà planifiée, on l'augmente ; sinon on l'ajoute
+                next[key] = existing >= 0
+                    ? queue.map((i, idx) => idx === existing ? { ...i, quantity: i.quantity + max } : i)
+                    : [...queue, {
+                        id: Math.random().toString(36).substr(2, 9),
+                        type,
+                        code,
+                        quantity: max
+                    }];
+            });
+            return next;
         });
     };
 
@@ -513,6 +596,34 @@ export default function Planification() {
                             <option value="pdc">PDC restant</option>
                             <option value="nbConstructions">Nombre de constructions</option>
                         </select>
+                        <button
+                            onClick={() => setIsMultiModalOpen(true)}
+                            style={{
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                backgroundColor: '#333',
+                                color: '#eee',
+                                border: '1px solid #555',
+                                borderRadius: 4
+                            }}
+                            title="Ajouter le maximum d'une construction dans chaque système (Alt+A)"
+                        >
+                            Action multiple
+                        </button>
+                        <button
+                            onClick={() => setShowBuilt(v => !v)}
+                            style={{
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                backgroundColor: showBuilt ? '#2c3e50' : '#333',
+                                color: '#eee',
+                                border: '1px solid #555',
+                                borderRadius: 4
+                            }}
+                            title="Afficher / masquer les bâtiments déjà construits dans les systèmes dépliés"
+                        >
+                            Bâtiments construits
+                        </button>
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
@@ -666,7 +777,8 @@ export default function Planification() {
 
                         if (isCollapsed) {
                             return (
-                                <tr key={key} style={{ borderBottom: '1px solid #444', backgroundColor: finalPc > 0 ? '' : '#333' }}>
+                                <React.Fragment key={key}>
+                                <tr style={{ borderBottom: queue.length > 0 ? 'none' : '1px solid #444', backgroundColor: finalPc > 0 ? '' : '#333' }}>
                                     <td style={{ padding: 8 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                             <button
@@ -680,25 +792,40 @@ export default function Planification() {
                                         </div>
                                     </td>
                                     <td style={{ padding: 8, textAlign: 'center' }}>
-                                        <span style={{ color: finalPc < 0 ? '#f55' : (finalPc < initial.pc ? '#5f5' : '#aaa') }}>{finalPc}</span>
+                                        <span className={stockClass(initial.pc, finalPc)} title="Points de Construction (total actuel, dépensé par les constructions)">
+                                            {initial.pc} {initial.pc - finalPc > 0 && <span className={spentClass(finalPc)}>{`( -${initial.pc - finalPc} )`}</span>}
+                                        </span>
                                     </td>
                                     <td style={{ padding: 8, textAlign: 'center' }}>
-                                        <span style={{ color: finalMinerai < 0 ? '#f55' : (finalMinerai < initial.minerai ? '#5f5' : '#aaa') }}>{finalMinerai}</span>
+                                        <span className={stockClass(initial.minerai, finalMinerai)} title="Stock (+ Production)">
+                                            {initial.initialMinerai.stock} {initial.initialMinerai.prod > 0 ? `( +${initial.initialMinerai.prod} )` : ''}
+                                            {initial.minerai - finalMinerai > 0 && <span className={spentClass(finalMinerai)}>{` ( -${initial.minerai - finalMinerai} )`}</span>}
+                                        </span>
                                     </td>
-                                    <td colSpan={marchandisesCols.length} style={{ padding: 8 }}>
-                                        <div style={{ fontSize: '0.85em', color: '#bbb', overflowX: 'auto', whiteSpace: 'nowrap', maxWidth: 0, minWidth: '100%' }}>
-                                            {queue.length > 0 ? (
-                                                (() => {
-                                                    const formatted = formatPlannedItems(queue, global?.technologies || []);
-                                                    const all = [...formatted.formattedBuildings, ...formatted.formattedShips];
-                                                    return all.join(', ');
-                                                })()
-                                            ) : (
-                                                <span style={{ fontStyle: 'italic', color: '#555' }}>Rien</span>
-                                            )}
-                                        </div>
-                                    </td>
+                                    {marchandisesCols.map(m => {
+                                        const initVal = initial.initialMarchandises[m.code] || 0;
+                                        const detail = initial.detailMarchandises[m.code] || { stock: 0, prod: 0 };
+                                        return (
+                                            <td key={m.code} style={{ padding: 8, textAlign: 'center' }}>
+                                                <span className={stockClass(initVal, finalMarchandises[m.code] || 0)} title="Stock (+ Production)">
+                                                    {detail.stock} {detail.prod > 0 ? `( +${detail.prod} )` : ''}
+                                                {initVal - (finalMarchandises[m.code] || 0) > 0 && <span className={spentClass(finalMarchandises[m.code] || 0)}>{` ( -${initVal - (finalMarchandises[m.code] || 0)} )`}</span>}
+                                                </span>
+                                            </td>
+                                        );
+                                    })}
                                 </tr>
+                                {queue.length > 0 && (
+                                    <tr style={{ borderBottom: '1px solid #444', backgroundColor: finalPc > 0 ? '' : '#333' }}>
+                                        <td colSpan={3 + marchandisesCols.length} style={{ padding: '0 8px 8px 8px', fontSize: '0.85em', color: '#bbb' }}>
+                                            {(() => {
+                                                const formatted = formatPlannedItems(queue, global?.technologies || []);
+                                                return [...formatted.formattedBuildings, ...formatted.formattedShips].join(', ');
+                                            })()}
+                                        </td>
+                                    </tr>
+                                )}
+                                </React.Fragment>
                             );
                         }
 
@@ -721,27 +848,27 @@ export default function Planification() {
                                 </td>
 
                                 <td style={{ padding: 8, textAlign: 'center' }}>
-                                    <div style={{ fontSize: '0.8em', color: '#888' }} title="Points de Construction (Production par tour)" className="hideOnMobile">{initial.pc}</div>
-                                    <div style={{ color: finalPc < 0 ? '#f55' : (finalPc < initial.pc ? '#5f5' : '#aaa'), fontWeight: finalPc < initial.pc ? 'bold' : 'normal' }}>{finalPc}</div>
+                                    <div className={stockClass(initial.pc, finalPc)} title="Points de Construction (total actuel, dépensé par les constructions)">
+                                        {initial.pc} {initial.pc - finalPc > 0 && <span className={spentClass(finalPc)}>{`( -${initial.pc - finalPc} )`}</span>}
+                                    </div>
                                 </td>
 
                                 <td style={{ padding: 8, textAlign: 'center' }}>
-                                    <div style={{ fontSize: '0.8em', color: '#888' }} title="Stock + Production" className="hideOnMobile">
+                                    <div className={stockClass(initial.minerai, finalMinerai)} title="Stock (+ Production)">
                                         {initial.initialMinerai.stock} {initial.initialMinerai.prod > 0 ? `( +${initial.initialMinerai.prod} )` : ''}
+                                            {initial.minerai - finalMinerai > 0 && <span className={spentClass(finalMinerai)}>{` ( -${initial.minerai - finalMinerai} )`}</span>}
                                     </div>
-                                    <div style={{ color: finalMinerai < 0 ? '#f55' : (finalMinerai < initial.minerai ? '#5f5' : '#aaa'), fontWeight: finalMinerai < initial.minerai ? 'bold' : 'normal' }}>{finalMinerai}</div>
                                 </td>
 
                                 {marchandisesCols.map(m => {
                                     const initVal = initial.initialMarchandises[m.code] || 0;
                                     const detail = initial.detailMarchandises[m.code] || { stock: 0, prod: 0 };
-                                    const val = finalMarchandises[m.code] || 0;
                                     return (
                                         <td key={m.code} style={{ padding: 8, textAlign: 'center' }}>
-                                            <div style={{ fontSize: '0.8em', color: '#888' }} title="Stock + Production" className="hideOnMobile">
+                                            <div className={stockClass(initVal, finalMarchandises[m.code] || 0)} title="Stock (+ Production)">
                                                 {detail.stock} {detail.prod > 0 ? `( +${detail.prod} )` : ''}
+                                                {initVal - (finalMarchandises[m.code] || 0) > 0 && <span className={spentClass(finalMarchandises[m.code] || 0)}>{` ( -${initVal - (finalMarchandises[m.code] || 0)} )`}</span>}
                                             </div>
-                                            <div style={{ color: val < 0 ? '#f55' : (val < initVal ? '#5f5' : '#aaa'), fontWeight: val < initVal ? 'bold' : 'normal' }}>{val}</div>
                                         </td>
                                     );
                                 })}
@@ -852,6 +979,24 @@ export default function Planification() {
                                         );
                                     })}
                                     </div>
+
+                                    {showBuilt && (
+                                        <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px dashed #444', fontSize: '0.85em' }}>
+                                            <div style={{ color: '#888', marginBottom: 4 }}>Bâtiments déjà construits</div>
+                                            {(() => {
+                                                // Même format que le récapitulatif, cumulé sur toutes les planètes du système
+                                                const counts: Record<string, number> = {};
+                                                ownedPlanets.forEach(pl => (pl.batiments || []).forEach(b => {
+                                                    if (b.count > 0) counts[b.techCode] = (counts[b.techCode] || 0) + b.count;
+                                                }));
+                                                const items = Object.entries(counts).map(([code, quantity]) => ({ type: 'building' as const, code, quantity }));
+                                                const text = formatPlannedItems(items, global?.technologies || []).formattedBuildings.join(', ');
+                                                return text
+                                                    ? <span style={{ color: '#bbb' }}>{text}</span>
+                                                    : <span style={{ color: '#555', fontStyle: 'italic' }}>Aucun</span>;
+                                            })()}
+                                        </div>
+                                    )}
                                 </td>
                             </tr>
                             </React.Fragment>
@@ -994,6 +1139,92 @@ export default function Planification() {
                     </>
                 )}
             </div>
+
+            {isMultiModalOpen && (
+                <Modal
+                    title="Action multiple"
+                    showCloseButton
+                    onClose={() => setIsMultiModalOpen(false)}
+                    backdropOpacity={0}
+                    closeOnBackdrop={false}
+                    zIndex={1500}
+                    panelStyle={{
+                        backgroundColor: '#222',
+                        padding: '16px',
+                        borderRadius: '8px',
+                        border: '1px solid #444',
+                        maxWidth: '500px',
+                        width: '90%',
+                        minHeight: 'min(450px, calc(100vh - 32px))', // laisse la place à la liste déroulante
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+                    }}
+                >
+                    <p style={{ color: '#aaa', fontSize: '0.9em', marginTop: 0 }}>
+                        Ajoute le maximum de la construction choisie dans chaque système, selon ses ressources restantes. Si elle est déjà planifiée dans un système, sa quantité est augmentée jusqu'au maximum possible.
+                    </p>
+                    <div style={{ marginBottom: 12 }}>
+                        <SearchableSelect
+                            options={searchableOptions}
+                            value={multiChoice}
+                            placeholder="Choisir une construction..."
+                            autoFocus
+                            onChange={setMultiChoice}
+                        />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16, color: '#ccc' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            Maximum à ajouter par système
+                            <input
+                                type="number"
+                                min={1}
+                                value={multiMax}
+                                onChange={(e) => setMultiMax(e.target.value)}
+                                placeholder="illimité"
+                                style={{ width: 90, padding: '4px 8px', backgroundColor: '#111', border: '1px solid #444', borderRadius: 4, color: '#fff' }}
+                            />
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <input
+                                type="checkbox"
+                                checked={multiOnlyMissing}
+                                onChange={(e) => setMultiOnlyMissing(e.target.checked)}
+                            />
+                            Uniquement les systèmes qui n'ont pas déjà ce bâtiment sur une planète
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <input
+                                type="checkbox"
+                                checked={multiIgnoreLimits}
+                                onChange={(e) => setMultiIgnoreLimits(e.target.checked)}
+                            />
+                            Ne pas tenir compte des limites de ressources (le maximum saisi est ajouté tel quel)
+                        </label>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                        <button
+                            onClick={() => setIsMultiModalOpen(false)}
+                            style={{ padding: '8px 16px', backgroundColor: '#444', color: '#eee', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                        >
+                            Fermer
+                        </button>
+                        <button
+                            onClick={() => addMaxToConstructingSystems(multiChoice, multiMax ? Math.max(0, parseInt(multiMax, 10) || 0) : undefined, multiOnlyMissing, multiIgnoreLimits)}
+                            disabled={!canAddMulti}
+                            style={{
+                                padding: '8px 16px',
+                                backgroundColor: canAddMulti ? '#282' : '#333',
+                                color: canAddMulti ? '#fff' : '#666',
+                                border: 'none',
+                                borderRadius: 4,
+                                cursor: canAddMulti ? 'pointer' : 'not-allowed',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            Ajouter les constructions
+                        </button>
+                    </div>
+                </Modal>
+            )}
 
             {isClearModalOpen && (
                 <Modal

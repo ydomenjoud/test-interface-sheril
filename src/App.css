@@ -371,3 +371,9 @@ nav.app-nav {
         background-color: #0056b3;
     }
 }
+
+.stockInfo { font-size: 0.8em; }
+.stockEmpty { color: #888; }
+.stockPositive { color: rgb(128 224 145); }
+.stockSpent { color: #fa0; }
+.stockOver { color: #f55; }

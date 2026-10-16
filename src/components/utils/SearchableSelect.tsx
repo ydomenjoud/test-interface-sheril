@@ -5,9 +5,10 @@ export default function SearchableSelect(props: {
   value: string;
   onChange: (val: string) => void;
   placeholder?: string;
+  autoFocus?: boolean; // focus le champ et déroule la liste à l'affichage
   style?: React.CSSProperties;
 }) {
-  const { options, value, onChange, placeholder, style } = props;
+  const { options, value, onChange, placeholder, autoFocus, style } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -26,6 +27,13 @@ export default function SearchableSelect(props: {
     if (!q) return options;
     return options.filter(o => o.label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q));
   }, [options, query]);
+
+  useEffect(() => {
+    if (autoFocus) {
+      inputRef.current?.focus();
+      setOpen(true);
+    }
+  }, [autoFocus]);
 
   useEffect(() => {
     setHighlight(0);
