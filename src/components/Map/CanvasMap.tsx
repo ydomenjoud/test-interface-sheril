@@ -290,13 +290,19 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             el.appendChild(nameEl);
             const owners = (sys as any).owners as number[] | undefined;
             if (owners && owners.length > 0) {
-                const ownEl = document.createElement('span');
-                ownEl.textContent = '  ' + owners.map(o => {
-                    const cmd = global?.commandants?.find(c2 => c2.numero === o);
-                    return cmd ? `${cmd.nom} (${o})` : `#${o}`;
-                }).join(', ');
-                ownEl.style.color = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna) || '#ddd';
-                el.appendChild(ownEl);
+                owners.forEach((o, i) => {
+                    if (i > 0) {
+                        const sep = document.createElement('span');
+                        sep.textContent = ', ';
+                        sep.style.color = '#888';
+                        el.appendChild(sep);
+                    }
+                    const span = document.createElement('span');
+                    const cmd = o === 0 ? undefined : global?.commandants?.find(c2 => c2.numero === o);
+                    span.textContent = (i === 0 ? '  ' : ' ') + (o === 0 ? 'Neutre (0)' : cmd ? `${cmd.nom} (${o})` : `#${o}`);
+                    span.style.color = o === 0 ? '#999' : (ownerRaceColor(o) || '#ddd');
+                    el.appendChild(span);
+                });
             }
         }
         const nf = fleets.filter(f => f.pos.x === xy.x && f.pos.y === xy.y).length;
@@ -314,7 +320,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         if (y + el.offsetHeight + 4 > rect.height) y = clientY - rect.top - el.offsetHeight - 14;
         el.style.left = `${Math.max(4, x)}px`;
         el.style.top = `${Math.max(4, y)}px`;
-    }, [systems, fleets, global, rapport, currentPlayerId]);
+    }, [systems, fleets, global, rapport, currentPlayerId, ownerRaceColor]);
 
 
     useEffect(() => {
