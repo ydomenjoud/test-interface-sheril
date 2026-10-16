@@ -64,7 +64,7 @@ La carte occupe toute la hauteur disponible (pas de scroll vertical de la page),
 conséquence.
 
 Une légende compacte des couleurs de possession (moi / alliance / PNA / ennemi / neutre / flotte) est affichée en
-bas à gauche de la carte, en mode de couleur "Alliés/Ennemis".
+bas à gauche de la carte, au ras du bord, en mode de couleur "Alliés/Ennemis".
 
 Les portées radar (systèmes et flottes) sont désactivées par défaut pour ne pas voiler la carte ; elles peuvent
 être activées par les boutons ◎ et ◉ de la barre d'outils (filtres rapides).
@@ -72,17 +72,20 @@ Les portées radar (systèmes et flottes) sont désactivées par défaut pour ne
 #### barre d'outils
 
 La barre d'outils (en haut de l'écran) est regroupée : vue (taille des cases, position), filtres rapides,
-historique (tours) et actions (minimap, import).
+historique (tours) et actions (import).
 
-Le groupe de filtres rapides est une barre d'icônes discrète :
+Le groupe de filtres rapides est une barre d'icônes discrète (raccourcis en doublon des cases à cocher du
+panneau "Filtres", qui garde la même liste complète) :
 
 * ✦ : afficher / masquer les systèmes
 * ◎ : portée radar des systèmes (désactivée par défaut)
 * ◉ : portée radar des flottes (désactivée par défaut)
+* ▣ : afficher / masquer la mini-carte (affichée par défaut)
 * ? : aide et raccourcis (touche `?`)
-* ⚙ : ouvre / ferme le panneau "Filtres" (options avancées, fermé par défaut) : Commandants, Tags, Carte
-  galactique, Secteurs, Influence (+ opacité), Minimap, Mode de couleur, Badges (combats / propriétaires /
-  flottes), Zones manuelles, Distance Capitale (zones de stabilité et choix du système de référence)
+* ⚙ : ouvre / ferme le panneau "Filtres" (options avancées, fermé par défaut) : Commandants, Tags, Afficher
+  systèmes, Carte galactique, Secteurs, Influence (+ opacité), Minimap, Mode de couleur, Badges (combats /
+  propriétaires / flottes), Zones manuelles, Portées Radar (systèmes / flottes), Distance Capitale (zones de
+  stabilité et choix du système de référence)
 
 #### interaction
 
@@ -91,8 +94,11 @@ Le groupe de filtres rapides est une barre d'icônes discrète :
 - Survol (sans clic) : la case sous le curseur est surlignée et un encart récapitulatif s'affiche à proximité du
   curseur (coordonnées, nom du système, possesseurs — chaque nom affiché à sa couleur de race, le neutre affiché
   "Neutre (0)" —, nombre de flottes).
+- Le même récapitulatif s'ancre sur la case sélectionnée (cadre jaune) quand on la déplace avec Maj + flèches ou
+  quand on la sélectionne au clic : au-dessus du cadre, en dessous s'il n'y a pas de place ; il suit la case
+  pendant le pan et disparaît si la case sort de la zone visible.
 - Clavier: flèches directionnelles (gauche, droite, haut, bas) déplacent le centre d'une case; avec Ctrl, déplacement
-  par pas de 5 cases.
+  par pas de 5 cases. Maj + flèches déplace la case sélectionnée (cadre jaune) d'une case, avec Ctrl : pas de 5 cases.
 - Drag souris: en maintenant le bouton gauche, on peut "panner" la carte; le centre se décale au rythme d'un pas de
   case dès qu'un multiple de la taille de case est parcouru, puis s'arrête au relâchement.
 - Mini-carte:
@@ -100,8 +106,8 @@ Le groupe de filtres rapides est une barre d'icônes discrète :
   - Un rectangle (bleu clair) y affiche le viewport courant (zones visibles de la carte principale); gestion du wrap
     torique lorsque le viewport chevauche un bord.
   - Un clic sur la mini-carte recadre la carte principale autour du point visé (par offset relatif au centre).
-  - Un bouton "Minimap" dans la barre d'outils (et une case à cocher dans les Filtres) permet de l'afficher/masquer ;
-    elle est affichée par défaut.
+  - L'icône ▣ dans les filtres rapides de la barre d'outils (et une case à cocher dans les Filtres) permet de
+    l'afficher/masquer ; elle est affichée par défaut.
 - Header: un bouton "Capitale" recentre la carte principale sur la capitale du joueur.
 
 ### données à afficher
@@ -171,10 +177,10 @@ une case sans aucun contenu (ni système, ni flotte, ni combat, ni zone) affiche
   - propriétaire
   - nombre de vaisseaux
   - puissance
-- mes flottes : les flottes du joueur situées sur la case, puis les plus proches atteignables ce tour, avec des
-  en-têtes de colonnes (Nom / Distance / AS / AP) ; survoler une ligne affiche le détail de la flotte (position,
-  direction, vitesse, directive, AS / AP, scan, nombre et composition des vaisseaux, distance et portée) ; la liste
-  complète (tri par nom ou distance, position) s'affiche sur demande
+- mes flottes : une seule liste de toutes les flottes du joueur, avec des colonnes triables (Nom, Distance,
+  Vitesse, AS, AP) et la Position ; les flottes hors de portée ce tour sont en orange estompé (légende sous la
+  liste) ; survoler une ligne affiche le détail de la flotte (position, direction, vitesse, directive, AS / AP,
+  scan, nombre et composition des vaisseaux, distance et portée)
 - combats sur la case (cartes dépliables avec les détails)
 - zones couvrant la case (éditables)
 - notes de la case (le formulaire d'ajout est replié derrière un bouton)
