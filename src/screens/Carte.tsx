@@ -242,16 +242,18 @@ export default function Carte() {
 
   const remainingMs = playing ? Math.max(0, playStepMs - (now - stepStart)) : 0;
 
-  // Raccourci : Maj + flèche déplace la case sélectionnée (depuis le centre si aucune case n'est sélectionnée)
+  // Raccourci : Maj + flèche déplace la case sélectionnée d'une case, Ctrl + Maj + flèche par pas de 5
+  // (depuis le centre si aucune case n'est sélectionnée)
   useEffect(() => {
     const moves: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
     function onKey(e: KeyboardEvent) {
-      if (!e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || isTypingTarget(e.target)) return;
+      if (!e.shiftKey || e.altKey || e.metaKey || isTypingTarget(e.target)) return;
       const move = moves[e.key];
       const from = selected ?? center;
       if (!move || !from) return;
       e.preventDefault();
-      setSelected({ x: wrapX(from.x + move[0]), y: wrapY(from.y + move[1]) });
+      const step = e.ctrlKey ? 5 : 1;
+      setSelected({ x: wrapX(from.x + move[0] * step), y: wrapY(from.y + move[1] * step) });
       setShowFleetsFor(undefined); // comme un clic simple
     }
     window.addEventListener('keydown', onKey);
