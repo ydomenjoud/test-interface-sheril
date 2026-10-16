@@ -4,6 +4,9 @@ import {SystemeJoueur} from '../types';
 import {formatPlannedItems, formatTechName} from '../utils/global';
 import SearchableSelect from '../components/utils/SearchableSelect';
 import Modal from '../components/utils/Modal';
+import {posToString} from '../utils/position';
+import {bonusPdcGouverneur, detailPdc, gouverneursParPosition, pdcSysteme} from '../utils/pdc';
+import {loadPlanificationConstruction, savePlanificationConstruction} from '../utils/planificationConstructionStorage';
 
 type PlannedItem = {
     id: string;
@@ -20,6 +23,25 @@ const construireBluePrintSeparator = '%#!%';
 const stockClass = (total: number, final: number) =>
     `stockInfo ${final < 0 ? 'stockOver' : (total > 0 ? 'stockPositive' : 'stockEmpty')}`;
 const spentClass = (final: number) => (final < 0 ? 'stockOver' : 'stockSpent');
+
+// Couleur des champs dont la valeur diffère du rapport (idem écran de revenus)
+const COULEUR_MODIFIE = '#ff9800';
+
+// Style des selects politique/gouverneur de l'écran de construction (sur le modèle du select de planète)
+const constrSelectStyle: React.CSSProperties = {
+    fontSize: '0.8em',
+    backgroundColor: '#444',
+    color: '#eee',
+    border: 'none',
+    borderRadius: 3,
+    padding: '2px 4px'
+};
+
+const constrStyleModifie: React.CSSProperties = {
+    border: `1px solid ${COULEUR_MODIFIE}`,
+    boxShadow: `0 0 0 1px ${COULEUR_MODIFIE}`,
+    backgroundColor: '#4a3418'
+};
 
 export default function Planification() {
     const { global, rapport } = useReport();
@@ -50,6 +72,67 @@ export default function Planification() {
     }, [highlightedItems]);
 
     const systems = useMemo(() => rapport?.systemesJoueur || [], [rapport]);
+
+    // --- Construction : PDC ajustés par la politique et le gouverneur choisis (état indépendant de l'écran Revenus) ---
+    const tour = rapport?.tour;
+    const numeroJoueur = rapport?.joueur?.numero;
+    const gouverneursDuRapport = useMemo(() => (rapport?.lieutenants ?? []).filter(l => l.type === 1), [rapport]);
+    const gouverneursParPos = useMemo(() => gouverneursParPosition(rapport?.lieutenants ?? []), [rapport]);
+
+    type ConstrState = { politique: number | undefined; gouverneur: string | null };
+
+    // État d'un système tel que décrit par le rapport
+    const etatConstrRapport = (s: SystemeJoueur): ConstrState => ({
+        politique: s.politique,
+        gouverneur: gouverneursParPos[posToString(s.pos)]?.nom ?? null,
+    });
+
+    // Les états sont rattachés à un tour : un changement de rapport repart des valeurs du rapport
+    const [store, setStore] = useState<{ tour: number | undefined; states: Record<string, ConstrState> }>({ tour: undefined, states: {} });
+    const constrStates = useMemo(() => (store.tour === tour ? store.states : {}), [store, tour]);
+    const setConstrStates = (updater: (prev: Record<string, ConstrState>) => Record<string, ConstrState>) => {
+        setStore(prev => ({ tour, states: updater(prev.tour === tour ? prev.states : {}) }));
+    };
+
+    // Initialisation des états à partir du rapport
+    useEffect(() => {
+        if (tour !== undefined && systems.length > 0) {
+            const initialStates: Record<string, ConstrState> = {};
+            systems.forEach(s => { initialStates[`${s.pos.x}_${s.pos.y}`] = etatConstrRapport(s); });
+            // Choix sauvegardés pour ce tour, par-dessus les valeurs du rapport
+            const saved = loadPlanificationConstruction<ConstrState>(tour) || {};
+            Object.keys(initialStates).forEach(k => { if (saved[k]) initialStates[k] = { ...initialStates[k], ...saved[k] }; });
+            setStore({ tour, states: initialStates });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [systems, tour]);
+
+    useEffect(() => {
+        if (tour !== undefined && store.tour === tour) savePlanificationConstruction(tour, store.states);
+    }, [store, tour]);
+
+    const etatConstrRapportByKey = (key: string): ConstrState => {
+        const s = systems.find(x => `${x.pos.x}_${x.pos.y}` === key);
+        return s ? etatConstrRapport(s) : { politique: undefined, gouverneur: null };
+    };
+
+    const handleConstrPolitiqueChange = (key: string, val: number) => {
+        setConstrStates(prev => ({ ...prev, [key]: { ...prev[key], politique: val } }));
+    };
+
+    const handleConstrGouverneurChange = (key: string, nom: string) => {
+        setConstrStates(prev => {
+            const next = { ...prev };
+            // Un gouverneur ne peut être que sur un seul système : on le retire de l'ancien
+            if (nom) Object.keys(next).forEach(k => { if (next[k]?.gouverneur === nom) next[k] = { ...next[k], gouverneur: null }; });
+            next[key] = { ...(next[key] ?? etatConstrRapportByKey(key)), gouverneur: nom || null };
+            return next;
+        });
+    };
+
+    const stateConstr = (s: SystemeJoueur): ConstrState =>
+        constrStates[`${s.pos.x}_${s.pos.y}`] || etatConstrRapport(s);
+    const gouverneurDe = (st: ConstrState) => gouverneursDuRapport.find(l => l.nom === st.gouverneur);
 
     const [collapsedSystems, setCollapsedSystems] = useState<Record<string, boolean>>(() => {
         const saved = localStorage.getItem('planification_collapsed');
@@ -452,7 +535,7 @@ export default function Planification() {
     };
 
     const getSystemResources = (s: SystemeJoueur) => {
-        let totalPdc = s.pdc || 0;
+        const totalPdc = pdcSysteme(s, numeroJoueur, gouverneurDe(stateConstr(s)), stateConstr(s).politique);
         let totalStockMinerai = 0;
         let totalProdMinerai = 0;
         s.planetes.forEach(p => {
@@ -749,6 +832,20 @@ export default function Planification() {
                         const initial = getSystemResources(s);
                         const queue = queues[key] || [];
 
+                        // PDC ajustés par les choix de politique / gouverneur ; l'état du rapport fait référence
+                        const state = stateConstr(s);
+                        const etatRef = etatConstrRapport(s);
+                        const modifPdc = initial.pc !== s.pdc;
+                        const modifPolitiqueConstr = state.politique !== etatRef.politique;
+                        const modifGouvConstr = state.gouverneur !== etatRef.gouverneur;
+                        // Les politiques "anti-*" ne sont pas proposées, sauf si elles sont déjà celle du système (rapport ou choix)
+                        const politiqueCodesConstr = Object.keys(global?.politiques || {}).map(Number)
+                            .filter(c => !global?.politiques[c]?.startsWith('anti-') || c === state.politique || c === etatRef.politique)
+                            .sort((a, b) => a - b);
+                        const detailPdcConstr = modifPdc
+                            ? `${detailPdc(s, numeroJoueur, gouverneurDe(state), state.politique)}\nRapport : ${s.pdc}`
+                            : undefined;
+
                         let finalPc = initial.pc;
                         let finalMinerai = initial.minerai;
                         let finalMarchandises: Record<number, number> = { ...initial.initialMarchandises };
@@ -791,8 +888,9 @@ export default function Planification() {
                                             <span style={{ fontWeight: 'bold' }} className="hideOnMobile">{s.nom}</span>
                                         </div>
                                     </td>
-                                    <td style={{ padding: 8, textAlign: 'center' }}>
-                                        <span className={stockClass(initial.pc, finalPc)} title="Points de Construction (total actuel, dépensé par les constructions)">
+                                    <td style={{ padding: 8, textAlign: 'center', ...(modifPdc ? constrStyleModifie : {}) }}
+                                        title={modifPdc ? detailPdcConstr : 'Points de Construction (total actuel, dépensé par les constructions)'}>
+                                        <span className={stockClass(initial.pc, finalPc)}>
                                             {initial.pc} {initial.pc - finalPc > 0 && <span className={spentClass(finalPc)}>{`( -${initial.pc - finalPc} )`}</span>}
                                         </span>
                                     </td>
@@ -879,10 +977,15 @@ export default function Planification() {
                                     </div>
                                 </td>
 
-                                <td style={{ padding: 8, textAlign: 'center' }}>
-                                    <div className={stockClass(initial.pc, finalPc)} title="Points de Construction (total actuel, dépensé par les constructions)">
-                                        {initial.pc} {initial.pc - finalPc > 0 && <span className={spentClass(finalPc)}>{`( -${initial.pc - finalPc} )`}</span>}
+                                <td style={{ padding: 8, textAlign: 'center', ...(modifPdc ? constrStyleModifie : {}) }}
+                                    title={modifPdc ? detailPdcConstr : 'Points de Construction (total actuel, dépensé par les constructions)'}>
+                                    <div style={{ fontSize: '0.8em', color: '#888' }} className="hideOnMobile">
+                                        <span className={stockClass(initial.pc, finalPc)}>
+                                            {initial.pc} {initial.pc - finalPc > 0 && <span className={spentClass(finalPc)}>{`( -${initial.pc - finalPc} )`}</span>}
+                                        </span>
+                                        {modifPdc && <span> (rapport : {s.pdc})</span>}
                                     </div>
+                                    <div style={{ color: finalPc < 0 ? '#f55' : (finalPc < initial.pc ? '#5f5' : '#aaa'), fontWeight: finalPc < initial.pc ? 'bold' : 'normal' }}>{finalPc}</div>
                                 </td>
 
                                 <td style={{ padding: 8, textAlign: 'center' }}>
@@ -908,6 +1011,33 @@ export default function Planification() {
                             </tr>
                             <tr className={idx % 2 ? 'rowOdd' : 'rowEven'} style={{  borderBottom: '2px solid #6F6', backgroundColor: finalPc>0 ? '' : '#333' }}>
                                 <td style={{ padding: 8 }} colSpan={19}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: 10 }}>
+                                        <span style={{ color: '#888', fontSize: '0.8em' }}>Politique</span>
+                                        <select
+                                            value={state.politique ?? ''}
+                                            onChange={(e) => handleConstrPolitiqueChange(key, parseInt(e.target.value, 10))}
+                                            style={{ ...constrSelectStyle, ...(modifPolitiqueConstr ? constrStyleModifie : {}) }}
+                                        >
+                                            {state.politique === undefined && <option value="" disabled>?</option>}
+                                            {politiqueCodesConstr.map(c => (
+                                                <option key={c} value={c}>{global?.politiques[c]}</option>
+                                            ))}
+                                        </select>
+                                        {modifPolitiqueConstr && <span title="Différent du rapport" style={{ color: COULEUR_MODIFIE, fontWeight: 'bold' }}>●</span>}
+                                        <span style={{ color: '#888', fontSize: '0.8em' }}>Gouverneur</span>
+                                        <select
+                                            value={state.gouverneur ?? ''}
+                                            onChange={(e) => handleConstrGouverneurChange(key, e.target.value)}
+                                            style={{ ...constrSelectStyle, ...(modifGouvConstr ? constrStyleModifie : {}) }}
+                                            title={gouverneurDe(state) ? `Bonus PDC : +${bonusPdcGouverneur(gouverneurDe(state))}` : undefined}
+                                        >
+                                            <option value="">aucun</option>
+                                            {gouverneursDuRapport.map(l => (
+                                                <option key={l.nom} value={l.nom}>{l.nom} (niv {l.niv})</option>
+                                            ))}
+                                        </select>
+                                        {modifGouvConstr && <span title="Différent du rapport" style={{ color: COULEUR_MODIFIE, fontWeight: 'bold' }}>●</span>}
+                                    </div>
                                     <div style={{ marginBottom: 10 }}>
                                         <SearchableSelect
                                             options={searchableOptions}
