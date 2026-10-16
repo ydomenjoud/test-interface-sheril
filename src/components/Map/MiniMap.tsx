@@ -18,7 +18,7 @@ function torusDelta(a: number, b: number, max: number): number {
 }
 
 export default function MiniMap({ onCenter, colorMode = 'status' }: Props) {
-  const { rapport, center, viewportCols, viewportRows } = useReport();
+  const { rapport, center, viewportCols, viewportRows, global } = useReport();
   const currentCenter = useMemo(() => center || CENTER, [center]);
   const ref = useRef<HTMLCanvasElement>(null);
   const playerId = rapport?.joueur?.numero || 0;
@@ -52,16 +52,16 @@ export default function MiniMap({ onCenter, colorMode = 'status' }: Props) {
     };
 
     rapport?.systemesJoueur.forEach(s => drawPointRel(s.pos.x, s.pos.y,
-        colorForOwnership(playerId, [playerId], [], [], colorMode)
+        colorForOwnership(playerId, [playerId], [], [], colorMode, global)
     ));
     rapport?.systemesDetectes.forEach(s => drawPointRel(s.pos.x, s.pos.y,
-        colorForOwnership(playerId, s.proprietaires, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode)
+        colorForOwnership(playerId, s.proprietaires, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global)
     ));
     rapport?.flottesJoueur.forEach(f => drawPointRel(f.pos.x, f.pos.y,
-        colorForOwnership(playerId, [playerId], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode)
+        colorForOwnership(playerId, [playerId], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global)
     ));
     rapport?.flottesDetectees.forEach(f => drawPointRel(f.pos.x, f.pos.y,
-        colorForOwnership(playerId, [f.proprio || 0], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode)
+        colorForOwnership(playerId, [f.proprio || 0], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global)
     ));
 
     // Rectangle du viewport, centré au milieu de la minimap
@@ -72,7 +72,7 @@ export default function MiniMap({ onCenter, colorMode = 'status' }: Props) {
       ctx.lineWidth = 2;
       ctx.strokeRect(midX - rectW / 2, midY - rectH / 2, rectW, rectH);
     }
-  }, [rapport, playerId, currentCenter, viewportCols, viewportRows, colorMode]);
+  }, [rapport, playerId, currentCenter, viewportCols, viewportRows, colorMode, global]);
 
   return (
     <canvas

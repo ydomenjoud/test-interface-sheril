@@ -4,7 +4,7 @@ import {BOUNDS, CENTER, getTorusDistance, torusDelta, wrapX, wrapY} from '../../
 import {getSectorNumber, isSectorLabelCell, sectorBackgroundColor, sectorLabelColor} from '../../utils/sectors';
 import {countCombatsByKind} from '../../parsers/parseCombatMessages';
 import {drawCombatMarkers} from '../../utils/combatMarkers';
-import {Alliance, XY, Zone} from '../../types';
+import {Alliance, GlobalData, XY, Zone} from '../../types';
 import {lightenHexColor, getColorForPlayer} from "../../utils/global";
 import {isTypingTarget} from '../../utils/keyboard';
 
@@ -23,6 +23,25 @@ const RACE_BADGE_COLORS: Record<number, string> = {
     4: '#009933',
     5: '#777777',
 };
+
+// Couleur de la race d'un commandant (même code couleur que les noms de joueurs)
+export function raceColorForOwner(globalData?: GlobalData, owner?: number): string | undefined {
+    if (owner == null) return undefined;
+    if (owner === 0) return 'grey';
+    if (!globalData) return undefined;
+    const commandant = globalData.commandants?.find(c => c.numero === owner);
+    if (commandant) {
+        const raceId = commandant.raceId;
+        const raceColor = globalData.races?.find(r => r.id === raceId)?.couleur;
+        if (raceColor && raceColor.trim() && raceColor.toLowerCase() !== 'white') {
+            return raceColor;
+        }
+        if (raceId != null) {
+            return RACE_BADGE_COLORS[raceId] || OWNER_BADGE_COLORS[owner];
+        }
+    }
+    return OWNER_BADGE_COLORS[owner];
+}
 
 export type ZoneRect = { x: number; y: number; width: number; height: number };
 
@@ -65,7 +84,7 @@ type Props = {
     influenceOpacity?: number;
 };
 
-export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[], colorMode: 'status' | 'player' = 'status') {
+export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[], colorMode: 'status' | 'player' = 'status', globalData?: GlobalData) {
     if (owners && owners?.length === 1 && owners[0] === 0) return 'grey';
     if (!owners || owners.length === 0) return '#999';
 
@@ -74,7 +93,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
         const withoutNeutral = owners.filter(o => o !== 0);
         // si tous pareil, on renvoit la couleur,
         const colors: Set<string> = new Set(withoutNeutral
-            .map(o => colorForOwnership(currentPlayerId, [o], alliances, pna, colorMode))
+            .map(o => colorForOwnership(currentPlayerId, [o], alliances, pna, colorMode, globalData))
             .filter((s): s is string => !!s)
         );
         if(colors.size === 1) {
@@ -89,7 +108,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     if (currentPlayerId && owners.includes(currentPlayerId)) return '#09ca31';
 
     if (colorMode === 'player') {
-        return getColorForPlayer(owner);
+        return raceColorForOwner(globalData, owner) || getColorForPlayer(owner);
     }
 
     if (alliances && alliances.some(a => a.commandants.includes(owner))) return '#224eff';
@@ -133,25 +152,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
     const currentPlayerId = rapport?.joueur.numero || 0; // placeholder si besoin d'ID joueur
 
     const ownerRaceColor = useCallback((owner?: number): string | undefined => {
-        if (owner == null) return undefined;
-        if (owner === 0) return 'grey';
-        if (!global) return undefined;
-
-        const commandant = global.commandants?.find(c => c.numero === owner);
-        if (commandant) {
-            const raceId = commandant.raceId;
-            const raceColor = global.races?.find(r => r.id === raceId)?.couleur;
-            // some data.xml files may omit color or use generic 'white' — prefer our mapping in that case
-            if (raceColor && raceColor.trim() && raceColor.toLowerCase() !== 'white') {
-                return raceColor;
-            }
-            // For commandants, use race mapping. Race 0 is a valid race color and is not the neutral owner.
-            if (raceId != null) {
-                return RACE_BADGE_COLORS[raceId] || OWNER_BADGE_COLORS[owner];
-            }
-        }
-
-        return OWNER_BADGE_COLORS[owner];
+        return raceColorForOwner(global, owner);
     }, [global]);
 
     const systems = useMemo(() => {
@@ -427,7 +428,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 // Couche Influence - dessinée après le damier pour plus de clarté
                 if (showInfluence && influenceGrid[r] && influenceGrid[r][c] !== -1) {
                     const closestOwner = influenceGrid[r][c];
-                    const baseColor = getColorForPlayer(closestOwner);
+                    const baseColor = colorMode === 'player' ? (ownerRaceColor(closestOwner) || getColorForPlayer(closestOwner)) : getColorForPlayer(closestOwner);
                     // On convertit HSL en HSLA un peu plus marqué
                     ctx.fillStyle = baseColor.replace(')', `, ${influenceOpacity})`).replace('hsl', 'hsla');
                     ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
@@ -815,7 +816,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             // Couleur(s) en fonction de la possession
             const owners = s.owners as number[] | undefined;
             const isGlobalOnly = s.isGlobalOnly;
-            let col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode);
+            let col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global);
             if (isGlobalOnly) col = '#333'; // Plus sombre pour les systèmes non détectés
 
             // Taille du disque en fonction du nombre de planètes:
@@ -860,7 +861,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 }
                 const total = weights.reduce((a, b) => a + b, 0);
                 // Préparer les couleurs par propriétaire
-                const colors = multiOwners.map(o => colorForOwnership(currentPlayerId, [o], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode));
+                const colors = multiOwners.map(o => colorForOwnership(currentPlayerId, [o], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global));
 
                 // Dessiner les parts: une par owner, angle proportionnel au poids
                 let angle = -Math.PI / 2; // démarrage en haut, pour stabilité visuelle
@@ -983,7 +984,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 c2d.filter = 'grayscale(1)';
             }
 
-            const ownerColor = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode) || '#000000';
+            const ownerColor = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global) || '#000000';
             const badgeColor = '#ffffff';
             const textColor = '#000000';
             const strokeColor = ownerColor;
@@ -1053,7 +1054,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
             // Contour fin autour du badge de flotte (remplace l'ancien halo lumineux)
             if (isFleetSelected((f as any).owner)) {
-                const col = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode);
+                const col = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global);
                 const cRing = ctx as CanvasRenderingContext2D;
                 cRing.save();
                 cRing.strokeStyle = col || '#000000';
