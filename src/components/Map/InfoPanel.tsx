@@ -63,6 +63,11 @@ export default function InfoPanel({ selected }: Props) {
     setHoverFleet({fleet: f, anchor: {top: r.top, bottom: r.bottom, left: r.left, right: r.right}});
   };
   const hideFleetHover = () => setHoverFleet(undefined);
+  // Changement de sélection : ne pas garder le détail de la flotte de l'ancienne case
+  useEffect(() => {
+    setHoverFleet(undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.x, selected?.y]);
 
   const atPos = useMemo(() => {
     if (!selected) return { systems: [], fleets: [] as any[], playerFleets: [] as any[] };
@@ -571,11 +576,11 @@ export default function InfoPanel({ selected }: Props) {
                 <tr><td style={lbl}>Position</td><td style={{ textAlign: 'right' }}><Position pos={f.pos} /></td></tr>
                 {f.direction && <tr><td style={lbl}>Direction</td><td style={{ textAlign: 'right' }}><Position pos={f.direction} /></td></tr>}
                 <tr><td style={lbl}>Vitesse</td><td style={{ textAlign: 'right' }}>{f.vitesse}</td></tr>
-                {f.directive != null && <tr><td style={lbl}>Directive</td><td style={{ textAlign: 'right' }}>{String(f.directive)}</td></tr>}
+                {f.directive ? <tr><td style={lbl}>Directive</td><td style={{ textAlign: 'right' }}>{String(f.directive)}</td></tr> : null}
                 <tr><td style={lbl}>AS / AP</td><td style={{ textAlign: 'right' }}>{f.as ?? 0} / {f.ap ?? 0}</td></tr>
                 <tr><td style={lbl}>Scan</td><td style={{ textAlign: 'right' }}>{f.scan}</td></tr>
                 <tr><td style={lbl}>Vaisseaux</td><td style={{ textAlign: 'right' }}>{f.nbVso}</td></tr>
-                {typeof f.dist === 'number' && (
+                {typeof f.dist === 'number' && f.dist > 0 && (
                   <tr><td style={lbl}>Distance</td><td style={{ textAlign: 'right' }}>{f.dist} {f.reachable ? '(atteignable ce tour)' : '(hors de portée)'}</td></tr>
                 )}
               </tbody>
