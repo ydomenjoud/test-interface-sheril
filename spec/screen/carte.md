@@ -172,6 +172,9 @@ panneau : il permet de voir l'essentiel en un coup d'œil.
   - nom du système, liste des propriétaires (numéro de commandant), nombre de planètes, population
   - si le système est possédé par le joueur : lien "détails" vers l'écran de détail du système (planètes, bâtiments,
     populations, minerai, points de construction)
+  - si le système n'est plus dans les données du tour affiché (vu dans un tour précédent) : les dernières
+    informations connues — le tour le plus récent stocké où il a été détecté — sont affichées, avec
+    "information tour X" en tête de panneau et l'avertissement ⚠ de données obsolètes
 
 Le reste des informations est organisé en sections, chacune n'étant affichée que s'il y a du contenu sur la case ;
 une case sans aucun contenu (ni système, ni flotte, ni combat, ni zone) affiche simplement "Case vide.".

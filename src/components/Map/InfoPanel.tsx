@@ -16,6 +16,7 @@ import { NavLink } from 'react-router-dom';
 import ZoneEditor from './ZoneEditor';
 import { zoneCovers } from '../../utils/zones';
 import { isObserved, lastKnownFleets } from '../../utils/fleetHistory';
+import { lastKnownSystem } from '../../utils/systemHistory';
 import { fleetSnapshotOf } from '../../storage/rapportStore';
 
 type Props = {
@@ -34,7 +35,7 @@ const StaleIcon = () => (
 
 
 export default function InfoPanel({ selected }: Props) {
-  const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats, zones, zoneLabels, fleetSnapshots } = useReport();
+  const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats, zones, zoneLabels, fleetSnapshots, systemSnapshots } = useReport();
 
   // Zones affichées : celles qui couvrent la case, plus celles déjà listées pour cette sélection
   // (une zone déplacée ou réduite hors de la case reste éditable jusqu'au prochain clic)
@@ -97,6 +98,16 @@ export default function InfoPanel({ selected }: Props) {
       });
     }
 
+    // Système vu sur la case dans un tour précédent mais plus dans les données actuelles :
+    // on affiche la dernière détection stockée (avec son tour) plutôt que le simple nom de data.xml
+    if (systems.length === 0 && rapport) {
+      const last = lastKnownSystem(systemSnapshots, selected, rapport.tour);
+      if (last) {
+        systems.push(last.systeme);
+        seen.add(`${last.systeme.pos.x}_${last.systeme.pos.y}`);
+      }
+    }
+
     if (global?.systemes) {
       global.systemes.filter(s => s.pos.x === selected.x && s.pos.y === selected.y).forEach(s => {
         if (!seen.has(`${s.pos.x}_${s.pos.y}`)) {
@@ -127,7 +138,7 @@ export default function InfoPanel({ selected }: Props) {
     });
 
     return { systems, fleets, playerFleets };
-  }, [selected, rapport, global, sortField, sortOrder]);
+  }, [selected, rapport, global, systemSnapshots, sortField, sortOrder]);
 
   const system = useMemo(() => {
     return atPos.systems[0];
