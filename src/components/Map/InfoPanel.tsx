@@ -53,6 +53,8 @@ export default function InfoPanel({ selected }: Props) {
 
   const [sortField, setSortField] = useState<'dist' | 'num'>('dist');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  // "Mes flottes" : la liste complète est repliée, seules les flottes de la case et les plus proches sont visibles
+  const [showAllFleets, setShowAllFleets] = useState(false);
 
   const atPos = useMemo(() => {
     if (!selected) return { systems: [], fleets: [] as any[], playerFleets: [] as any[] };
@@ -159,6 +161,19 @@ export default function InfoPanel({ selected }: Props) {
   const hasCellContent = useMemo(
     () => !!system || atPos.fleets.length > 0 || !!pastFleets || cellCombats.length > 0 || zonesHere.length > 0,
     [system, atPos.fleets.length, pastFleets, cellCombats.length, zonesHere.length]
+  );
+
+  // Mes flottes : celles de la case sélectionnée, puis les plus proches atteignables (récapitulatif)
+  const myFleetsAtCell = useMemo(
+    () => atPos.playerFleets.filter((f: any) => f.pos.x === selected?.x && f.pos.y === selected?.y),
+    [atPos.playerFleets, selected]
+  );
+  const nearestReachableFleets = useMemo(
+    () => atPos.playerFleets
+      .filter((f: any) => !(f.pos.x === selected?.x && f.pos.y === selected?.y) && f.reachable)
+      .sort((a: any, b: any) => a.dist - b.dist)
+      .slice(0, 5),
+    [atPos.playerFleets, selected]
   );
 
   const handleAddNote = (e: React.FormEvent) => {
@@ -318,6 +333,51 @@ export default function InfoPanel({ selected }: Props) {
       {atPos.playerFleets.length > 0 && (
         <div className="info-block">
           <h4>Mes flottes</h4>
+
+          {myFleetsAtCell.length > 0 && (
+            <>
+              <div className="info-sublabel">Sur la case</div>
+              <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <tbody>
+                {myFleetsAtCell.map((f: any, i: number) => (
+                  <tr key={`here-${i}`}>
+                    <td>{f.nom} ({f.num + 1})</td>
+                    <td style={{ textAlign: 'right' }}>{f.as ?? 0} / {f.ap ?? 0}</td>
+                  </tr>
+                ))}
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {nearestReachableFleets.length > 0 && (
+            <>
+              <div className="info-sublabel">Plus proches (atteignables ce tour)</div>
+              <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <tbody>
+                {nearestReachableFleets.map((f: any, i: number) => (
+                  <tr key={`near-${i}`}>
+                    <td>{f.nom} ({f.num + 1})</td>
+                    <td style={{ textAlign: 'right' }} title="Distance">{f.dist}</td>
+                    <td style={{ textAlign: 'right' }} title="AS / AP">{f.as ?? 0} / {f.ap ?? 0}</td>
+                  </tr>
+                ))}
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {atPos.playerFleets.length > myFleetsAtCell.length + nearestReachableFleets.length && (
+            <button
+              type="button"
+              onClick={() => setShowAllFleets(v => !v)}
+              style={{ marginTop: 6, padding: '3px 8px', cursor: 'pointer', backgroundColor: '#333', color: '#eee', border: '1px solid #555', borderRadius: 4, fontSize: '0.85em' }}
+            >
+              {showAllFleets ? 'Réduire' : `Voir tout (${atPos.playerFleets.length})`}
+            </button>
+          )}
+
+          {showAllFleets && (
           <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
             <tr>
@@ -360,6 +420,7 @@ export default function InfoPanel({ selected }: Props) {
             })}
             </tbody>
           </table>
+          )}
         </div>
       )}
       {cellCombats.length > 0 && (

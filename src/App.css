@@ -272,6 +272,13 @@ a {
     margin: 8px 0 6px;
 }
 
+/* Sous-titre compact à l'intérieur d'un bloc d'information (ex. "Sur la case") */
+.info-sublabel {
+    font-size: 0.8em;
+    color: #aaa;
+    margin: 8px 0 4px;
+}
+
 .badge {
     display: inline-block;
     padding: 2px 6px;
