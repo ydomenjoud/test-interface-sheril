@@ -261,17 +261,17 @@ a {
     height: 160px;
 }
 
-/* Légende compacte des couleurs de possession (au-dessus du bouton d'aide) */
+/* Légende compacte des couleurs de possession : en bas à gauche, au ras du bord */
 .map-legend {
     position: absolute;
-    left: 20px;
-    bottom: 60px;
+    left: 0;
+    bottom: 0;
     display: flex;
     gap: 10px;
     align-items: center;
     background: rgba(10, 10, 10, 0.7);
     border: 1px solid #333;
-    border-radius: 6px;
+    border-radius: 0 6px 0 0;
     padding: 4px 10px;
     font-size: 0.75em;
     color: #ccc;
