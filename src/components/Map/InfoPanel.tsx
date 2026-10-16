@@ -156,11 +156,7 @@ export default function InfoPanel({ selected }: Props) {
 
   const isOwner = useMemo(() => system?.proprietaires?.some((p: any) => p === rapport?.joueur?.numero), [system, rapport])
 
-  // Récapitulatif de la case : total de vaisseaux et couleur de possession
-  const shipsAtCell = useMemo(
-    () => (atPos.fleets as any[]).reduce((sum: number, f: any) => sum + (typeof f.nbVso === 'number' ? f.nbVso : 0), 0),
-    [atPos.fleets]
-  );
+  // Couleur de possession du système (bordure du récapitulatif de case)
   const summaryColor = useMemo(() => {
     if (system?.proprietaires?.length) {
       return colorForOwnership(rapport?.joueur?.numero, system.proprietaires, rapport?.joueur?.alliances, rapport?.joueur?.pna) || '#555';
@@ -225,8 +221,9 @@ export default function InfoPanel({ selected }: Props) {
         </div>
       )}
 
-      {/* Récapitulatif : l'essentiel de la case en un coup d'œil */}
-      {(system || atPos.fleets.length > 0) && (
+      {/* Récapitulatif du système de la case (affiché seulement s'il y a un système : sans système,
+      les sections ci-dessous suffisent) */}
+      {system && (
         <div className="info-block" style={{ borderLeft: `4px solid ${summaryColor}`, paddingLeft: 10 }}>
           {system && (
             <>
@@ -251,9 +248,6 @@ export default function InfoPanel({ selected }: Props) {
           <div style={{ fontSize: '0.85em', color: '#bbb' }}>
             {system?.nbPla != null && <>{fmt(system.nbPla)} planètes</>}
             {system?.pop != null && system?.popMax != null && <> · pop {fmt(system.pop)}/{fmt(system.popMax)}</>}
-            {atPos.fleets.length > 0 && (
-              <> · <strong style={{ color: '#eee' }}>{atPos.fleets.length} flotte{atPos.fleets.length > 1 ? 's' : ''}</strong>{shipsAtCell > 0 && <> ({fmt(shipsAtCell)} vaisseaux)</>}</>
-            )}
           </div>
         </div>
       )}

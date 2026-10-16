@@ -123,6 +123,10 @@ l'affichage de ces points va dépendre de leur caractéristiques.
 
 L'image du système prend toute la case de la grille.
 
+La taille du disque varie avec le nombre de planètes (10 planètes : 50 % de la case, 20 planètes et plus :
+100 %, linéaire entre les deux) ; les systèmes connus uniquement de la carte galactique (jamais détectés)
+s'affichent à moitié taille.
+
 il faut utiliser une image correspondante à sa propriété "typeEtoile" et utiliser l'image
 public/img/etoile{typeEtoile}.gif (images pack étoiles).
 Si le système est :
@@ -164,11 +168,10 @@ Lorsqu'on clique sur une case, la partie information affiche d'abord un récapit
 panneau : il permet de voir l'essentiel en un coup d'œil.
 
 - coordonnées (+ tour d'où viennent les données, et avertissement si les données sont d'un tour précédent)
-- récapitulatif :
+- récapitulatif du système (affiché uniquement s'il y a un système sur la case) :
   - nom du système, liste des propriétaires (numéro de commandant), nombre de planètes, population
   - si le système est possédé par le joueur : lien "détails" vers l'écran de détail du système (planètes, bâtiments,
     populations, minerai, points de construction)
-  - nombre de flottes sur la case et total de vaisseaux
 
 Le reste des informations est organisé en sections, chacune n'étant affichée que s'il y a du contenu sur la case ;
 une case sans aucun contenu (ni système, ni flotte, ni combat, ni zone) affiche simplement "Case vide.".
