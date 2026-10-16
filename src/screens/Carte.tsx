@@ -47,13 +47,14 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_fleet_badges');
     return saved !== null ? JSON.parse(saved) : true;
   });
+  // Portées radar : désactivées par défaut (voile bleu sur la carte) ; à activer dans les Filtres si besoin
   const [showSystemRadar, setShowSystemRadar] = useState(() => {
     const saved = localStorage.getItem('carte_show_system_radar');
-    return saved !== null ? JSON.parse(saved) : true;
+    return saved !== null ? JSON.parse(saved) : false;
   });
   const [showFleetRadar, setShowFleetRadar] = useState(() => {
     const saved = localStorage.getItem('carte_show_fleet_radar');
-    return saved !== null ? JSON.parse(saved) : true;
+    return saved !== null ? JSON.parse(saved) : false;
   });
   const [showMiniMap, setShowMiniMap] = useState(() => {
     const saved = localStorage.getItem('carte_show_minimap');
