@@ -43,6 +43,28 @@ export function raceColorForOwner(globalData?: GlobalData, owner?: number): stri
     return OWNER_BADGE_COLORS[owner];
 }
 
+// Rend une couleur semi-transparente (opacité 0..1) : gère HSL, hexadécimal et quelques couleurs nommées
+function withOpacity(color: string, opacity: number): string {
+    if (color.startsWith('hsl')) {
+        return color.replace(')', `, ${opacity})`).replace('hsl', 'hsla');
+    }
+    const named: Record<string, string> = { grey: '#808080', gray: '#808080', yellow: '#ffff00' };
+    const hex = (named[color] || (color.startsWith('#') ? color : '')).replace('#', '');
+    if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+        const r = parseInt(hex.slice(0, 2), 16);
+        const g = parseInt(hex.slice(2, 4), 16);
+        const b = parseInt(hex.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
+    if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+        const r = parseInt(hex[0] + hex[0], 16);
+        const g = parseInt(hex[1] + hex[1], 16);
+        const b = parseInt(hex[2] + hex[2], 16);
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
+    return color;
+}
+
 export type ZoneRect = { x: number; y: number; width: number; height: number };
 
 // Rectangle (coin haut-gauche + taille) couvrant deux cases opposées, en prenant le plus court chemin sur le tore
@@ -209,7 +231,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         return [...rapport.flottesJoueur.map(f => ({
             ...f, owner: currentPlayerId,
         })), ...rapport.flottesDetectees.map(f => ({
-            ...f, owner: f.proprio,
+            ...f, owner: f.proprio || 0,
         })),];
     }, [rapport, currentPlayerId]);
 
@@ -299,7 +321,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     }
                     const span = document.createElement('span');
                     const cmd = o === 0 ? undefined : global?.commandants?.find(c2 => c2.numero === o);
-                    span.textContent = (i === 0 ? '  ' : ' ') + (o === 0 ? 'Neutre (0)' : cmd ? `${cmd.nom} (${o})` : `#${o}`);
+                    span.textContent = (i === 0 ? '  ' : '') + (o === 0 ? 'Neutre (0)' : cmd ? `${cmd.nom} (${o})` : `#${o}`);
                     span.style.color = o === 0 ? '#999' : (ownerRaceColor(o) || '#ddd');
                     el.appendChild(span);
                 });
@@ -435,8 +457,8 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 if (showInfluence && influenceGrid[r] && influenceGrid[r][c] !== -1) {
                     const closestOwner = influenceGrid[r][c];
                     const baseColor = colorMode === 'player' ? (ownerRaceColor(closestOwner) || getColorForPlayer(closestOwner)) : getColorForPlayer(closestOwner);
-                    // On convertit HSL en HSLA un peu plus marqué
-                    ctx.fillStyle = baseColor.replace(')', `, ${influenceOpacity})`).replace('hsl', 'hsla');
+                    // Rend la couleur semi-transparente (couleurs HSL des joueurs ou hexa des races)
+                    ctx.fillStyle = withOpacity(baseColor, influenceOpacity);
                     ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
                 }
 
