@@ -50,6 +50,8 @@ export default function InfoPanel({ selected }: Props) {
   const [noteText, setNoteText] = useState('');
   const [noteColor, setNoteColor] = useState('#ffcc00');
   const [noteTag, setNoteTag] = useState('');
+  // Le formulaire d'ajout est replié derrière un bouton pour laisser la place aux notes existantes
+  const [showNoteForm, setShowNoteForm] = useState(false);
 
   const [sortField, setSortField] = useState<'dist' | 'num'>('dist');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -182,6 +184,7 @@ export default function InfoPanel({ selected }: Props) {
     addNote(selected, noteText, noteColor, noteTag.trim() || undefined);
     setNoteText('');
     setNoteTag('');
+    setShowNoteForm(false);
   };
 
   if (!selected) {
@@ -247,36 +250,7 @@ export default function InfoPanel({ selected }: Props) {
         </div>
       )}
 
-      {system && (
-      <div className="info-block">
-        <h4>Systèmes</h4>
-        <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-          <tr>
-            <th>Nom</th>
-            <th>Planètes</th>
-            <th>Population</th>
-            <th>Commandants</th>
-          </tr>
-          </thead>
-          <tbody>
-          <tr style={staleTour !== undefined ? staleRowStyle : undefined}>
-            <td>
-              {staleTour !== undefined && <StaleIcon />}
-              {system.nom}
-            </td>
-            <td style={{ textAlign: 'right' }}>{system.nbPla ?? '—'}</td>
-              <td>{system.pop}/{system.popMax}</td>
-            <td style={{ textAlign: 'right' }}>
-              {Array.isArray(system.proprietaires) && system.proprietaires.length
-                ? system.proprietaires.map((p: number, key: number) => <Commandant num={p} key={key} />)
-                : '—'}
-            </td>
-          </tr>
-          </tbody>
-        </table>
-      </div>
-      )}
+      {/* Le détail système (nom, possesseurs, planètes, population) est dans le récapitulatif en tête de panneau */}
 
       {(atPos.fleets.length > 0 || pastFleets) && (
       <div className="info-block">
@@ -452,41 +426,9 @@ export default function InfoPanel({ selected }: Props) {
 
       <div className="info-block">
         <h4>Notes</h4>
-        <form onSubmit={handleAddNote} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              type="color"
-              value={noteColor}
-              onChange={(e) => setNoteColor(e.target.value)}
-              style={{ width: 40, height: 30, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
-              title="Choisir une couleur"
-            />
-            <input
-              type="text"
-              value={noteTag}
-              onChange={(e) => setNoteTag(e.target.value)}
-              placeholder="Tag..."
-              list="tags-list"
-              style={{ width: 80, padding: '4px 8px', background: '#123', color: '#eee', border: '1px solid #345' }}
-            />
-            <datalist id="tags-list">
-              {allTags.map(tag => (
-                <option key={tag} value={tag} />
-              ))}
-            </datalist>
-            <input
-              type="text"
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Ajouter une note..."
-              style={{ flex: 1, padding: '4px 8px', background: '#123', color: '#eee', border: '1px solid #345' }}
-            />
-            <button type="submit" style={{ padding: '4px 12px' }}>Ajouter</button>
-          </div>
-        </form>
 
         {currentNotes.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
             {currentNotes.map((note: Note) => (
               <div
                 key={note.id}
@@ -535,7 +477,55 @@ export default function InfoPanel({ selected }: Props) {
             ))}
           </div>
         ) : (
-          <div style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em' }}>Aucune note pour cette case.</div>
+          <div style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em', marginBottom: 8 }}>Aucune note pour cette case.</div>
+        )}
+
+        {showNoteForm ? (
+          <form onSubmit={handleAddNote} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="color"
+                value={noteColor}
+                onChange={(e) => setNoteColor(e.target.value)}
+                style={{ width: 40, height: 30, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                title="Choisir une couleur"
+              />
+              <input
+                type="text"
+                value={noteTag}
+                onChange={(e) => setNoteTag(e.target.value)}
+                placeholder="Tag..."
+                list="tags-list"
+                style={{ width: 80, padding: '4px 8px', background: '#123', color: '#eee', border: '1px solid #345' }}
+              />
+              <datalist id="tags-list">
+                {allTags.map(tag => (
+                  <option key={tag} value={tag} />
+                ))}
+              </datalist>
+              <input
+                type="text"
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="Ajouter une note..."
+                style={{ flex: 1, padding: '4px 8px', background: '#123', color: '#eee', border: '1px solid #345' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="submit" style={{ padding: '4px 12px' }}>Ajouter</button>
+              <button type="button" onClick={() => setShowNoteForm(false)} style={{ padding: '4px 12px', background: 'transparent', color: '#aaa', border: '1px solid #555', borderRadius: 4 }}>
+                Annuler
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowNoteForm(true)}
+            style={{ padding: '4px 12px', cursor: 'pointer', backgroundColor: '#333', color: '#eee', border: '1px solid #555', borderRadius: 4, fontSize: '0.85em' }}
+          >
+            + Ajouter une note
+          </button>
         )}
       </div>
     </div>
