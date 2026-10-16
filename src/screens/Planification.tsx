@@ -744,7 +744,7 @@ export default function Planification() {
                     </tr>
                 </thead>
                 <tbody>
-                    {orderedSystems.map(s => {
+                    {orderedSystems.map((s, idx) => {
                         const key = `${s.pos.x}_${s.pos.y}`;
                         const initial = getSystemResources(s);
                         const queue = queues[key] || [];
@@ -778,7 +778,7 @@ export default function Planification() {
                         if (isCollapsed) {
                             return (
                                 <React.Fragment key={key}>
-                                <tr style={{ borderBottom: queue.length > 0 ? 'none' : '1px solid #444', backgroundColor: finalPc > 0 ? '' : '#333' }}>
+                                <tr className={`systemStart ${idx % 2 ? 'rowOdd' : 'rowEven'}`} style={{ borderBottom: queue.length > 0 ? 'none' : '1px solid #444', backgroundColor: finalPc > 0 ? '' : '#333' }}>
                                     <td style={{ padding: 8 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                             <button
@@ -816,11 +816,43 @@ export default function Planification() {
                                     })}
                                 </tr>
                                 {queue.length > 0 && (
-                                    <tr style={{ borderBottom: '1px solid #444', backgroundColor: finalPc > 0 ? '' : '#333' }}>
+                                    <tr className={idx % 2 ? 'rowOdd' : 'rowEven'} style={{ borderBottom: '1px solid #444', backgroundColor: finalPc > 0 ? '' : '#333' }}>
                                         <td colSpan={3 + marchandisesCols.length} style={{ padding: '0 8px 8px 8px', fontSize: '0.85em', color: '#bbb' }}>
                                             {(() => {
-                                                const formatted = formatPlannedItems(queue, global?.technologies || []);
-                                                return [...formatted.formattedBuildings, ...formatted.formattedShips].join(', ');
+                                                // Un groupe par type de bâtiment (tous niveaux confondus) ou par plan de vaisseau
+                                                const technologies = global?.technologies || [];
+                                                const groupOf = (item: PlannedItem) =>
+                                                    item.type === 'building'
+                                                        ? `building:${technologies.find(t => t.code === item.code)?.nom ?? item.code}`
+                                                        : `ship:${item.code}`;
+                                                const groups = new Map<string, PlannedItem[]>();
+                                                queue.forEach(item => {
+                                                    const g = groupOf(item);
+                                                    groups.set(g, [...(groups.get(g) || []), item]);
+                                                });
+                                                const entries = Array.from(groups.entries())
+                                                    .map(([g, items]) => {
+                                                        const f = formatPlannedItems(items, technologies);
+                                                        return { g, label: [...f.formattedBuildings, ...f.formattedShips].join(', ') };
+                                                    })
+                                                    .sort((a, b) => a.g.localeCompare(b.g));
+                                                return entries.map(({ g, label }) => (
+                                                    <span key={g} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, backgroundColor: '#222', border: '1px solid #444', borderRadius: 12, padding: '2px 4px 2px 10px', marginRight: 6, marginBottom: 2 }}>
+                                                        {label}
+                                                        <button
+                                                            onClick={() => setQueues(prev => ({ ...prev, [key]: (prev[key] || []).filter(item => groupOf(item) !== g) }))}
+                                                            title="Supprimer cette planification"
+                                                            style={{ background: 'none', border: 'none', color: '#f55', cursor: 'pointer', padding: 2, lineHeight: 0 }}
+                                                        >
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                            </svg>
+                                                        </button>
+                                                    </span>
+                                                ));
                                             })()}
                                         </td>
                                     </tr>
@@ -831,7 +863,7 @@ export default function Planification() {
 
                         return (
                             <React.Fragment key={key}>
-                            <tr style={{verticalAlign: 'top', backgroundColor: finalPc>0 ? '' : '#333' }}>
+                            <tr className={`systemStart ${idx % 2 ? 'rowOdd' : 'rowEven'}`} style={{verticalAlign: 'top', backgroundColor: finalPc>0 ? '' : '#333' }}>
                                 <td style={{ padding: 8 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <button
@@ -874,7 +906,7 @@ export default function Planification() {
                                 })}
 
                             </tr>
-                            <tr style={{  borderBottom: '2px solid #6F6', backgroundColor: finalPc>0 ? '' : '#333' }}>
+                            <tr className={idx % 2 ? 'rowOdd' : 'rowEven'} style={{  borderBottom: '2px solid #6F6', backgroundColor: finalPc>0 ? '' : '#333' }}>
                                 <td style={{ padding: 8 }} colSpan={19}>
                                     <div style={{ marginBottom: 10 }}>
                                         <SearchableSelect

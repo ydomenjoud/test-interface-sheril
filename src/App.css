@@ -377,3 +377,10 @@ nav.app-nav {
 .stockPositive { color: rgb(128 224 145); }
 .stockSpent { color: #fa0; }
 .stockOver { color: #f55; }
+
+.rowOdd { background-color: rgba(255, 255, 255, 0.06); }
+
+/* Séparation visible entre deux systèmes : la bordure reprend la couleur du fond de page */
+.planification_table tr.systemStart > td { border-top: 2px solid #111; }
+
+.rowEven { background-color: #090909; }
