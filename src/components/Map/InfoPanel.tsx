@@ -139,6 +139,12 @@ export default function InfoPanel({ selected }: Props) {
     return [...rapportCombats, ...publicCombatsAt];
   }, [selected, rapport, publicCombats]);
 
+  // La case a-t-elle du contenu (système, flottes actuelles/connues, combats, zones) ?
+  const hasCellContent = useMemo(
+    () => !!system || atPos.fleets.length > 0 || !!pastFleets || cellCombats.length > 0 || zonesHere.length > 0,
+    [system, atPos.fleets.length, pastFleets, cellCombats.length, zonesHere.length]
+  );
+
   const handleAddNote = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected || !noteText.trim()) return;
@@ -171,6 +177,13 @@ export default function InfoPanel({ selected }: Props) {
         )}
       </div>
 
+      {!hasCellContent && (
+        <div className="info-block" style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em' }}>
+          Case vide.
+        </div>
+      )}
+
+      {system && (
       <div className="info-block">
         <h4>Systèmes</h4>
         <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -184,28 +197,26 @@ export default function InfoPanel({ selected }: Props) {
           </tr>
           </thead>
           <tbody>
-          {system ? (
-            <tr style={staleTour !== undefined ? staleRowStyle : undefined}>
-              <td>
-                {staleTour !== undefined && <StaleIcon />}
-                {system.nom}
-              </td>
-              <td style={{ textAlign: 'right' }}>{system.nbPla ?? '—'}</td>
-                <td>{system.pop}/{system.popMax}</td>
-              <td style={{ textAlign: 'right' }}>
-                {Array.isArray(system.proprietaires) && system.proprietaires.length
-                  ? system.proprietaires.map((p: number, key: number) => <Commandant num={p} key={key} />)
-                  : '—'}
-              </td>
-              { isOwner && <td className='app-nav'><NavLink  to={`/player-system-detail/${selected.x}-${selected.y}`}>détails {isOwner}</NavLink></td> }
-            </tr>
-          ) : (
-            <tr><td colSpan={3} style={{ textAlign: 'center', padding: 8, color: '#aaa' }}>Aucun système ici.</td></tr>
-          )}
+          <tr style={staleTour !== undefined ? staleRowStyle : undefined}>
+            <td>
+              {staleTour !== undefined && <StaleIcon />}
+              {system.nom}
+            </td>
+            <td style={{ textAlign: 'right' }}>{system.nbPla ?? '—'}</td>
+              <td>{system.pop}/{system.popMax}</td>
+            <td style={{ textAlign: 'right' }}>
+              {Array.isArray(system.proprietaires) && system.proprietaires.length
+                ? system.proprietaires.map((p: number, key: number) => <Commandant num={p} key={key} />)
+                : '—'}
+            </td>
+            { isOwner && <td className='app-nav'><NavLink  to={`/player-system-detail/${selected.x}-${selected.y}`}>détails {isOwner}</NavLink></td> }
+          </tr>
           </tbody>
         </table>
       </div>
+      )}
 
+      {(atPos.fleets.length > 0 || pastFleets) && (
       <div className="info-block">
         <h4>Flottes</h4>
         <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -252,12 +263,10 @@ export default function InfoPanel({ selected }: Props) {
               <td style={{ textAlign: 'right' }}>{`${getPuissanceFromString(f.puiss)} - ${f.puiss}`}</td>
             </tr>
           ))}
-          {atPos.fleets.length === 0 && !pastFleets && (
-            <tr><td colSpan={4} style={{ textAlign: 'center', padding: 8, color: '#aaa' }}>Aucune flotte ici.</td></tr>
-          )}
           </tbody>
         </table>
       </div>
+      )}
 
       {atPos.playerFleets.length > 0 && (
         <div className="info-block">
@@ -306,38 +315,32 @@ export default function InfoPanel({ selected }: Props) {
           </table>
         </div>
       )}
+      {cellCombats.length > 0 && (
       <div className="info-block">
         <h4>Combats</h4>
         <p className="combat-legend">
           <span className="combat-legend-spatial">S</span> spatial (bas-gauche)
           <span className="combat-legend-planetary">P</span> planétaire (haut-gauche)
         </p>
-        {cellCombats.length > 0 ? (
-          <div className="combat-list">
-            {cellCombats.map((combat) => (
-              <CombatCard key={combat.id} combat={combat} />
-            ))}
-          </div>
-        ) : (
-          <div style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em' }}>
-            Aucun combat signalé sur cette case.
-          </div>
-        )}
+        <div className="combat-list">
+          {cellCombats.map((combat) => (
+            <CombatCard key={combat.id} combat={combat} />
+          ))}
+        </div>
       </div>
+      )}
 
+      {zonesHere.length > 0 && (
       <div className="info-block">
         <h4>Zones</h4>
-        {zonesHere.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {zonesHere.map(z => <ZoneEditor key={z.id} zone={z} />)}
-            <datalist id="zone-editor-labels">
-              {zoneLabels.map(l => <option key={l} value={l} />)}
-            </datalist>
-          </div>
-        ) : (
-          <div style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em' }}>Aucune zone sur cette case (Alt + clic + glisser pour en tracer une).</div>
-        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {zonesHere.map(z => <ZoneEditor key={z.id} zone={z} />)}
+          <datalist id="zone-editor-labels">
+            {zoneLabels.map(l => <option key={l} value={l} />)}
+          </datalist>
+        </div>
       </div>
+      )}
 
       <div className="info-block">
         <h4>Notes</h4>
