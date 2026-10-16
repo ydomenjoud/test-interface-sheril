@@ -34,6 +34,11 @@ describe('parseRapportXml - XML lowercase only', () => {
             <vaisseau plan="intercepteur standard" type="intercepteur standard"/>
           </f>
         </flottes>
+
+        <pna>
+          <p com="3"/>
+          <p com="14"/>
+        </pna>
       </commandant>
     </rapport>
   `;
@@ -90,6 +95,16 @@ describe('parseRapportXml - XML lowercase only', () => {
       proprio: 3,
       puiss: 'grande',
     });
+  });
+
+  it("extrait la liste des PNA (<pna><p com>), vide s'il n'y en a pas", () => {
+    expect(parseRapportXml(xml).joueur.pna).toEqual([3, 14]);
+    const sansPna = `
+      <rapport numtour="8">
+        <commandant numero="1" nom="mab"/>
+      </rapport>
+    `;
+    expect(parseRapportXml(sansPna).joueur.pna).toEqual([]);
   });
 });
 
