@@ -57,6 +57,12 @@ export default function InfoPanel({ selected }: Props) {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   // "Mes flottes" : la liste complète est repliée, seules les flottes de la case et les plus proches sont visibles
   const [showAllFleets, setShowAllFleets] = useState(false);
+  const [hoverFleet, setHoverFleet] = useState<{fleet: any; anchor: {top: number; bottom: number; left: number; right: number}} | undefined>(undefined);
+  const showFleetHover = (f: any) => (e: React.MouseEvent<HTMLTableRowElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setHoverFleet({fleet: f, anchor: {top: r.top, bottom: r.bottom, left: r.left, right: r.right}});
+  };
+  const hideFleetHover = () => setHoverFleet(undefined);
 
   const atPos = useMemo(() => {
     if (!selected) return { systems: [], fleets: [] as any[], playerFleets: [] as any[] };
@@ -281,7 +287,7 @@ export default function InfoPanel({ selected }: Props) {
 
             }
             return (
-              <tr key={`flt-${i}`}>
+              <tr key={`flt-${i}`} {...(f.type === 'joueur' ? { onMouseEnter: showFleetHover(f), onMouseLeave: hideFleetHover } : {})}>
                 <td>{f.nom} ({f.num+1})</td>
                 <td style={{ textAlign: 'right' }}>
                   {typeof owner === 'number' ? <Commandant num={owner} /> : '—'}
@@ -320,7 +326,7 @@ export default function InfoPanel({ selected }: Props) {
                 </thead>
                 <tbody>
                 {myFleetsAtCell.map((f: any, i: number) => (
-                  <tr key={`here-${i}`}>
+                  <tr key={`here-${i}`} onMouseEnter={showFleetHover(f)} onMouseLeave={hideFleetHover}>
                     <td>{f.nom} ({f.num + 1})</td>
                     <td style={{ textAlign: 'right' }}>{f.as ?? 0} / {f.ap ?? 0}</td>
                   </tr>
@@ -343,7 +349,7 @@ export default function InfoPanel({ selected }: Props) {
                 </thead>
                 <tbody>
                 {nearestReachableFleets.map((f: any, i: number) => (
-                  <tr key={`near-${i}`}>
+                  <tr key={`near-${i}`} onMouseEnter={showFleetHover(f)} onMouseLeave={hideFleetHover}>
                     <td>{f.nom} ({f.num + 1})</td>
                     <td style={{ textAlign: 'right' }}>{f.dist}</td>
                     <td style={{ textAlign: 'right' }}>{f.as ?? 0} / {f.ap ?? 0}</td>
@@ -396,7 +402,7 @@ export default function InfoPanel({ selected }: Props) {
               const isHere = f.pos.x === selected.x && f.pos.y === selected.y;
               const rowStyle = !f.reachable && !isHere ? { opacity: 0.5, color: '#ffa500' } : {};
               return (
-                <tr key={`player-flt-${i}`} style={rowStyle}>
+                <tr key={`player-flt-${i}`} style={rowStyle} onMouseEnter={showFleetHover(f)} onMouseLeave={hideFleetHover}>
                   <td>{f.nom} ({f.num+1})</td>
                   <td style={{ textAlign: 'right' }}>{isHere ? '—' : f.dist}</td>
                   <td style={{ textAlign: 'right' }}>{f.vitesse}</td>
@@ -541,6 +547,50 @@ export default function InfoPanel({ selected }: Props) {
           </button>
         )}
       </div>
+
+      {hoverFleet && (() => {
+        const f = hoverFleet.fleet as any;
+        const width = 280;
+        // À droite de la ligne si la place existe, sinon à gauche ; alignée sur la ligne
+        const left = hoverFleet.anchor.right + 8 + width < window.innerWidth
+            ? hoverFleet.anchor.right + 8
+            : Math.max(8, hoverFleet.anchor.left - width - 8);
+        const estHeight = 240;
+        let top = hoverFleet.anchor.top;
+        if (top + estHeight > window.innerHeight - 8) top = Math.max(8, window.innerHeight - estHeight - 8);
+        // Composition des vaisseaux : type × nombre
+        const comp: Record<string, number> = {};
+        (f.vaisseaux || []).forEach((v: any) => { comp[v.type] = (comp[v.type] || 0) + 1; });
+        const compEntries = Object.entries(comp);
+        const lbl: React.CSSProperties = { color: '#999', paddingRight: 12, whiteSpace: 'nowrap' };
+        return (
+          <div style={{ position: 'fixed', left, top, width, zIndex: 300, pointerEvents: 'none', background: 'rgba(15,15,20,0.97)', border: '1px solid #555', borderRadius: 6, padding: '8px 10px', fontSize: '0.82em', color: '#ddd', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+            <div style={{ fontWeight: 'bold', color: '#eee', marginBottom: 6 }}>{f.nom} ({f.num + 1})</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                <tr><td style={lbl}>Position</td><td style={{ textAlign: 'right' }}><Position pos={f.pos} /></td></tr>
+                {f.direction && <tr><td style={lbl}>Direction</td><td style={{ textAlign: 'right' }}><Position pos={f.direction} /></td></tr>}
+                <tr><td style={lbl}>Vitesse</td><td style={{ textAlign: 'right' }}>{f.vitesse}</td></tr>
+                {f.directive != null && <tr><td style={lbl}>Directive</td><td style={{ textAlign: 'right' }}>{String(f.directive)}</td></tr>}
+                <tr><td style={lbl}>AS / AP</td><td style={{ textAlign: 'right' }}>{f.as ?? 0} / {f.ap ?? 0}</td></tr>
+                <tr><td style={lbl}>Scan</td><td style={{ textAlign: 'right' }}>{f.scan}</td></tr>
+                <tr><td style={lbl}>Vaisseaux</td><td style={{ textAlign: 'right' }}>{f.nbVso}</td></tr>
+                {typeof f.dist === 'number' && (
+                  <tr><td style={lbl}>Distance</td><td style={{ textAlign: 'right' }}>{f.dist} {f.reachable ? '(atteignable ce tour)' : '(hors de portée)'}</td></tr>
+                )}
+              </tbody>
+            </table>
+            {compEntries.length > 0 && (
+              <div style={{ marginTop: 6, borderTop: '1px solid #333', paddingTop: 6 }}>
+                {compEntries.slice(0, 8).map(([type, nb]) => (
+                  <div key={type} style={{ display: 'flex', justifyContent: 'space-between' }}><span>{type}</span><span>× {nb}</span></div>
+                ))}
+                {compEntries.length > 8 && <div style={{ color: '#888' }}>… +{compEntries.length - 8} autres</div>}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
