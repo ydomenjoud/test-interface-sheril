@@ -56,7 +56,7 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_fleet_radar');
     return saved !== null ? JSON.parse(saved) : false;
   });
-  const [showMiniMap, setShowMiniMap] = useState(() => {
+  const [showMiniMap, setShowMiniMap] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_show_minimap');
     return saved !== null ? JSON.parse(saved) : true;
   });
@@ -309,6 +309,7 @@ export default function Carte() {
           <button type="button" className={showSystems ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Afficher / masquer les systèmes" onClick={() => setShowSystems(v => !v)}>✦</button>
           <button type="button" className={showSystemRadar ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Portée radar des systèmes" onClick={() => setShowSystemRadar(v => !v)}>◎</button>
           <button type="button" className={showFleetRadar ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Portée radar des flottes" onClick={() => setShowFleetRadar(v => !v)}>◉</button>
+          <button type="button" className={showMiniMap ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Afficher / masquer la mini-carte" onClick={() => setShowMiniMap(v => !v)}>▣</button>
           <MapHelp renderTrigger={open => (
             <button type="button" className="carte-icon-btn" title="Aide et raccourcis (?)" onClick={open}>?</button>
           )} />
@@ -369,16 +370,8 @@ export default function Carte() {
           </div>
         )}
 
-        {/* Actions : minimap + import */}
+        {/* Actions : import */}
         <div className="carte-toolbar-group" style={{ marginLeft: 'auto' }}>
-          <button
-            type="button"
-            className={showMiniMap ? 'carte-toggle active' : 'carte-toggle'}
-            onClick={() => setShowMiniMap(!showMiniMap)}
-            title="Afficher / masquer la mini-carte"
-          >
-            Minimap
-          </button>
           <button onClick={() => setShowPaste(true)} className="carte-btn">
             Importer systèmes
           </button>
@@ -500,6 +493,14 @@ export default function Carte() {
                       )}
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #444', paddingTop: 8 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={showSystems}
+                              onChange={(e) => setShowSystems(e.target.checked)}
+                            />
+                            Afficher systèmes
+                          </label>
                           <label
                             title="Systèmes connus uniquement par les données publiques (data.xml), jamais détectés dans vos rapports"
                             style={{ display: 'flex', alignItems: 'center', gap: 6, color: showSystems ? '#eee' : '#777', fontSize: '0.9em', cursor: showSystems ? 'pointer' : 'default', marginLeft: 16 }}
@@ -645,6 +646,26 @@ export default function Carte() {
                               ))}
                           </div>
                       )}
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #444', paddingTop: 8 }}>
+                          <span style={{ fontSize: '0.85em', color: '#aaa' }}>Portées Radar</span>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={showSystemRadar}
+                              onChange={(e) => setShowSystemRadar(e.target.checked)}
+                            />
+                            Systèmes
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={showFleetRadar}
+                              onChange={(e) => setShowFleetRadar(e.target.checked)}
+                            />
+                            Flottes
+                          </label>
+                      </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #444', paddingTop: 8 }}>
                           <span style={{ fontSize: '0.85em', color: '#aaa' }}>Distance Capitale</span>
