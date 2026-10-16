@@ -100,6 +100,10 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
 export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    // Case survolée : dessinée sur un canvas séparé pour ne pas redessiner toute la carte à chaque mouvement de souris
+    const hoverCanvasRef = useRef<HTMLCanvasElement>(null);
+    const tooltipRef = useRef<HTMLDivElement>(null);
+    const hoverRef = useRef<XY | undefined>(undefined);
 
     // Ref sur le center pour des mises à jour synchrones dans le drag
     const centerRef = useRef<XY | undefined>(center);
@@ -213,6 +217,103 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         const fromPublic = publicCombats ?? [];
         return [...fromRapport, ...fromPublic];
     }, [rapport, publicCombats]);
+
+    // Redessine uniquement le contour de la case survolée (sur le canvas dédié).
+    // La géométrie est recalculée pour rester alignée avec la carte principale (tore, centre, taille de case).
+    const redrawHoverOverlay = useCallback(() => {
+        const cvs = canvasRef.current;
+        const hov = hoverCanvasRef.current;
+        if (!cvs || !hov) return;
+        const dpr = window.devicePixelRatio || 1;
+        const w = Math.round(cvs.clientWidth * dpr);
+        const h = Math.round(cvs.clientHeight * dpr);
+        if (hov.width !== w) hov.width = w;
+        if (hov.height !== h) hov.height = h;
+        const ctx = hov.getContext('2d');
+        if (!ctx) return;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, cvs.clientWidth, cvs.clientHeight);
+
+        const cell = hoverRef.current;
+        const c = centerRef.current;
+        if (!cell || !c) return;
+
+        const cols = Math.floor(cvs.clientWidth / cellSize);
+        const rows = Math.floor(cvs.clientHeight / cellSize);
+        const halfCols = Math.floor(cols / 2);
+        const halfRows = Math.floor(rows / 2);
+        const topX = wrapX(c.x - halfRows);
+        const leftY = wrapY(c.y - halfCols);
+
+        // Même enroulement tore que pour le dessin des systèmes
+        let dx = ((cell.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+        let dyBase = ((cell.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.lineWidth = 2;
+        while (dx < cols) {
+            if (dx === 0) { dx += BOUNDS.maxY; continue; }
+            let dy = dyBase;
+            while (dy < rows) {
+                if (dy === 0) { dy += BOUNDS.maxX; continue; }
+                const px = dx * cellSize;
+                const py = dy * cellSize;
+                ctx.strokeRect(px + 2, py + 2, cellSize - 4, cellSize - 4);
+                dy += BOUNDS.maxX;
+            }
+            dx += BOUNDS.maxY;
+        }
+    }, [cellSize]);
+
+    // Tooltip de survol : récapitulatif de la case sous le curseur, sans avoir à cliquer
+    const updateTooltip = useCallback((clientX: number, clientY: number, xy: XY | undefined) => {
+        const el = tooltipRef.current;
+        const cvs = canvasRef.current;
+        if (!el) return;
+        if (!xy || !cvs) {
+            el.style.display = 'none';
+            return;
+        }
+        const rect = cvs.getBoundingClientRect();
+
+        el.textContent = '';
+        const posEl = document.createElement('span');
+        posEl.textContent = `${xy.x}-${xy.y}`;
+        posEl.style.cssText = 'font-weight:bold;color:#ffe600;';
+        el.appendChild(posEl);
+
+        const sys = systems.find(s => s.pos.x === xy.x && s.pos.y === xy.y);
+        if (sys) {
+            const nameEl = document.createElement('span');
+            nameEl.textContent = `  ${sys.nom}`;
+            el.appendChild(nameEl);
+            const owners = (sys as any).owners as number[] | undefined;
+            if (owners && owners.length > 0) {
+                const ownEl = document.createElement('span');
+                ownEl.textContent = '  ' + owners.map(o => {
+                    const cmd = global?.commandants?.find(c2 => c2.numero === o);
+                    return cmd ? `${cmd.nom} (${o})` : `#${o}`;
+                }).join(', ');
+                ownEl.style.color = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna) || '#ddd';
+                el.appendChild(ownEl);
+            }
+        }
+        const nf = fleets.filter(f => f.pos.x === xy.x && f.pos.y === xy.y).length;
+        if (nf > 0) {
+            const flEl = document.createElement('span');
+            flEl.textContent = `  ${nf} flotte${nf > 1 ? 's' : ''}`;
+            flEl.style.color = '#9fc6ff';
+            el.appendChild(flEl);
+        }
+
+        el.style.display = 'block';
+        let x = clientX - rect.left + 14;
+        let y = clientY - rect.top + 14;
+        if (x + el.offsetWidth + 4 > rect.width) x = clientX - rect.left - el.offsetWidth - 14;
+        if (y + el.offsetHeight + 4 > rect.height) y = clientY - rect.top - el.offsetHeight - 14;
+        el.style.left = `${Math.max(4, x)}px`;
+        el.style.top = `${Math.max(4, y)}px`;
+    }, [systems, fleets, global, rapport, currentPlayerId]);
 
 
     useEffect(() => {
@@ -1137,7 +1238,10 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
             cSel.restore();
         }
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone]);
+
+        // Le survol dépend de la géométrie (centre, taille de case) : on resynchronise l'overlay après chaque dessin
+        redrawHoverOverlay();
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
@@ -1178,6 +1282,29 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             y: torusDelta(c.y, col - Math.floor(cols / 2), BOUNDS.maxY),
         };
     }, [cellSize]);
+
+    // Survol : surligne la case et affiche un récapitulatif (masqué sur les en-têtes et pendant le drag)
+    const handleMouseMove = useCallback((evt: React.MouseEvent<HTMLCanvasElement>) => {
+        const cvs = canvasRef.current;
+        if (!cvs) return;
+        const rect = cvs.getBoundingClientRect();
+        let xy: XY | undefined;
+        const inGrid = evt.clientX - rect.left >= cellSize && evt.clientY - rect.top >= cellSize;
+        if (!dragRef.current.dragging && inGrid) {
+            xy = cellAt(evt.clientX, evt.clientY);
+        }
+        const prev = hoverRef.current;
+        const changed = !!prev !== !!xy || (!!prev && !!xy && (prev.x !== xy.x || prev.y !== xy.y));
+        hoverRef.current = xy;
+        updateTooltip(evt.clientX, evt.clientY, xy);
+        if (changed) redrawHoverOverlay();
+    }, [cellAt, cellSize, updateTooltip, redrawHoverOverlay]);
+
+    const handleMouseLeave = useCallback(() => {
+        hoverRef.current = undefined;
+        updateTooltip(0, 0, undefined);
+        redrawHoverOverlay();
+    }, [updateTooltip, redrawHoverOverlay]);
 
     const handleClick = (evt: React.MouseEvent<HTMLCanvasElement>) => {
         if (dragRef.current.moved) {
@@ -1303,6 +1430,23 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 onClick={handleClick}
                 onMouseDown={handleMouseDown}
                 onWheel={handleWheel}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
+            />
+            {/* Surcouche transparente : contour de la case survolée */}
+            <canvas
+                ref={hoverCanvasRef}
+                style={{position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none'}}
+            />
+            {/* Récapitulatif de la case survolée */}
+            <div
+                ref={tooltipRef}
+                style={{
+                    position: 'absolute', display: 'none', pointerEvents: 'none', zIndex: 200,
+                    background: 'rgba(15, 15, 20, 0.95)', border: '1px solid #555', borderRadius: 4,
+                    padding: '4px 8px', fontSize: '0.8em', color: '#ddd', whiteSpace: 'nowrap',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                }}
             />
         </div>);
 }
