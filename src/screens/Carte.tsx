@@ -407,6 +407,17 @@ export default function Carte() {
             stabilitySystemPos={stabilitySystemPos}
           />
           {showMiniMap && <MiniMap onCenter={(x, y) => setCenter({ x, y })} colorMode={colorMode} />}
+          {/* Légende des couleurs (mode Alliés/Ennemis) : la carte se suffit à elle-même au coup d'œil */}
+          {colorMode === 'status' && (
+            <div className="map-legend" title="Couleurs de possession des systèmes et des flottes">
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#09ca31' }} /> moi</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#224eff' }} /> alliance</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#ffff00' }} /> PNA</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#f80c0c' }} /> ennemi</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#999999' }} /> neutre</span>
+              <span className="map-legend-item"><span className="map-legend-dot map-legend-fleet" /> flotte</span>
+            </div>
+          )}
           <MapHelp />
 
           {/* Filtres Popup en bas à droite */}

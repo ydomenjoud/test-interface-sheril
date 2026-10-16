@@ -152,6 +152,45 @@ a {
     height: 160px;
 }
 
+/* Légende compacte des couleurs de possession (au-dessus du bouton d'aide) */
+.map-legend {
+    position: absolute;
+    left: 20px;
+    bottom: 60px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: rgba(10, 10, 10, 0.7);
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.75em;
+    color: #ccc;
+    z-index: 100;
+    pointer-events: none;
+}
+
+.map-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.map-legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.map-legend-fleet {
+    background: #fff;
+    border: 2px solid #888;
+    width: 8px;
+    height: 8px;
+}
+
 .combat-legend {
     font-size: 0.8em;
     color: #999;
