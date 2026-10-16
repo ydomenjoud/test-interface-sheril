@@ -63,10 +63,18 @@ si la borne max X est 40 : les coordonnées représentée vont de 33 à 12 en pa
 La carte occupe toute la hauteur disponible (pas de scroll vertical de la page), la grille se redimensionne en
 conséquence.
 
+Une légende compacte des couleurs de possession (moi / alliance / PNA / ennemi / neutre / flotte) est affichée en
+bas à gauche de la carte, en mode de couleur "Alliés/Ennemis".
+
+Les portées radar (systèmes et flottes) sont désactivées par défaut pour ne pas voiler la carte ; elles peuvent
+être activées dans les Filtres.
+
 #### interaction
 
 - Clic: lorsqu'on clique sur une position de la carte, la carte affiche les informations de la position cliquée dans la
   partie "information".
+- Survol (sans clic) : la case sous le curseur est surlignée et un encart récapitulatif s'affiche à proximité du
+  curseur (coordonnées, nom du système, possesseurs, nombre de flottes).
 - Clavier: flèches directionnelles (gauche, droite, haut, bas) déplacent le centre d'une case; avec Ctrl, déplacement
   par pas de 5 cases.
 - Drag souris: en maintenant le bouton gauche, on peut "panner" la carte; le centre se décale au rythme d'un pas de
@@ -76,6 +84,8 @@ conséquence.
   - Un rectangle (bleu clair) y affiche le viewport courant (zones visibles de la carte principale); gestion du wrap
     torique lorsque le viewport chevauche un bord.
   - Un clic sur la mini-carte recadre la carte principale autour du point visé (par offset relatif au centre).
+  - Un bouton "Minimap" dans la barre d'outils (et une case à cocher dans les Filtres) permet de l'afficher/masquer ;
+    elle est affichée par défaut.
 - Header: un bouton "Capitale" recentre la carte principale sur la capitale du joueur.
 
 ### données à afficher
@@ -118,14 +128,25 @@ orange allant du centre de la case actuelle vers le centre de la case cible (vis
 
 ### partie information
 
-Lorsqu'on clique sur une case non vide, la partie information affiche les informations de la case :
+Lorsqu'on clique sur une case, la partie information affiche d'abord un récapitulatif de la case en tête de
+panneau : il permet de voir l'essentiel en un coup d'œil.
 
-- coordonnées
-- détail système (s'il y en a un sur la case)
-  - nom, nombre de planètes
-  - liste des propriétaires (numéro de commandant)
-  - si système possédé par le joueur: détails planètes (propriétaire, bâtiment(s) avec info au survol, populations,
-    minerai, points de construction)
-- liste des flottes de la case
+- coordonnées (+ tour d'où viennent les données, et avertissement si les données sont d'un tour précédent)
+- récapitulatif :
+  - nom du système, liste des propriétaires (numéro de commandant), nombre de planètes, population
+  - si le système est possédé par le joueur : lien "détails" vers l'écran de détail du système (planètes, bâtiments,
+    populations, minerai, points de construction)
+  - nombre de flottes sur la case et total de vaisseaux
+
+Le reste des informations est organisé en sections, chacune n'étant affichée que s'il y a du contenu sur la case ;
+une case sans aucun contenu (ni système, ni flotte, ni combat, ni zone) affiche simplement "Case vide.".
+
+- liste des flottes de la case (et dernières flottes observées si la case n'a pas été vue au tour affiché)
   - propriétaire
-  - liste des vaisseaux (nom, puissance, nombre)
+  - nombre de vaisseaux
+  - puissance
+- mes flottes : les flottes du joueur situées sur la case, puis les plus proches atteignables ce tour ; la liste
+  complète (tri par nom ou distance, position) s'affiche sur demande
+- combats sur la case (cartes dépliables avec les détails)
+- zones couvrant la case (éditables)
+- notes de la case (le formulaire d'ajout est replié derrière un bouton)
