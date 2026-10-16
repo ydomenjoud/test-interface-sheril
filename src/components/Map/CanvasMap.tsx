@@ -952,12 +952,19 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
         }
 
-        // flottes
+        // flottes : un seul marqueur par case, étiqueté au nombre total de flottes sur la case
         if (showFleetBadges) {
+            const fleetCells = new Map<string, any[]>();
             fleets.forEach(f => {
-                let dx = ((f.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
-                let dy = ((f.pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+                const k = `${f.pos.x}_${f.pos.y}`;
+                const arr = fleetCells.get(k);
+                if (arr) arr.push(f); else fleetCells.set(k, [f]);
+            });
 
+            fleetCells.forEach(fGroup => {
+                const pos = fGroup[0].pos;
+                let dx = ((pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+                let dy = ((pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
                 while (dx < cols) {
                     if (dx === 0) {
                         dx += BOUNDS.maxY;
@@ -969,10 +976,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                             currentDy += BOUNDS.maxX;
                             continue;
                         }
-                        const px = dx * cellSize;
-                        const py = currentDy * cellSize;
-
-                        renderFleet(f, px, py);
+                        renderFleetCell(fGroup, dx * cellSize, currentDy * cellSize);
                         currentDy += BOUNDS.maxX;
                     }
                     dx += BOUNDS.maxY;
@@ -980,87 +984,78 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             });
         }
 
-        function renderFleet(f: any, px: number, py: number) {
+        function renderFleetCell(fGroup: any[], px: number, py: number) {
+            const count = fGroup.length;
             const diameter = Math.max(10, Math.floor(cellSize / 3));
             const cx = px + cellSize / 2;
             const cy = py + cellSize / 2;
             const c2d = ctx as CanvasRenderingContext2D;
+            const owners = Array.from(new Set(fGroup.map(f => f.owner)));
+            const isSelected = fGroup.some(f => isFleetSelected(f.owner));
+
             c2d.save();
-            if (!isFleetSelected((f as any).owner)) {
+            if (!isSelected) {
                 c2d.filter = 'grayscale(1)';
             }
 
-            const ownerColor = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global) || '#000000';
-            const badgeColor = '#ffffff';
-            const textColor = '#000000';
-            const strokeColor = ownerColor;
-
-            c2d.fillStyle = badgeColor;
+            const ownerColor = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global) || '#000000';
+            c2d.fillStyle = '#ffffff';
             c2d.beginPath();
             c2d.arc(cx, cy, diameter / 2, 0, Math.PI * 2);
             c2d.fill();
 
-            c2d.strokeStyle = strokeColor;
+            c2d.strokeStyle = ownerColor;
             c2d.lineWidth = Math.max(1, Math.floor(cellSize * 0.06));
             c2d.stroke();
 
-            const ships = typeof (f as any).nbVso === 'number' ? (f as any).nbVso : undefined;
-            const label = ships && ships > 1 ? String(ships) : 'F';
-            c2d.fillStyle = textColor;
-            c2d.font = `bold ${Math.max(8, Math.floor(diameter * 0.55))}px sans-serif`;
+            // Étiquette : nombre total de flottes sur la case (toujours le même type d'information)
+            const label = String(count);
+            c2d.fillStyle = '#000000';
+            c2d.font = `bold ${Math.max(8, Math.floor(diameter * (label.length > 1 ? 0.45 : 0.55)))}px sans-serif`;
             c2d.textAlign = 'center';
             c2d.textBaseline = 'middle';
             c2d.fillText(label, cx, cy + 0.5);
 
-            // Flèche de direction (flottes du joueur uniquement, si "direction" est défini)
-            const t = (f as any).direction;
-            if (t) {
-                const tdx = ((t.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
-                const tdy = ((t.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
-                const tx = tdx * cellSize + cellSize / 2;
-                const ty = tdy * cellSize + cellSize / 2;
-
-                // ne tracer que si la cible est dans le viewport
-                if (tx >= 0 && ty >= 0 && tx <= cols * cellSize && ty <= rows * cellSize) {
-                    const sx = px + cellSize / 2;
-                    const sy = py + cellSize / 2;
-
-                    // dessiner une flèche orange
-                    const drawArrow = (c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) => {
-                        const headLen = Math.max(6, Math.floor(cellSize * 0.25));
-                        const angle = Math.atan2(y2 - y1, x2 - x1);
-                        c.save();
-
-                        // Clip pour éviter de dessiner sur les en-têtes (colonne 0 et ligne 0)
-                        c.beginPath();
-                        c.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
-                        c.clip();
-
-                        c.strokeStyle = '#ff9800';
-                        c.fillStyle = '#ff9800';
-                        c.lineWidth = 2;
-                        c.beginPath();
-                        c.moveTo(x1, y1);
-                        c.lineTo(x2, y2);
-                        c.stroke();
-                        // pointe de flèche
-                        c.beginPath();
-                        c.moveTo(x2, y2);
-                        c.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
-                        c.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
-                        c.closePath();
-                        c.fill();
-                        c.restore();
-                    };
-
-                    drawArrow(c2d as CanvasRenderingContext2D, sx, sy, tx, ty);
+            // Flèches de direction (une par flotte du groupe qui en a une, flottes du joueur uniquement)
+            fGroup.forEach(f => {
+                const t = f.direction;
+                if (t) {
+                    const tdx = ((t.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+                    const tdy = ((t.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+                    const tx = tdx * cellSize + cellSize / 2;
+                    const ty = tdy * cellSize + cellSize / 2;
+                    if (tx >= 0 && ty >= 0 && tx <= cols * cellSize && ty <= rows * cellSize) {
+                        const drawArrow = (c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) => {
+                            const headLen = Math.max(6, Math.floor(cellSize * 0.25));
+                            const angle = Math.atan2(y2 - y1, x2 - x1);
+                            c.save();
+                            c.beginPath();
+                            c.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
+                            c.clip();
+                            c.strokeStyle = '#ff9800';
+                            c.fillStyle = '#ff9800';
+                            c.lineWidth = 2;
+                            c.beginPath();
+                            c.moveTo(x1, y1);
+                            c.lineTo(x2, y2);
+                            c.stroke();
+                            c.beginPath();
+                            c.moveTo(x2, y2);
+                            c.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+                            c.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+                            c.closePath();
+                            c.fill();
+                            c.restore();
+                        };
+                        drawArrow(c2d, cx, cy, tx, ty);
+                    }
                 }
-            }
+            });
             c2d.restore();
 
-            // Contour fin autour du badge de flotte (remplace l'ancien halo lumineux)
-            if (isFleetSelected((f as any).owner)) {
-                const col = colorForOwnership(currentPlayerId, [(f as any).owner], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global);
+            // Contour fin si la flotte correspond au filtre (remplace l'ancien halo lumineux)
+            if (isSelected) {
+                const col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global);
                 const cRing = ctx as CanvasRenderingContext2D;
                 cRing.save();
                 cRing.strokeStyle = col || '#000000';
