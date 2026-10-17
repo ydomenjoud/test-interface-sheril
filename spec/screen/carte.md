@@ -176,6 +176,9 @@ panneau : il permet de voir l'essentiel en un coup d'œil.
 - coordonnées (+ tour d'où viennent les données, et avertissement si les données sont d'un tour précédent)
 - récapitulatif du système (affiché uniquement s'il y a un système sur la case) :
   - nom du système, liste des propriétaires (numéro de commandant), nombre de planètes, population
+  - capacité de réparation par tour (sommée sur les bâtiments des planètes : caractéristique « capacité
+    réparation vaisseaux » de data.xml — p. ex. chantier naval +20, centre de réparation spatial I +100, II +400,
+    III +1350, IV +3200, V +6250) ; affichée uniquement si le système a des planètes connues
   - si le système est possédé par le joueur : lien "détails" vers l'écran de détail du système (planètes, bâtiments,
     populations, minerai, points de construction)
   - si le système n'est plus dans les données du tour affiché (vu dans un tour précédent) : les dernières
@@ -192,7 +195,8 @@ une case sans aucun contenu (ni système, ni flotte, ni combat, ni zone) affiche
 - mes flottes : une seule liste de toutes les flottes du joueur, avec des colonnes triables (Nom, Distance,
   Vitesse, AS, AP) et la Position ; les flottes hors de portée ce tour sont en orange estompé (légende sous la
   liste) ; survoler une ligne affiche le détail de la flotte (position, direction, vitesse, directive, AS / AP,
-  scan, nombre et composition des vaisseaux, distance et portée)
+  scan, nombre et composition des vaisseaux, distance et portée) ET surligne la case de la flotte sur la carte
+  (voile clair + contour, par-dessus les flèches)
 - combats sur la case (cartes dépliables avec les détails)
 - zones couvrant la case (éditables)
 - notes de la case (le formulaire d'ajout est replié derrière un bouton)
@@ -206,7 +210,8 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 
 - Un mousedown sur une case occupée par au moins une flotte du joueur ouvre le sélecteur de flotte (« Déplace une
   flotte »), ancré sur le point de clic : il liste les flottes de la case avec leur déplacement en cours éventuel
-  (« déjà déplacée → 0_x_y »).
+  (« déjà déplacée → 0_x_y »). La fenêtre est déplaçable en saisissant son en-tête (pour ne pas masquer
+  d'informations importantes) ; le bouton × et le drag des lignes ne sont pas affectés.
 - Un simple clic reste une sélection de case (le sélecteur se referme au mousedown suivant) ; le pan et les zones
   Alt + clic + glisser sont inchangés — un pan qui démarre sur la case annule le sélecteur, et Alt + clic n'ouvre
   jamais le sélecteur (Alt est réservé aux zones).
@@ -237,7 +242,8 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 - La flèche d'ordre de déplacement est dessinée dans un passage dédié PAR-DESSUS TOUT le reste de la carte
   (disques de flottes, marqueurs de combat, cadre de sélection) : la cible commandée n'est jamais masquée
   (seul le tracé du glisser en cours se dessine au-dessus).
-- Couleur de la flèche : orange (#ff9800) si la destination est à portée de la flotte, rouge (#f44336) sinon.
+- Couleur de la flèche : verte (#4caf50) si la destination est à portée de la flotte ce tour, rouge (#f44336) sinon.
+  L'orange (#ff9800) est réservé aux flèches de « direction » préexistantes du rapport.
 
 ### panneau « Déplacements »
 
@@ -246,9 +252,10 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
   visible, en-tête cliquable « Déplacements (n) » (▸/▾), largeur animée 170 px replié (assez large pour lire
   « Déplacements (n) ») / 560 px déplié (un déplacement par ligne) ; une icône ⇢ dans la barre d'outils pilote le
   même état. Le panneau se déplie tout seul au premier dépos.
-- Déplié, chaque déplacement tient sur UNE ligne : numéro et nom (ou « Flotte #n » si la flotte n'est plus dans le
-  rapport, tronqué avec ellipsis si trop long), origine → destination (coordonnées x_y) suivie de la distance
-  torique en rouge quand elle est hors de portée (à distance normale sinon), un ⚠ ambre compact (infobulle « déjà en
+- Déplié, chaque déplacement tient sur UNE ligne : nom de la flotte puis son numéro « Nom (#n) » (ou « Flotte #n » si
+  la flotte n'est plus dans le rapport, tronqué avec ellipsis si trop long), origine → destination où chaque case
+  s'affiche au NOM du système qui l'occupe quand il y en a un (coordonnées au survol), sinon en coordonnées x_y ;
+  suivi de la distance torique en rouge quand elle est hors de portée (à distance normale sinon), un ⚠ ambre compact (infobulle « déjà en
   route vers x_y ») si le rapport avait une direction, deux menus — « Directive » et « Stratégie » — pour choisir
   les valeurs de l'ordre, et un bouton × pour supprimer ce déplacement.
 - Vide : mention d'aide (cliquer une case de flotte, glisser une ligne sur la destination).

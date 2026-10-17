@@ -40,6 +40,8 @@ export default function Carte() {
     setZonePreview(undefined); // validée ou annulée, l'aperçu disparaît
   }, []);
   const [selected, setSelected] = useState<XY | undefined>(undefined);
+  // Case mise en surbrillance sur la carte quand on survole une ligne de flotte du panneau info
+  const [hoverFleetPos, setHoverFleetPos] = useState<XY | undefined>(undefined);
   const [showFleetsFor, setShowFleetsFor] = useState<XY | undefined>(undefined);
   const [showGoto, setShowGoto] = useState(false);
   const [selectedOwners, setSelectedOwners] = useState<(number)[]>(() => {
@@ -442,6 +444,20 @@ export default function Carte() {
     for (const [num, deplacement] of Object.entries(deplacements)) cibles[Number(num)] = deplacement.to;
     return cibles;
   }, [deplacements]);
+  // Nom du système par position (priorité : systèmes du joueur > détectés > carte galactique,
+  // premier trouvé) : les lignes du panneau Déplacements affichent le nom quand la case en porte un
+  const nomSystemeByPos = useMemo(() => {
+    const map = new Map<string, string>();
+    const add = (s: { nom?: string; pos?: { x: number; y: number } } | null | undefined) => {
+      if (!s || !s.pos || !s.nom) return;
+      const key = `${s.pos.x}_${s.pos.y}`;
+      if (!map.has(key)) map.set(key, s.nom);
+    };
+    (rapport?.systemesJoueur || []).forEach(add);
+    (rapport?.systemesDetectes || []).forEach(add);
+    (global?.systemes || []).forEach(add);
+    return map;
+  }, [rapport, global]);
 
   const copierLeSchema = async () => {
     const ok = await copierSchema(schemaDeplacements(ordresDeplacement));
@@ -587,6 +603,7 @@ export default function Carte() {
               }
             }}
             selected={selected}
+            highlightPos={hoverFleetPos}
             showFleetsFor={showFleetsFor}
             showSystems={showSystems}
             showGlobalSystems={showGlobalSystems}
@@ -965,19 +982,28 @@ export default function Carte() {
                         const origine = flotte?.pos;
                         const dist = origine ? getTorusDistance(origine, to) : undefined;
                         const dansPortee = dist !== undefined && flotte ? dist <= flotte.vitesse : false;
+                        // Coordonnées d'une case : nom du système s'il existe (coordonnées au survol),
+                        // sinon les coordonnées seules
+                        const coordSpan = (pos: XY) => {
+                          const nom = nomSystemeByPos.get(`${pos.x}_${pos.y}`);
+                          return nom
+                            ? <span title={`${nom} (${posToString(pos)})`}>{nom}</span>
+                            : <span>{posToString(pos)}</span>;
+                        };
                         // Un déplacement par LIGNE : nom (tronqué si long), origine → destination (distance en
                         // rouge si hors de portée), ⚠ compacte, menus directive/stratégie, ×
                         return (
                           <div key={num} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div
                               style={{ flex: 1, fontSize: '0.85em', color: '#ddd', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                              title={flotte ? `Flotte ${num + 1} — ${flotte.nom}` : `Flotte ${num + 1} (absente du rapport affiché)`}
+                              title={flotte ? `${flotte.nom} (#${num + 1})` : `Flotte #${num + 1} (absente du rapport affiché)`}
                             >
-                              <strong>Flotte #{num + 1}</strong>
-                              {flotte ? <span style={{ color: '#aaa' }}> — {flotte.nom}</span> : null}
+                              {flotte
+                                ? <><strong>{flotte.nom}</strong><span style={{ color: '#aaa' }}> (#{num + 1})</span></>
+                                : <strong>Flotte #{num + 1}</strong>}
                             </div>
                             <div style={{ fontFamily: 'monospace', fontSize: '0.8em', color: '#bbb', flexShrink: 0 }}>
-                              {origine ? posToString(origine) : '—'} → {posToString(to)}
+                              {origine ? coordSpan(origine) : '—'} → {coordSpan(to)}
                               {dist !== undefined && (
                                 <span
                                   title={dansPortee ? undefined : 'Hors de portée (distance > vitesse)'}
@@ -1094,7 +1120,7 @@ export default function Carte() {
         </div>
       </div>
 
-      <InfoPanel selected={selected} />
+      <InfoPanel selected={selected} onFleetHover={setHoverFleetPos} />
 
       {showGoto && (
         <GotoDialog
