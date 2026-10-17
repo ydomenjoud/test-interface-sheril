@@ -107,6 +107,7 @@ type Props = {
     // ---- Ordres de déplacement (drag & drop de flottes) ----
     deplacements?: Record<number, XY>; // flotteNum → cible commandée
     dragFleet?: { from: XY; vitesse: number; cursor: XY } | null; // drag en cours : anneau de vitesse + ligne + distance
+    highlightPos?: XY; // case à surbriller (survol d'une flotte dans le panneau info)
     onAnyCanvasMouseDown?: () => void; // tout clic gauche sur la carte (avant la logique de pan)
     onFleetCellMouseDown?: (cell: XY, clientX: number, clientY: number) => void; // clic gauche sur une case avec ≥1 flotte du joueur
     onFleetCellGestureAbort?: () => void; // mousedown sur une case de flotte qui se transforme en pan
@@ -148,7 +149,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
 }
 
 export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
-                       deplacements, dragFleet, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort, onFleetDragOver, onFleetDragLeave, onFleetDrop}: Props) {
+                       deplacements, dragFleet, highlightPos, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort, onFleetDragOver, onFleetDragLeave, onFleetDrop}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     // Case survolée : dessinée sur un canvas séparé pour ne pas redessiner toute la carte à chaque mouvement de souris
@@ -1364,8 +1365,10 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 let ddy = t.y - f.pos.y;
                 if (ddy > BOUNDS.maxY / 2) ddy -= BOUNDS.maxY;
                 if (ddy < -BOUNDS.maxY / 2) ddy += BOUNDS.maxY;
-                // Hors de la portée de la flotte : flèche rouge (à portée : orange)
-                const cDeplacement = getTorusDistance(f.pos, t) > f.vitesse ? '#f44336' : '#ff9800';
+                // Hors de la portée de la flotte : flèche rouge (à portée : verte).
+                // L'orange (#ff9800) est déjà utilisé par les flèches de direction préexistantes,
+                // d'où le vert/rouge pour les ordres de déplacement en attente.
+                const cDeplacement = getTorusDistance(f.pos, t) > f.vitesse ? '#f44336' : '#4caf50';
                 // La flèche part de chaque copie de la case de la flotte visible dans le viewport
                 // (viewport plus grand que le tore : mêmes copies que le passage des disques)
                 let dx = ((f.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
@@ -1389,6 +1392,36 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     }
                     dx += BOUNDS.maxY;
                 }
+            }
+        }
+
+        // SURBRILLANCE DE CASE (survol d'une flotte dans le panneau info) : par-dessus les flèches,
+        // sous le drag en cours
+        if (highlightPos) {
+            const hCtx = ctx as CanvasRenderingContext2D;
+            let dx = ((highlightPos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+            let dy = ((highlightPos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+            while (dx < cols) {
+                if (dx === 0) {
+                    dx += BOUNDS.maxY;
+                    continue;
+                }
+                let currentDy = dy;
+                while (currentDy < rows) {
+                    if (currentDy === 0) {
+                        currentDy += BOUNDS.maxX;
+                        continue;
+                    }
+                    hCtx.save();
+                    hCtx.fillStyle = 'rgba(255, 224, 130, 0.18)';
+                    hCtx.fillRect(dx * cellSize, currentDy * cellSize, cellSize, cellSize);
+                    hCtx.strokeStyle = '#ffe082';
+                    hCtx.lineWidth = 2;
+                    hCtx.strokeRect(dx * cellSize + 1, currentDy * cellSize + 1, cellSize - 2, cellSize - 2);
+                    hCtx.restore();
+                    currentDy += BOUNDS.maxX;
+                }
+                dx += BOUNDS.maxY;
             }
         }
 
@@ -1479,7 +1512,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         // Le survol dépend de la géométrie (centre, taille de case) : on resynchronise l'overlay après chaque dessin
         redrawHoverOverlay();
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
