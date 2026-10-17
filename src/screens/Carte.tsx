@@ -15,6 +15,26 @@ import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
 import {loadDeplacements, saveDeplacements, clearDeplacements} from '../storage/deplacementOrdersStorage';
 import {CDT_DEFAUT, DeplacementEnAttente, DeplacementOrdre, DIRECTIVE_CDT, DIRECTIVE_DEFAUT, OPTIONS_DIRECTIVES, STRATEGIE_DEFAUT, schemaDeplacements} from '../utils/ordreDeplacement';
 import {copierSchema} from '../utils/ordreSchema';
+import {
+  IconSystem,
+  IconRadarSystem,
+  IconRadarFleet,
+  IconMiniMap,
+  IconHelp,
+  IconSliders,
+  IconFleetMove,
+  IconPlay,
+  IconStop,
+  IconAlert,
+  IconClipboard,
+  IconCheck,
+  IconRefresh,
+  IconClose,
+  IconChevronDown,
+  IconChevronRight,
+  IconChevronUp,
+  IconArrowRight,
+} from '../components/icons/Icons';
 
 // Libellé du commandant visé par la directive « Attaque flottes cdt » (infobulle du menu)
 const commandantViserLabel = (globalData: GlobalData | undefined, num: number): string =>
@@ -24,15 +44,21 @@ const commandantViserLabel = (globalData: GlobalData | undefined, num: number): 
 const DEFAULT_PLAY_STEP_S = 2;
 const MAX_PLAY_STEP_S = 60;
 
-// Boutons du panneau des déplacements (mêmes codes que l'écran Planification des Revenus)
+// Boutons du panneau des déplacements
 const styleBoutonDeplacement: React.CSSProperties = {
-    backgroundColor: '#333',
-    color: '#fff',
-    border: '1px solid #555',
-    borderRadius: 4,
-    padding: '4px 8px',
-    fontSize: '0.85em',
-    cursor: 'pointer'
+    backgroundColor: '#262c36',
+    color: '#e2e8f0',
+    border: '1px solid #475569',
+    borderRadius: 6,
+    padding: '6px 10px',
+    fontSize: '0.85rem',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    fontWeight: 500,
+    transition: 'background-color 0.15s, border-color 0.15s',
 };
 
 export default function Carte() {
@@ -510,17 +536,73 @@ export default function Carte() {
         {!global && (
           <div className="carte-toolbar-status">Données globales en chargement…</div>
         )}
-        {/* Filtres rapides : icônes discrètes, les options avancées sont dans le panneau Filtres (⚙) */}
+        {/* Filtres rapides : icônes modernes et accessibles */}
         <div className="carte-toolbar-group" role="group" aria-label="Filtres rapides">
-          <button type="button" className={showSystems ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Afficher / masquer les systèmes" onClick={() => setShowSystems(v => !v)}>✦</button>
-          <button type="button" className={showSystemRadar ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Portée radar des systèmes" onClick={() => setShowSystemRadar(v => !v)}>◎</button>
-          <button type="button" className={showFleetRadar ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Portée radar des flottes" onClick={() => setShowFleetRadar(v => !v)}>◉</button>
-          <button type="button" className={showMiniMap ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Afficher / masquer la mini-carte" onClick={() => setShowMiniMap(v => !v)}>▣</button>
+          <button
+            type="button"
+            className={showSystems ? 'carte-icon-btn active' : 'carte-icon-btn'}
+            title="Afficher / masquer les systèmes (✦)"
+            aria-label="Afficher / masquer les systèmes"
+            onClick={() => setShowSystems(v => !v)}
+          >
+            <IconSystem size={15} />
+          </button>
+          <button
+            type="button"
+            className={showSystemRadar ? 'carte-icon-btn active' : 'carte-icon-btn'}
+            title="Portée radar des systèmes (◎)"
+            aria-label="Portée radar des systèmes"
+            onClick={() => setShowSystemRadar(v => !v)}
+          >
+            <IconRadarSystem size={15} />
+          </button>
+          <button
+            type="button"
+            className={showFleetRadar ? 'carte-icon-btn active' : 'carte-icon-btn'}
+            title="Portée radar des flottes (◉)"
+            aria-label="Portée radar des flottes"
+            onClick={() => setShowFleetRadar(v => !v)}
+          >
+            <IconRadarFleet size={15} />
+          </button>
+          <button
+            type="button"
+            className={showMiniMap ? 'carte-icon-btn active' : 'carte-icon-btn'}
+            title="Afficher / masquer la mini-carte (▣)"
+            aria-label="Afficher / masquer la mini-carte"
+            onClick={() => setShowMiniMap(v => !v)}
+          >
+            <IconMiniMap size={15} />
+          </button>
           <MapHelp renderTrigger={open => (
-            <button type="button" className="carte-icon-btn" title="Aide et raccourcis (?)" onClick={open}>?</button>
+            <button
+              type="button"
+              className="carte-icon-btn"
+              title="Aide et raccourcis (?)"
+              aria-label="Aide et raccourcis"
+              onClick={open}
+            >
+              <IconHelp size={15} />
+            </button>
           )} />
-          <button type="button" className={filtersExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Filtres avancés" onClick={() => setFiltersExpanded(v => !v)}>⚙</button>
-          <button type="button" className={deplacementsExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Déplacements de flottes (glisser-déposer)" onClick={() => setDeplacementsExpanded(v => !v)}>⇢</button>
+          <button
+            type="button"
+            className={filtersExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'}
+            title="Filtres avancés (⚙)"
+            aria-label="Filtres avancés"
+            onClick={() => setFiltersExpanded(v => !v)}
+          >
+            <IconSliders size={15} />
+          </button>
+          <button
+            type="button"
+            className={deplacementsExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'}
+            title={`Déplacements de flottes (${nbDeplacements}) (⇢)`}
+            aria-label="Déplacements de flottes"
+            onClick={() => setDeplacementsExpanded(v => !v)}
+          >
+            <IconFleetMove size={15} />
+          </button>
         </div>
         {/* Historique : tour affiché + lecture */}
         {tourOptions.length > 0 && (
@@ -548,8 +630,9 @@ export default function Carte() {
               className="carte-btn"
               onClick={playing ? stopPlay : startPlay}
               title={playing ? 'Arrêter la lecture' : `Rejouer tous les tours depuis le premier (un tour toutes les ${playStepS} s, zones masquées)`}
+              aria-label={playing ? 'Arrêter la lecture' : 'Rejouer les tours'}
             >
-              {playing ? '■' : '▶'}
+              {playing ? <IconStop size={12} /> : <IconPlay size={12} />}
             </button>
             <label title="Durée d'affichage de chaque tour pendant la lecture" className="carte-toolbar-label">
               <input
@@ -649,37 +732,43 @@ export default function Carte() {
               position: 'absolute',
               top: 8,
               right: 8,
-              width: filtersExpanded ? 280 : 120,
-              backgroundColor: '#222',
-              border: '1px solid #444',
+              width: filtersExpanded ? 290 : 120,
+              backgroundColor: 'rgba(15, 23, 42, 0.96)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid #334155',
               borderRadius: 8,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.6)',
               zIndex: 100,
               display: 'flex',
               flexDirection: 'column',
               // Le panneau ne dépasse pas la zone de la carte : l'en-tête reste accessible et le contenu défile
               maxHeight: 'calc(100% - 16px)',
-              transition: 'width 0.3s ease'
+              transition: 'width 0.25s ease'
           }}>
               <div
                   onClick={() => setFiltersExpanded(!filtersExpanded)}
                   style={{
                       padding: '8px 12px',
-                      backgroundColor: '#333',
-                      borderBottom: filtersExpanded ? '1px solid #444' : 'none',
+                      backgroundColor: '#1e2530',
+                      borderBottom: filtersExpanded ? '1px solid #334155' : 'none',
                       borderRadius: filtersExpanded ? '8px 8px 0 0' : 8,
                       cursor: 'pointer',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       fontWeight: 'bold',
-                      fontSize: '0.9em',
-                      color: '#eee',
+                      fontSize: '0.875rem',
+                      color: '#f1f5f9',
                       flexShrink: 0
                   }}
               >
-                  <span>Filtres</span>
-                  <span>{filtersExpanded ? '▼' : '▲'}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <IconSliders size={15} color="#38bdf8" />
+                    Filtres
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', color: '#94a3b8' }}>
+                    {filtersExpanded ? <IconChevronDown size={15} /> : <IconChevronUp size={15} />}
+                  </span>
               </div>
 
               {filtersExpanded && (
@@ -932,24 +1021,25 @@ export default function Carte() {
             position: 'absolute',
             top: 8,
             left: 8,
-            width: deplacementsExpanded ? 560 : 170, // replié : assez large pour lire « Déplacements (n) » ; déplié : un déplacement par ligne
-            backgroundColor: '#222',
-            border: '1px solid #444',
+            width: deplacementsExpanded ? 580 : 180, // replié : assez large pour lire « Déplacements (n) » ; déplié : un déplacement par ligne
+            backgroundColor: 'rgba(15, 23, 42, 0.96)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid #334155',
             borderRadius: 8,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+            boxShadow: '0 8px 20px rgba(0,0,0,0.6)',
             zIndex: 100,
             display: 'flex',
             flexDirection: 'column',
             // Le panneau ne dépasse pas la zone de la carte : l'en-tête reste accessible et le contenu défile
             maxHeight: 'calc(100% - 16px)',
-            transition: 'width 0.3s ease'
+            transition: 'width 0.25s ease'
           }}>
             <div
               onClick={() => setDeplacementsExpanded(!deplacementsExpanded)}
               style={{
                 padding: '8px 12px',
-                backgroundColor: '#333',
-                borderBottom: deplacementsExpanded ? '1px solid #444' : 'none',
+                backgroundColor: '#1e2530',
+                borderBottom: deplacementsExpanded ? '1px solid #334155' : 'none',
                 borderRadius: deplacementsExpanded ? '8px 8px 0 0' : 8,
                 cursor: 'pointer',
                 display: 'flex',
@@ -957,23 +1047,26 @@ export default function Carte() {
                 alignItems: 'center',
                 gap: 8,
                 fontWeight: 'bold',
-                fontSize: '0.9em',
-                color: '#eee',
+                fontSize: '0.875rem',
+                color: '#f1f5f9',
                 flexShrink: 0
               }}
             >
-              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <IconFleetMove size={15} color="#38bdf8" />
                 Déplacements ({nbDeplacements})
               </span>
-              <span style={{ flexShrink: 0 }}>{deplacementsExpanded ? '▾' : '▸'}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, color: '#94a3b8' }}>
+                {deplacementsExpanded ? <IconChevronDown size={15} /> : <IconChevronRight size={15} />}
+              </span>
             </div>
             {deplacementsExpanded && (
               <>
                 <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
                   {nbDeplacements === 0 ? (
-                    <div style={{ color: '#666', fontSize: '0.85em' }}>
-                      Aucun déplacement — cliquer une case occupée par vos flottes, puis glisser une
-                      flotte sur sa case de destination.
+                    <div style={{ color: '#94a3b8', fontSize: '0.85rem', padding: '4px 0' }}>
+                      Aucun déplacement — cliquez sur une case occupée par vos flottes, puis glissez une
+                      flotte vers sa destination.
                     </div>
                   ) : (
                     Object.entries(deplacements)
@@ -996,32 +1089,34 @@ export default function Carte() {
                         // Un déplacement par LIGNE : nom (tronqué si long), origine → destination (distance en
                         // rouge si hors de portée), ⚠ compacte, menus directive/stratégie, ×
                         return (
-                          <div key={num} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div key={num} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0' }}>
                             <div
-                              style={{ flex: 1, fontSize: '0.85em', color: '#ddd', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                              style={{ flex: 1, fontSize: '0.85rem', color: '#f1f5f9', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                               title={flotte ? `${flotte.nom} (#${num + 1})` : `Flotte #${num + 1} (absente du rapport affiché)`}
                             >
                               {flotte
-                                ? <><strong>{flotte.nom}</strong><span style={{ color: '#aaa' }}> (#{num + 1})</span></>
+                                ? <><strong>{flotte.nom}</strong><span style={{ color: '#94a3b8', marginLeft: 4 }}>(#{num + 1})</span></>
                                 : <strong>Flotte #{num + 1}</strong>}
                             </div>
-                            <div style={{ fontFamily: 'monospace', fontSize: '0.8em', color: '#bbb', flexShrink: 0 }}>
-                              {origine ? coordSpan(origine) : '—'} → {coordSpan(to)}
+                            <div style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#cbd5e1', flexShrink: 0, display: 'inline-flex', alignItems: 'center' }}>
+                              {origine ? coordSpan(origine) : '—'}
+                              <IconArrowRight size={11} style={{ margin: '0 4px', color: '#64748b' }} />
+                              {coordSpan(to)}
                               {dist !== undefined && (
                                 <span
                                   title={dansPortee ? undefined : 'Hors de portée (distance > vitesse)'}
-                                  style={{ color: dansPortee ? undefined : '#f44336', fontWeight: dansPortee ? undefined : 'bold' }}
+                                  style={{ color: dansPortee ? '#94a3b8' : '#f87171', fontWeight: dansPortee ? undefined : 'bold', marginLeft: 4 }}
                                 >
-                                  {' '}({dist})
+                                  ({dist})
                                 </span>
                               )}
                             </div>
                             {flotte?.direction && (
                               <span
                                 title={`Déjà en route vers ${posToString(flotte.direction)} dans le rapport`}
-                                style={{ color: '#ff9800', flexShrink: 0, fontSize: '0.85em' }}
+                                style={{ display: 'inline-flex', alignItems: 'center', color: '#f59e0b', flexShrink: 0 }}
                               >
-                                ⚠
+                                <IconAlert size={14} />
                               </span>
                             )}
                             {/* Menu de directive (sans libellé : évident en contexte) — libellés de la règle 4.4, ordre de
@@ -1055,6 +1150,7 @@ export default function Carte() {
                             <button
                               type="button"
                               title="Supprimer ce déplacement"
+                              aria-label="Supprimer ce déplacement"
                               onClick={() => setDeplacements(d => {
                                 const reste = { ...d };
                                 delete reste[num];
@@ -1064,20 +1160,26 @@ export default function Carte() {
                                 flexShrink: 0,
                                 background: 'transparent',
                                 border: 'none',
-                                color: '#a66',
+                                color: '#f87171',
                                 cursor: 'pointer',
-                                padding: '0 4px',
-                                fontSize: '1.1em'
+                                padding: '2px 4px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: 4,
+                                opacity: 0.8,
                               }}
+                              onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                              onMouseLeave={e => (e.currentTarget.style.opacity = '0.8')}
                             >
-                              ×
+                              <IconClose size={14} />
                             </button>
                           </div>
                         );
                       })
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: 8, padding: '8px 12px', borderTop: '1px solid #444', flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: 8, padding: '8px 12px', borderTop: '1px solid #334155', flexShrink: 0 }}>
                   <button
                     type="button"
                     onClick={copierLeSchema}
@@ -1086,12 +1188,17 @@ export default function Carte() {
                     style={{
                       ...styleBoutonDeplacement,
                       flex: 1,
-                      textDecoration: 'underline dotted',
-                      opacity: nbDeplacements === 0 ? 0.3 : 1,
+                      opacity: nbDeplacements === 0 ? 0.35 : 1,
                       cursor: nbDeplacements === 0 ? 'default' : 'pointer'
                     }}
                   >
-                    {copieSchema === 'ok' ? '✓ Schéma copié' : copieSchema === 'ko' ? '✗ Échec de la copie' : '📋 Copier le schéma (à venir)'}
+                    {copieSchema === 'ok' ? (
+                      <><IconCheck size={14} color="#4ade80" /> Schéma copié</>
+                    ) : copieSchema === 'ko' ? (
+                      <><IconAlert size={14} color="#f87171" /> Échec de la copie</>
+                    ) : (
+                      <><IconClipboard size={14} /> Copier le schéma (à venir)</>
+                    )}
                   </button>
                   <button
                     type="button"
@@ -1100,12 +1207,11 @@ export default function Carte() {
                     title="Retirer tous les déplacements de ce tour"
                     style={{
                       ...styleBoutonDeplacement,
-                      textDecoration: 'underline dotted',
-                      opacity: nbDeplacements === 0 ? 0.3 : 1,
+                      opacity: nbDeplacements === 0 ? 0.35 : 1,
                       cursor: nbDeplacements === 0 ? 'default' : 'pointer'
                     }}
                   >
-                    ↺ Tout réinitialiser
+                    <IconRefresh size={14} /> Tout réinitialiser
                   </button>
                 </div>
               </>

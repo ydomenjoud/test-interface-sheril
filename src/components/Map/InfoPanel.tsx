@@ -19,6 +19,7 @@ import { isObserved, lastKnownFleets } from '../../utils/fleetHistory';
 import { lastKnownSystem } from '../../utils/systemHistory';
 import { fleetSnapshotOf } from '../../storage/rapportStore';
 import {capaciteReparation} from '../../utils/reparation';
+import {IconAlert} from '../icons/Icons';
 
 type Props = {
   selected?: XY;
@@ -30,9 +31,14 @@ type Props = {
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
 // Ligne issue d'un tour précédent : texte grisé et icône d'avertissement à côté du nom
-const staleRowStyle: React.CSSProperties = { color: '#999' };
+const staleRowStyle: React.CSSProperties = { color: '#94a3b8' };
 const StaleIcon = () => (
-  <span title="Information d'un tour précédent, peut-être obsolète" style={{ marginRight: 6, color: '#ffb000', cursor: 'help' }}>⚠</span>
+  <span
+    title="Information d'un tour précédent, peut-être obsolète"
+    style={{ display: 'inline-flex', alignItems: 'center', marginRight: 6, color: '#f59e0b', verticalAlign: -1, cursor: 'help' }}
+  >
+    <IconAlert size={14} />
+  </span>
 );
 
 
@@ -220,15 +226,16 @@ export default function InfoPanel({ selected, onFleetHover }: Props) {
         <h3>
           Case <Position pos={selected} />
           {rapport && (
-            <span style={{ marginLeft: 10, fontSize: '0.7em', fontWeight: 'normal', color: '#aaa' }}>
+            <span style={{ marginLeft: 10, fontSize: '0.8rem', fontWeight: 'normal', color: '#94a3b8' }}>
               {/* tour d'où viennent les données : celui d'une ancienne observation, sinon le tour consulté */}
               information tour {staleFromTour === undefined ? rapport.tour : staleFromTour}
             </span>
           )}
         </h3>
         {rapport && staleFromTour !== undefined && (
-          <div style={{ marginTop: 6, padding: '4px 8px', background: '#332200', color: '#ffcc00', borderLeft: '3px solid #ffb000', fontSize: '0.85em' }}>
-            ⚠ Données affichées provenant {staleFromTour === 'inconnu' ? "d'un tour inconnu" : `du tour ${staleFromTour}`} (dernier {rapport.tour})
+          <div style={{ marginTop: 6, padding: '6px 10px', background: 'rgba(245, 158, 11, 0.12)', color: '#fbbf24', borderLeft: '3px solid #f59e0b', borderRadius: '0 4px 4px 0', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <IconAlert size={15} style={{ flexShrink: 0 }} />
+            <span>Données affichées provenant {staleFromTour === 'inconnu' ? "d'un tour inconnu" : `du tour ${staleFromTour}`} (dernier {rapport.tour})</span>
           </div>
         )}
       </div>
@@ -363,7 +370,7 @@ export default function InfoPanel({ selected, onFleetHover }: Props) {
             })}
             </tbody>
           </table>
-          <div style={{ fontSize: '0.75em', color: '#888', marginTop: 4 }}>orange estompé = hors de portée ce tour</div>
+          <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 6 }}>orange estompé = hors de portée ce tour</div>
         </div>
       )}
       {cellCombats.length > 0 && (

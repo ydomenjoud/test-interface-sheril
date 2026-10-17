@@ -2,18 +2,20 @@ import React, {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {FlotteJoueur, XY} from '../../types';
 import {codePositionOrdre} from '../../utils/ordreSchema';
 import {isTypingTarget} from '../../utils/keyboard';
+import {IconAlert, IconClose, IconFleetMove, IconGrip} from '../icons/Icons';
 
 export interface FleetPickerProps {
     anchor: {x: number; y: number}; // clientX/clientY (coordonnées viewport) du mousedown d'origine
     fleets: {fleet: FlotteJoueur; deplacement: XY | undefined}[]; // deplacement = cible déjà commandée (si ordres)
-    dragNum?: number; // flotte en cours de glisser-déposer : sa ligne est surbrillance (le sélecteur reste ouvert pendant le drag)
+    dragNum?: number; // flotte en cours de glisser-déposer : sa ligne est en surbrillance
     onSelectFleet: (fleetNum: number) => void; // drag d'une ligne démarré
     onDragEnd: () => void; // drag terminé (drop ou annulation)
     onClose: () => void;
 }
 
 const OFFSET = 12; // écart entre l'ancre et le panneau
-const EDGE = 4; // marge minimum par rapport au bord de la fenêtre
+const EDGE = 6; // marge minimum par rapport au bord de la fenêtre
+const PANEL_WIDTH = 280; // largeur optimisée pour lisibilité
 const DRAG_VISIBLE_X = 40; // part du panneau restée visible (gauche/droite) pendant le drag de l'en-tête
 const DRAG_VISIBLE_Y = 24; // part du panneau restée visible (haut/bas) pendant le drag de l'en-tête
 
@@ -81,7 +83,7 @@ export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, 
             const s = dragPanel.current;
             if (!s) return;
             const el = panelRef.current;
-            const w = el ? el.offsetWidth : 260; // taille mesurée (repli 260x200 si non montée)
+            const w = el ? el.offsetWidth : PANEL_WIDTH; // taille mesurée
             const h = el ? el.offsetHeight : 200;
             setPos(clampPanelPos(s.left + (ev.clientX - s.mouseX), s.top + (ev.clientY - s.mouseY), w, h));
         };
@@ -101,68 +103,163 @@ export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, 
         <div
             ref={panelRef}
             style={{
-                position: 'fixed', left: pos.left, top: pos.top, zIndex: 300, // au-dessus du tooltip (200)
-                width: 260, background: '#2a2a2a', border: '1px solid #555', borderRadius: 4,
-                boxShadow: '0 4px 16px rgba(0,0,0,0.6)', color: '#ddd', fontSize: '0.85em',
+                position: 'fixed',
+                left: pos.left,
+                top: pos.top,
+                zIndex: 300, // au-dessus du tooltip (200)
+                width: PANEL_WIDTH,
+                background: 'rgba(15, 23, 42, 0.96)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid #334155',
+                borderRadius: 8,
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7)',
+                color: '#e2e8f0',
+                fontSize: '0.85rem',
+                overflow: 'hidden',
             }}
         >
             <div
-                title="Glisser pour déplacer le panneau"
+                title="Glisser pour repositionner ce panneau"
                 onMouseDown={startPanelDrag}
                 style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '6px 10px', borderBottom: '1px solid #444',
-                    cursor: dragging ? 'grabbing' : 'grab', userSelect: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
+                    background: 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)',
+                    borderBottom: '1px solid #334155',
+                    cursor: dragging ? 'grabbing' : 'grab',
+                    userSelect: 'none',
                 }}
             >
-                <span style={{fontWeight: 'bold', color: '#ffe600'}}>Déplace une flotte</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <IconGrip size={14} color="#94a3b8" />
+                    <span style={{ fontWeight: 600, color: '#f8fafc', fontSize: '0.875rem' }}>
+                        Déplacer une flotte
+                    </span>
+                </div>
                 <button
                     type="button"
-                    title="Fermer"
+                    title="Fermer (Échap)"
+                    aria-label="Fermer"
                     onClick={onClose}
-                    style={{background: 'none', border: 'none', color: '#aaa', fontSize: '1.2em', cursor: 'pointer', lineHeight: 1, padding: '0 2px'}}
-                >×</button>
+                    style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '4px',
+                        borderRadius: 4,
+                        lineHeight: 1,
+                        transition: 'color 0.15s, background-color 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                        e.currentTarget.style.color = '#fff';
+                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                    }}
+                    onMouseLeave={e => {
+                        e.currentTarget.style.color = '#94a3b8';
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                >
+                    <IconClose size={15} />
+                </button>
             </div>
-            <div style={{padding: '4px 0'}}>
-                {fleets.map(({fleet, deplacement}) => (
-                    <div
-                        key={fleet.num}
-                        draggable
-                        onDragStart={e => {
-                            e.dataTransfer.setData('application/x-fleet-num', String(fleet.num));
-                            e.dataTransfer.effectAllowed = 'move';
-                            // L'image de drag par défaut du navigateur est la ligne « Flotte #X » en
-                            // translucide : on la remplace par un pixel transparent — la flotte en
-                            // déplacement reste identifiable via la surbrillance de sa ligne ici
-                            const fantome = document.createElement('canvas');
-                            fantome.width = 1;
-                            fantome.height = 1;
-                            e.dataTransfer.setDragImage(fantome, 0, 0);
-                            onSelectFleet(fleet.num);
-                        }}
-                        onDragEnd={onDragEnd}
-                        onMouseEnter={() => setHoverNum(fleet.num)}
-                        onMouseLeave={() => setHoverNum(n => (n === fleet.num ? undefined : n))}
-                        style={{
-                            padding: '5px 10px', cursor: 'grab', userSelect: 'none',
-                            // Flotte en cours de drag : surbrillance claire (au-dessus du survol)
-                            background: dragNum === fleet.num
-                                ? 'rgba(255, 230, 0, 0.18)'
-                                : hoverNum === fleet.num ? '#3a3a3a' : 'transparent',
-                            borderBottom: '1px solid #333',
-                        }}
-                    >
-                        <div style={{color: '#fff'}}>Flotte #{fleet.num + 1} — {fleet.nom}</div>
-                        <div style={{color: '#9fc6ff', fontSize: '0.9em'}}>
-                            vitesse {fleet.vitesse} · {fleet.nbVso} vaisseau{fleet.nbVso > 1 ? 'x' : ''}
-                        </div>
-                        {deplacement && (
-                            <div style={{color: '#ff9800', fontSize: '0.9em'}}>
-                                déjà déplacée → {codePositionOrdre(deplacement)}
+
+            <div style={{ padding: '6px 12px 4px', fontSize: '0.75rem', color: '#94a3b8' }}>
+                Glissez une flotte vers sa destination sur la carte :
+            </div>
+
+            <div style={{ padding: '4px 6px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {fleets.map(({fleet, deplacement}) => {
+                    const isDragging = dragNum === fleet.num;
+                    const isHovered = hoverNum === fleet.num;
+                    return (
+                        <div
+                            key={fleet.num}
+                            draggable
+                            onDragStart={e => {
+                                e.dataTransfer.setData('application/x-fleet-num', String(fleet.num));
+                                e.dataTransfer.effectAllowed = 'move';
+                                // Remplacement du ghost par un pixel transparent pour garder le tracé net
+                                const fantome = document.createElement('canvas');
+                                fantome.width = 1;
+                                fantome.height = 1;
+                                e.dataTransfer.setDragImage(fantome, 0, 0);
+                                onSelectFleet(fleet.num);
+                            }}
+                            onDragEnd={onDragEnd}
+                            onMouseEnter={() => setHoverNum(fleet.num)}
+                            onMouseLeave={() => setHoverNum(n => (n === fleet.num ? undefined : n))}
+                            style={{
+                                padding: '8px 10px',
+                                cursor: 'grab',
+                                userSelect: 'none',
+                                borderRadius: 6,
+                                background: isDragging
+                                    ? 'rgba(56, 189, 248, 0.18)'
+                                    : isHovered ? '#1e293b' : 'rgba(30, 41, 59, 0.45)',
+                                border: isDragging
+                                    ? '1px solid #38bdf8'
+                                    : isHovered ? '1px solid #475569' : '1px solid #334155',
+                                transition: 'all 0.15s ease',
+                            }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                                    <IconFleetMove size={14} color="#38bdf8" style={{ flexShrink: 0 }} />
+                                    <span style={{ fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {fleet.nom}
+                                    </span>
+                                    <span style={{ color: '#94a3b8', fontSize: '0.8rem', flexShrink: 0 }}>
+                                        (#{fleet.num + 1})
+                                    </span>
+                                </div>
                             </div>
-                        )}
-                    </div>
-                ))}
+
+                            <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                                <span style={{
+                                    fontSize: '0.75rem',
+                                    padding: '1px 6px',
+                                    borderRadius: 4,
+                                    background: '#0f172a',
+                                    color: '#38bdf8',
+                                    border: '1px solid #1e293b',
+                                }}>
+                                    Vitesse {fleet.vitesse}
+                                </span>
+                                <span style={{
+                                    fontSize: '0.75rem',
+                                    padding: '1px 6px',
+                                    borderRadius: 4,
+                                    background: '#0f172a',
+                                    color: '#cbd5e1',
+                                    border: '1px solid #1e293b',
+                                }}>
+                                    {fleet.nbVso} vaisseau{fleet.nbVso > 1 ? 'x' : ''}
+                                </span>
+                            </div>
+
+                            {deplacement && (
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    color: '#f59e0b',
+                                    fontSize: '0.75rem',
+                                    marginTop: 4,
+                                    fontWeight: 500,
+                                }}>
+                                    <IconAlert size={12} style={{ flexShrink: 0 }} />
+                                    <span>Déjà déplacée → {codePositionOrdre(deplacement)}</span>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
