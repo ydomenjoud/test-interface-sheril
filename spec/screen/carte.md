@@ -69,8 +69,9 @@ si la borne max X est 40 : les coordonnées représentée vont de 33 à 12 en pa
 La carte occupe toute la hauteur disponible (pas de scroll vertical de la page), la grille se redimensionne en
 conséquence.
 
-Une légende compacte des couleurs de possession (moi / alliance / PNA / ennemi / neutre / flotte) est affichée en
-bas à gauche de la carte, au ras du bord, en mode de couleur "Alliés/Ennemis".
+Une légende compacte (couleurs de possession moi / alliance / PNA / ennemi / neutre, marqueur flotte, et
+« réparation » = bordure blanche du disque) est affichée en bas à gauche de la carte, au ras du bord, en mode
+de couleur "Alliés/Ennemis".
 
 Les portées radar (systèmes et flottes) sont désactivées par défaut pour ne pas voiler la carte ; elles peuvent
 être activées par les boutons ◎ et ◉ de la barre d'outils (filtres rapides).
@@ -132,6 +133,10 @@ L'image du système prend toute la case de la grille.
 La taille du disque varie avec le nombre de planètes (10 planètes : 50 % de la case, 20 planètes et plus :
 100 %, linéaire entre les deux) ; les systèmes connus uniquement de la carte galactique (jamais détectés)
 s'affichent à moitié taille.
+
+Un système dont la capacité de réparation par tour est > 0 (somme des caractéristiques « capacité réparation
+vaisseaux » des bâtiments de ses planètes) reçoit une bordure blanche épaisse autour de son disque, pour le
+repérer d'un coup d'œil (entrée « réparation » de la légende).
 
 il faut utiliser une image correspondante à sa propriété "typeEtoile" et utiliser l'image
 public/img/etoile{typeEtoile}.gif (images pack étoiles).
@@ -196,7 +201,7 @@ une case sans aucun contenu (ni système, ni flotte, ni combat, ni zone) affiche
   Vitesse, AS, AP) et la Position ; les flottes hors de portée ce tour sont en orange estompé (légende sous la
   liste) ; survoler une ligne affiche le détail de la flotte (position, direction, vitesse, directive, AS / AP,
   scan, nombre et composition des vaisseaux, distance et portée) ET surligne la case de la flotte sur la carte
-  (voile clair + contour, par-dessus les flèches)
+  (mêmes équerres blanches débordantes que la case sélectionnée, par-dessus les flèches)
 - combats sur la case (cartes dépliables avec les détails)
 - zones couvrant la case (éditables)
 - notes de la case (le formulaire d'ajout est replié derrière un bouton)
@@ -256,19 +261,29 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
   la flotte n'est plus dans le rapport, tronqué avec ellipsis si trop long), origine → destination où chaque case
   s'affiche au NOM du système qui l'occupe quand il y en a un (coordonnées au survol), sinon en coordonnées x_y ;
   suivi de la distance torique en rouge quand elle est hors de portée (à distance normale sinon), un ⚠ ambre compact (infobulle « déjà en
-  route vers x_y ») si le rapport avait une direction, deux menus — « Directive » et « Stratégie » — pour choisir
-  les valeurs de l'ordre, et un bouton × pour supprimer ce déplacement.
+  route vers x_y ») si le rapport avait une direction, un menu de directive (sans libellé, évident en
+  contexte) pour choisir la directive de l'ordre, et un bouton × pour supprimer ce déplacement. Le menu de
+  stratégie n'existe pas encore (stratégie pas encore paramétrée, valeur par défaut conservée).
+- Le menu de directive est alimenté par les directives de rencontre de la règle 4.4
+  (https://sheril.pbem-france.net/rule/4_flottes#4.4), dans l'ordre de résolution du jeu, avec des libellés
+  abrégés (suppression des « de », « Attaque flottes cdt » pour la première ; libellé complet en infobulle) :
+  Attaque flottes cdt, Attaque préventive, Attaque toute flotte, Attaque système, Pillage système, Attaque
+  planète, Pillage planète, Eradication planète, Attitude neutre. La directive « Attaque flottes cdt » ouvre un
+  second menu de commandant visé (0 = neutre, puis les commandants de data.xml ; nom en infobulle). Les valeurs
+  numérique/codes du jeu restent des placeholders à confirmer avec la console.
 - Vide : mention d'aide (cliquer une case de flotte, glisser une ligne sur la destination).
-- En pied : « Copier le schéma » (retour visuel « Schéma copié » / « Échec de la copie ») et
+- En pied : « Copier le schéma (à venir) » (retour visuel « Schéma copié » / « Échec de la copie ») et
   « ↺ Tout réinitialiser » (efface tous les déplacements du tour et replie le panneau ; les deux boutons sont
-  estompés et désactivés quand il n'y a plus de déplacement).
+  estompés et désactivés quand il n'y a plus de déplacement). Le libellé « (à venir) » rappelle que la syntaxe
+  d'ordre est encore un placeholder à confirmer avec le jeu.
 
 ### schéma d'ordres
 
 - Schéma = ordres `[deplacement_flotte, num, 0_x_y, directive, stratégie]` (table, numéro de flotte, destination,
-  directive, stratégie) séparés par `%#!%`, encodés en base64, triés par numéro de flotte.
-- La directive et la stratégie sont propres à chaque ordre : par défaut 1 et 0 au dépos, modifiables dans les menus
-  du panneau.
+  directive, stratégie) séparés par `%#!%`, encodés en base64, triés par numéro de flotte. Quand la directive est
+  « Attaque flottes cdt », le commandant visé (0 = neutre) est ajouté en 6e position.
+- La directive et la stratégie sont propres à chaque ordre : par défaut 1 et 0 au dépos. La directive est
+  modifiable dans le panneau ; la stratégie garde sa valeur par défaut (son menu viendra plus tard).
 - PLACEHOLDER — syntaxe réelle à confirmer : la table, les valeurs par défaut et les listes proposées dans les menus
   sont provisoires (voir `src/utils/ordreDeplacement.ts`).
 

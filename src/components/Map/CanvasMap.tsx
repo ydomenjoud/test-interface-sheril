@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
 import {BOUNDS, CENTER, getTorusDistance, torusDelta, wrapX, wrapY} from '../../utils/position';
+import {capaciteReparation} from '../../utils/reparation';
 import {getSectorNumber, isSectorLabelCell, sectorBackgroundColor, sectorLabelColor} from '../../utils/sectors';
 import {countCombatsByKind} from '../../parsers/parseCombatMessages';
 import {drawCombatMarkers} from '../../utils/combatMarkers';
@@ -263,6 +264,19 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         );
         return [...fromRapport, ...fromPublic];
     }, [rapport, publicCombats]);
+
+    // Capacité de réparation par position (somme des caractéristiques « capacité réparation
+    // vaisseaux » des bâtiments des planètes) : les systèmes à capacité > 0 reçoivent un bord
+    // blanc épais sur leur disque (légende « réparation »)
+    const reparationByPos = useMemo(() => {
+        const map = new Map<string, number>();
+        systems.forEach(s => {
+            if (Array.isArray(s.planetes) && s.planetes.length > 0) {
+                map.set(`${s.pos.x}_${s.pos.y}`, capaciteReparation(s.planetes, global));
+            }
+        });
+        return map;
+    }, [systems, global]);
 
     // Redessine uniquement le contour de la case survolée (sur le canvas dédié).
     // La géométrie est recalculée pour rester alignée avec la carte principale (tore, centre, taille de case).
@@ -1013,6 +1027,19 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 cRing.restore();
             }
 
+            // Système avec une capacité de réparation > 0 : bordure blanche épaisse (légende « réparation »)
+            const reparation = reparationByPos.get(`${s.pos.x}_${s.pos.y}`) ?? 0;
+            if (reparation > 0 && isSystemSelected(owners)) {
+                const cRep = ctx as CanvasRenderingContext2D;
+                cRep.save();
+                cRep.strokeStyle = '#ffffff';
+                cRep.lineWidth = Math.max(2, Math.round(cellSize * 0.09));
+                cRep.beginPath();
+                cRep.arc(cx, cy, radius + 2, 0, Math.PI * 2);
+                cRep.stroke();
+                cRep.restore();
+            }
+
             // Badges propriétaires en bas à droite de la case
             if (showOwnerBadges && owners && owners.length > 0) {
                 const badgePadding = Math.max(2, Math.floor(cellSize * 0.08));
@@ -1286,6 +1313,25 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
         }
 
+        // Équerres blanches débordant de la case — style commun à la case sélectionnée et à la
+// surbrillance de case (survol d'une flotte dans le panneau info)
+        const drawCellCorners = (c2d: CanvasRenderingContext2D, px: number, py: number) => {
+            const m = Math.max(3, Math.round(cellSize * 0.15));
+            const l = Math.max(5, Math.round(cellSize * 0.35));
+            c2d.lineWidth = 2;
+            c2d.strokeStyle = '#ffffff';
+            c2d.beginPath();
+            // haut-gauche
+            c2d.moveTo(px - m, py - m + l); c2d.lineTo(px - m, py - m); c2d.lineTo(px - m + l, py - m);
+            // haut-droite
+            c2d.moveTo(px + cellSize + m - l, py - m); c2d.lineTo(px + cellSize + m, py - m); c2d.lineTo(px + cellSize + m, py - m + l);
+            // bas-droite
+            c2d.moveTo(px + cellSize + m, py + cellSize + m - l); c2d.lineTo(px + cellSize + m, py + cellSize + m); c2d.lineTo(px + cellSize + m - l, py + cellSize + m);
+            // bas-gauche
+            c2d.moveTo(px - m + l, py + cellSize + m); c2d.lineTo(px - m, py + cellSize + m); c2d.lineTo(px - m, py + cellSize + m - l);
+            c2d.stroke();
+        };
+
         // CASE SÉLECTIONNÉE (dessinée en dernier pour rester visible au-dessus de tout)
         if (selected) {
             const cSel = ctx as CanvasRenderingContext2D;
@@ -1328,20 +1374,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     cSel.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
 
                     // Coins en équerre débordant de la case
-                    const m = Math.max(3, Math.round(cellSize * 0.15));
-                    const l = Math.max(5, Math.round(cellSize * 0.35));
-                    cSel.lineWidth = 2;
-                    cSel.strokeStyle = '#ffffff';
-                    cSel.beginPath();
-                    // haut-gauche
-                    cSel.moveTo(px - m, py - m + l); cSel.lineTo(px - m, py - m); cSel.lineTo(px - m + l, py - m);
-                    // haut-droite
-                    cSel.moveTo(px + cellSize + m - l, py - m); cSel.lineTo(px + cellSize + m, py - m); cSel.lineTo(px + cellSize + m, py - m + l);
-                    // bas-droite
-                    cSel.moveTo(px + cellSize + m, py + cellSize + m - l); cSel.lineTo(px + cellSize + m, py + cellSize + m); cSel.lineTo(px + cellSize + m - l, py + cellSize + m);
-                    // bas-gauche
-                    cSel.moveTo(px - m + l, py + cellSize + m); cSel.lineTo(px - m, py + cellSize + m); cSel.lineTo(px - m, py + cellSize + m - l);
-                    cSel.stroke();
+                    drawCellCorners(cSel, px, py);
 
                     dy += BOUNDS.maxX;
                 }
@@ -1395,10 +1428,14 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
         }
 
-        // SURBRILLANCE DE CASE (survol d'une flotte dans le panneau info) : par-dessus les flèches,
-        // sous le drag en cours
+        // SURBRILLANCE DE CASE (survol d'une flotte dans le panneau info) : même style que la case
+        // sélectionnée (équerres blanches), par-dessus les flèches, sous le drag en cours
         if (highlightPos) {
             const hCtx = ctx as CanvasRenderingContext2D;
+            hCtx.save();
+            hCtx.beginPath();
+            hCtx.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
+            hCtx.clip();
             let dx = ((highlightPos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
             let dy = ((highlightPos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
             while (dx < cols) {
@@ -1412,17 +1449,12 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                         currentDy += BOUNDS.maxX;
                         continue;
                     }
-                    hCtx.save();
-                    hCtx.fillStyle = 'rgba(255, 224, 130, 0.18)';
-                    hCtx.fillRect(dx * cellSize, currentDy * cellSize, cellSize, cellSize);
-                    hCtx.strokeStyle = '#ffe082';
-                    hCtx.lineWidth = 2;
-                    hCtx.strokeRect(dx * cellSize + 1, currentDy * cellSize + 1, cellSize - 2, cellSize - 2);
-                    hCtx.restore();
+                    drawCellCorners(hCtx, dx * cellSize, currentDy * cellSize);
                     currentDy += BOUNDS.maxX;
                 }
                 dx += BOUNDS.maxY;
             }
+            hCtx.restore();
         }
 
         // DRAG DE FLOTTE EN COURS : anneau de vitesse (carré de Tchebyshev autour de l'origine),
@@ -1512,7 +1544,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         // Le survol dépend de la géométrie (centre, taille de case) : on resynchronise l'overlay après chaque dessin
         redrawHoverOverlay();
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
