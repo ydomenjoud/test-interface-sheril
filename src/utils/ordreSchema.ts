@@ -25,10 +25,16 @@ export const deserialiserSchema = (schema: string): string[][] => {
 };
 
 // Copie le schéma dans le presse-papiers ; true si réussi, false (et console.error) sinon
-export const copierSchema = (schema: string): Promise<boolean> =>
-    navigator.clipboard.writeText(schema)
+// (navigator.clipboard est absent en contexte non sécurisé : on renvoie false au lieu de jeter)
+export const copierSchema = (schema: string): Promise<boolean> => {
+    if (!navigator.clipboard) {
+        console.error('Copie impossible : presse-papiers indisponible');
+        return Promise.resolve(false);
+    }
+    return navigator.clipboard.writeText(schema)
         .then(() => true)
         .catch(err => {
             console.error('Erreur copie du schéma', err);
             return false;
         });
+};

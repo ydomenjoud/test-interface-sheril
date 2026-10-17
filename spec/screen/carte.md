@@ -233,8 +233,9 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 ### feedback pendant le glisser
 
 - Une ligne relie la case d'origine de la flotte à la case sous le curseur, avec une pointe de flèche à l'extrémité
-  (curseur), la distance torique affichée au milieu du trait (décalée perpendiculairement, pour ne jamais passer
-  sous le curseur) et un anneau de portée (vitesse de la flotte) centré sur l'origine.
+(curseur), la distance torique affichée au milieu du trait (décalée perpendiculairement, pour ne jamais passer
+   sous le curseur) et un contour de portée — un carré de Tchebychev de rayon égal à la vitesse de la flotte —
+   centré sur l'origine.
 - La ligne est verte (#4caf50) si la destination est atteignable (distance ≤ vitesse), rouge (#f44336) sinon.
 - Le tracé disparaît quand le glisser quitte la carte (l'identité de la flotte est conservée pour le restaurer au
   retour sur la carte) et à la fin du drag (dépos ou annulation, y compris un Échap).
@@ -246,7 +247,7 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
   le rapport en avait une).
 - La flèche d'ordre de déplacement est dessinée dans un passage dédié PAR-DESSUS TOUT le reste de la carte
   (disques de flottes, marqueurs de combat, cadre de sélection) : la cible commandée n'est jamais masquée
-  (seul le tracé du glisser en cours se dessine au-dessus).
+  (seuls le tracé du glisser en cours et la surbrillance de survol d'une flotte se dessinent au-dessus).
 - Couleur de la flèche : verte (#4caf50) si la destination est à portée de la flotte ce tour, rouge (#f44336) sinon.
   L'orange (#ff9800) est réservé aux flèches de « direction » préexistantes du rapport.
 
@@ -280,7 +281,8 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 ### schéma d'ordres
 
 - Schéma = ordres `[deplacement_flotte, num, 0_x_y, directive, stratégie]` (table, numéro de flotte, destination,
-  directive, stratégie) séparés par `%#!%`, encodés en base64, triés par numéro de flotte. Quand la directive est
+  directive, stratégie) séparés par `%#!%`, encodés en base64, triés par numéro de flotte. `num` est le numéro
+  interne de la flotte dans le rapport (0-based — l'interface l'affiche en « #num+1 »). Quand la directive est
   « Attaque flottes cdt », le commandant visé (0 = neutre) est ajouté en 6e position.
 - La directive et la stratégie sont propres à chaque ordre : par défaut 1 et 0 au dépos. La directive est
   modifiable dans le panneau ; la stratégie garde sa valeur par défaut (son menu viendra plus tard).

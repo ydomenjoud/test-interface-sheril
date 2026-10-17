@@ -6,7 +6,9 @@ import {
     positionsDuRapport,
     reinitialiserBornesGalaxie,
     tailleAxeDepuisCoord,
+    torusDelta,
     wrapX,
+    wrapY,
 } from './position';
 
 describe('tailleAxeDepuisCoord', () => {
@@ -41,10 +43,17 @@ describe('appliquerBornesDepuisPositions', () => {
     test('le calcul torique suit les bornes recalculées', () => {
         // Avec les bornes par défaut 60×60, (1,1)→(40,1) vaut 21
         expect(getTorusDistance({x: 1, y: 1}, {x: 40, y: 1})).toBe(21);
+        // Diagonale avec enroulement sur les deux axes (l'axe Y est aussi vérifié)
+        expect(getTorusDistance({x: 1, y: 1}, {x: 59, y: 60})).toBe(2);
         // Sur une galaxie 40×40, la colonne 40 est voisine de la colonne 1 (enroulement)
         appliquerBornesDepuisPositions([{x: 40, y: 40}]);
         expect(getTorusDistance({x: 1, y: 1}, {x: 40, y: 1})).toBe(1);
+        expect(getTorusDistance({x: 1, y: 1}, {x: 40, y: 40})).toBe(1); // diagonale, enroulement X et Y
         expect(wrapX(41)).toBe(1);
+        expect(wrapY(41)).toBe(1);
+        expect(wrapY(0)).toBe(40);
+        expect(torusDelta(40, 1, 40)).toBe(1);
+        expect(torusDelta(1, -1, 40)).toBe(40);
     });
 });
 

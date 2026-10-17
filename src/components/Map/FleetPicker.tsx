@@ -1,6 +1,7 @@
 import React, {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {FlotteJoueur, XY} from '../../types';
 import {codePositionOrdre} from '../../utils/ordreSchema';
+import {isTypingTarget} from '../../utils/keyboard';
 
 export interface FleetPickerProps {
     anchor: {x: number; y: number}; // clientX/clientY (coordonnées viewport) du mousedown d'origine
@@ -51,7 +52,8 @@ export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, 
     // Échap ferme le sélecteur
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
+            // Ne pas fermer quand la saisie est dans un champ (convention commune des raccourcis de l'app)
+            if (e.key === 'Escape' && !isTypingTarget(e.target)) onClose();
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
