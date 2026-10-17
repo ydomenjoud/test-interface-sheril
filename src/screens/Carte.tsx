@@ -317,15 +317,23 @@ export default function Carte() {
   const [copieSchema, setCopieSchema] = useState<'ok' | 'ko' | null>(null);
   const copieTimerRef = useRef<number | undefined>(undefined);
 
+  // Fin d'un geste de déplacement (dépos, annulation, changement de tour, mousedown sur la carte) :
+  // sélecteur et suivi de drag remis à zéro d'un seul point de passage
+  const resetFleetDrag = useCallback(() => {
+    setPicker(null);
+    setDragState(null);
+    setDragCursor(null);
+  }, []);
+  // Fermeture du sélecteur seule (bouton ×, Échap) : sans le suivi de drag
+  const fermerPicker = useCallback(() => setPicker(null), []);
+
   // Nouveau rapport ou changement de tour : recharger les déplacements stockés pour le tour affiché
   // (importCount : un import d'un tour plus ancien ne change pas le rapport affiché mais vide le
   // stockage — sans ce compteur, les déplacements en mémoire ressusciteraient à la sauvegarde)
   useEffect(() => {
     setDeplacements(tour !== undefined ? loadDeplacements(tour) : {});
-    setPicker(null);
-    setDragState(null);
-    setDragCursor(null);
-  }, [tour, rapport, importCount]);
+    resetFleetDrag();
+  }, [tour, rapport, importCount, resetFleetDrag]);
 
   // Sauvegarde à chaque modification
   useEffect(() => {
@@ -341,16 +349,12 @@ export default function Carte() {
   // Tout mousedown sur la carte referme le sélecteur ouvert et nettoie un suivi de drag orphelin
   // (drag annulé par Échap sans relâchement de bouton)
   const onAnyCanvasMouseDown = useCallback(() => {
-    setPicker(null);
-    setDragState(null);
-    setDragCursor(null);
-  }, []);
+    resetFleetDrag();
+  }, [resetFleetDrag]);
   // Un pan démarre sur la case : le geste de sélection est annulé (pan et zone Alt inchangés)
   const onFleetCellGestureAbort = useCallback(() => {
-    setPicker(null);
-    setDragState(null);
-    setDragCursor(null);
-  }, []);
+    resetFleetDrag();
+  }, [resetFleetDrag]);
   const onFleetDragOver = useCallback((cell: XY) => {
     // ~60 Hz pendant le drag : on ne re-render la carte que si la case change
     setDragCursor(prev => (prev && prev.x === cell.x && prev.y === cell.y ? prev : cell));
@@ -372,10 +376,8 @@ export default function Carte() {
   // Fin du drag (dépos ou annulation) : on arrête le suivi et on referme le sélecteur
   // (la ligne du sélecteur restant montée, son dragend nous parvient bien)
   const onDragEnd = useCallback(() => {
-    setDragState(null);
-    setDragCursor(null);
-    setPicker(null);
-  }, []);
+    resetFleetDrag();
+  }, [resetFleetDrag]);
   // Filet de sécurité anti-tracé-figé pour un drag annulé (Échap sans relâchement de bouton,
   // relâchement hors fenêtre, dépôt refusé) : on guette le relâchement global du bouton GAUCHE et
   // un dragend éventuel au niveau document
@@ -404,9 +406,7 @@ export default function Carte() {
     // Flotte absente du rapport affiché (changement de tour pendant le drag) : on ignore le
     // dépos plutôt que de stocker un déplacement orphelin
     if (!origine) {
-      setDragState(null);
-      setDragCursor(null);
-      setPicker(null);
+      resetFleetDrag();
       return;
     }
     if (cell.x === origine.x && cell.y === origine.y) {
@@ -416,14 +416,12 @@ export default function Carte() {
         return reste;
       });
     } else {
-      // directive/stratégie par défaut (placeholder) : modifiables dans les menus du panneau
+      // directive/stratégie par défaut (placeholders) : la directive est modifiable dans le menu du panneau
       setDeplacements(d => ({ ...d, [fleetNum]: { to: cell, directive: DIRECTIVE_DEFAUT, strategy: STRATEGIE_DEFAUT } }));
       setDeplacementsExpanded(true); // on ouvre le panneau pour montrer le résultat du dépos
     }
-    setDragState(null);
-    setDragCursor(null);
-    setPicker(null);
-  }, [rapport]);
+    resetFleetDrag();
+  }, [rapport, resetFleetDrag]);
 
   // Schéma d'ordres : un ordre par déplacement dont la flotte est encore dans le rapport
   // (une flotte introuvable, ex. tour différent, est ignorée ici et en ligne repliée du panneau)
@@ -433,7 +431,6 @@ export default function Carte() {
       const flotte = rapport?.flottesJoueur.find(f => f.num === Number(num));
       if (flotte) liste.push({
         fleetNum: flotte.num,
-        from: flotte.pos,
         to: deplacement.to,
         directive: deplacement.directive,
         strategy: deplacement.strategy,
@@ -477,8 +474,8 @@ export default function Carte() {
     if (tour !== undefined) clearDeplacements(tour);
     setDeplacementsExpanded(false);
   };
-  // Modification de la directive / de la stratégie d'un déplacement existant (menus du panneau)
-  const majDeplacement = useCallback((num: number, champ: { directive?: number; strategy?: number; cdt?: number }) => {
+  // Modification de la directive (ou du commandant visé) d'un déplacement existant (menus du panneau)
+  const majDeplacement = useCallback((num: number, champ: { directive?: number; cdt?: number }) => {
     setDeplacements(d => {
       const actuel = d[num];
       if (!actuel) return d;
@@ -1028,8 +1025,7 @@ export default function Carte() {
                               </span>
                             )}
                             {/* Menu de directive (sans libellé : évident en contexte) — libellés de la règle 4.4, ordre de
-                                résolution du jeu, libellé complet en infobulle. Le menu de stratégie
-                                (pas encore paramétré) viendra plus tard. */}
+                                résolution du jeu, libellé complet en infobulle */}
                             <select
                               className="carte-select"
                               title="Directive (règle 4.4, ordre de résolution du jeu)"
@@ -1126,7 +1122,7 @@ export default function Carte() {
               dragNum={dragState?.num}
               onSelectFleet={onSelectFleet}
               onDragEnd={onDragEnd}
-              onClose={() => setPicker(null)}
+              onClose={fermerPicker}
             />
           )}
         </div>

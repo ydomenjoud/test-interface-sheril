@@ -6,8 +6,6 @@ import { codePositionOrdre, serialiserSchema } from './ordreSchema';
 export const TABLE_ORDRE_DEPLACEMENT = 'deplacement_flotte'; // à remplacer
 export const DIRECTIVE_DEFAUT = 1;   // à remplacer
 export const STRATEGIE_DEFAUT = 0;   // à remplacer
-// PLACEHOLDER — valeurs proposées dans le menu « Stratégie » ; à remplacer
-export const OPTIONS_STRATEGIES = [0, 1, 2, 3, 4, 5, 6, 7];
 
 // Directives de rencontre — règle 4.4 (https://sheril.pbem-france.net/rule/4_flottes#4.4),
 // dans l'ordre de résolution du jeu (cet ordre est déterminant).
@@ -34,8 +32,7 @@ export const DIRECTIVE_CDT = 0; // « Attaque flottes cdt » : exige le commanda
 export const CDT_DEFAUT = 0;    // 0 = le neutre (le jeu le considère comme un commandant)
 
 export interface DeplacementOrdre {
-    fleetNum: number;  // num de la flotte (identité rapport)
-    from: XY;          // position dans le rapport (pour info/affichage)
+    fleetNum: number;  // num de la flotte (identité rapport, 0-based — l'interface affiche « #num+1 »)
     to: XY;            // destination commandée
     directive: number; // directive commandée (int)
     strategy: number;  // stratégie commandée (int)

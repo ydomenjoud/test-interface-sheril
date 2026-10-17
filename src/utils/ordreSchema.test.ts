@@ -59,17 +59,17 @@ describe('copierSchema', () => {
 
 describe('ordreDeplacement', () => {
     it('construit [table, num de flotte, destination, directive, stratégie]', () => {
-        const d = {fleetNum: 7, from: {x: 1, y: 2}, to: {x: 3, y: 4}, directive: 2, strategy: 5};
+        const d = {fleetNum: 7, to: {x: 3, y: 4}, directive: 2, strategy: 5};
         expect(ordreDeplacement(d)).toEqual(['deplacement_flotte', '7', '0_3_4', '2', '5']);
     });
 
     it('ajoute le commandant visé en 6e position pour la directive « Attaque flottes cdt »', () => {
-        const d = {fleetNum: 7, from: {x: 1, y: 2}, to: {x: 3, y: 4}, directive: DIRECTIVE_CDT, strategy: 5, cdt: 3};
+        const d = {fleetNum: 7, to: {x: 3, y: 4}, directive: DIRECTIVE_CDT, strategy: 5, cdt: 3};
         expect(ordreDeplacement(d)).toEqual(['deplacement_flotte', '7', '0_3_4', '0', '5', '3']);
     });
 
     it('la directive cdt sans commandant visé utilise le neutre (0)', () => {
-        const d = {fleetNum: 7, from: {x: 1, y: 2}, to: {x: 3, y: 4}, directive: DIRECTIVE_CDT, strategy: 5};
+        const d = {fleetNum: 7, to: {x: 3, y: 4}, directive: DIRECTIVE_CDT, strategy: 5};
         expect(ordreDeplacement(d)).toEqual(['deplacement_flotte', '7', '0_3_4', '0', '5', '0']);
     });
 });
@@ -87,9 +87,9 @@ describe('OPTIONS_DIRECTIVES (règle 4.4)', () => {
 describe('schemaDeplacements', () => {
     it('tri par num de flotte (1, 2, 10) et reserialise en 3 ordres (directive/stratégie propres à chaque ordre)', () => {
         const deplacements = [
-            {fleetNum: 2, from: {x: 0, y: 0}, to: {x: 5, y: 5}, directive: 1, strategy: 0},
-            {fleetNum: 10, from: {x: 0, y: 0}, to: {x: 6, y: 6}, directive: 3, strategy: 2},
-            {fleetNum: 1, from: {x: 0, y: 0}, to: {x: 7, y: 7}, directive: 0, strategy: 1},
+            {fleetNum: 2, to: {x: 5, y: 5}, directive: 1, strategy: 0},
+            {fleetNum: 10, to: {x: 6, y: 6}, directive: 3, strategy: 2},
+            {fleetNum: 1, to: {x: 7, y: 7}, directive: 0, strategy: 1},
         ];
         // la flotte 1 a la directive cdt (0) : son ordre porte le commandant visé en 6e position (neutre par défaut)
         expect(deserialiserSchema(schemaDeplacements(deplacements))).toEqual([
