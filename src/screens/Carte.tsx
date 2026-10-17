@@ -10,11 +10,15 @@ import {FleetPicker} from '../components/Map/FleetPicker';
 import {isTypingTarget} from '../utils/keyboard';
 import {wrapX, wrapY, getTorusDistance, posToString} from '../utils/position';
 import Modal from '../components/utils/Modal';
-import {XY, Zone} from '../types';
+import {GlobalData, XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
 import {loadDeplacements, saveDeplacements, clearDeplacements} from '../storage/deplacementOrdersStorage';
-import {DeplacementEnAttente, DeplacementOrdre, DIRECTIVE_DEFAUT, OPTIONS_DIRECTIVES, OPTIONS_STRATEGIES, STRATEGIE_DEFAUT, schemaDeplacements} from '../utils/ordreDeplacement';
+import {CDT_DEFAUT, DeplacementEnAttente, DeplacementOrdre, DIRECTIVE_CDT, DIRECTIVE_DEFAUT, OPTIONS_DIRECTIVES, STRATEGIE_DEFAUT, schemaDeplacements} from '../utils/ordreDeplacement';
 import {copierSchema} from '../utils/ordreSchema';
+
+// Libellé du commandant visé par la directive « Attaque flottes cdt » (infobulle du menu)
+const commandantViserLabel = (globalData: GlobalData | undefined, num: number): string =>
+    num === CDT_DEFAUT ? 'Neutre' : (globalData?.commandants.find(c => c.numero === num)?.nom ?? `cdt ${num}`);
 
 // Durée d'affichage de chaque tour pendant la lecture automatique de l'historique (en secondes, modifiable)
 const DEFAULT_PLAY_STEP_S = 2;
@@ -433,6 +437,7 @@ export default function Carte() {
         to: deplacement.to,
         directive: deplacement.directive,
         strategy: deplacement.strategy,
+        cdt: deplacement.cdt,
       });
     }
     return liste;
@@ -473,7 +478,7 @@ export default function Carte() {
     setDeplacementsExpanded(false);
   };
   // Modification de la directive / de la stratégie d'un déplacement existant (menus du panneau)
-  const majDeplacement = useCallback((num: number, champ: { directive?: number; strategy?: number }) => {
+  const majDeplacement = useCallback((num: number, champ: { directive?: number; strategy?: number; cdt?: number }) => {
     setDeplacements(d => {
       const actuel = d[num];
       if (!actuel) return d;
@@ -639,6 +644,7 @@ export default function Carte() {
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#f80c0c' }} /> ennemi</span>
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#999999' }} /> neutre</span>
               <span className="map-legend-item"><span className="map-legend-dot map-legend-fleet" /> flotte</span>
+              <span className="map-legend-item" title="Système avec une capacité de réparation (bordure blanche épaisse sur le disque)"><span className="map-legend-dot" style={{ background: 'transparent', border: '3px solid #fff' }} /> réparation</span>
             </div>
           )}
           {/* Filtres Popup en haut à droite (la mini-carte occupe le bas à droite) */}
@@ -1021,29 +1027,35 @@ export default function Carte() {
                                 ⚠
                               </span>
                             )}
-                            {/* Directive et stratégie de l'ordre (valeurs placeholder, à confirmer avec le jeu) */}
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75em', color: '#aaa', flexShrink: 0 }}>
-                              Directive
+                            {/* Menu de directive (sans libellé : évident en contexte) — libellés de la règle 4.4, ordre de
+                                résolution du jeu, libellé complet en infobulle. Le menu de stratégie
+                                (pas encore paramétré) viendra plus tard. */}
+                            <select
+                              className="carte-select"
+                              title="Directive (règle 4.4, ordre de résolution du jeu)"
+                              value={deplacement.directive}
+                              onChange={e => majDeplacement(num, { directive: Number(e.target.value) })}
+                              style={{ minWidth: 66, maxWidth: 160, flexShrink: 0 }}
+                            >
+                              {OPTIONS_DIRECTIVES.map(o => (
+                                <option key={o.value} value={o.value} title={o.full}>{o.label}</option>
+                              ))}
+                            </select>
+                            {/* La directive « Attaque flottes cdt » vise un commandant précis : menu de son numéro */}
+                            {deplacement.directive === DIRECTIVE_CDT && (
                               <select
                                 className="carte-select"
-                                value={deplacement.directive}
-                                onChange={e => majDeplacement(num, { directive: Number(e.target.value) })}
-                                style={{ width: 52 }}
+                                title={`Commandant visé (0 = neutre) : ${commandantViserLabel(global, deplacement.cdt ?? CDT_DEFAUT)}`}
+                                value={deplacement.cdt ?? CDT_DEFAUT}
+                                onChange={e => majDeplacement(num, { cdt: Number(e.target.value) })}
+                                style={{ width: 48, flexShrink: 0 }}
                               >
-                                {OPTIONS_DIRECTIVES.map(v => <option key={v} value={v}>{v}</option>)}
+                                <option value={CDT_DEFAUT} title="Neutre (le jeu le considère comme un commandant)">0</option>
+                                {(global?.commandants ?? []).filter(c => typeof c.numero === 'number').map(c => (
+                                  <option key={c.numero} value={c.numero} title={`${c.nom ?? '?'} (#${c.numero})`}>{c.numero}</option>
+                                ))}
                               </select>
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75em', color: '#aaa', flexShrink: 0 }}>
-                              Stratégie
-                              <select
-                                className="carte-select"
-                                value={deplacement.strategy}
-                                onChange={e => majDeplacement(num, { strategy: Number(e.target.value) })}
-                                style={{ width: 52 }}
-                              >
-                                {OPTIONS_STRATEGIES.map(v => <option key={v} value={v}>{v}</option>)}
-                              </select>
-                            </label>
+                            )}
                             <button
                               type="button"
                               title="Supprimer ce déplacement"
@@ -1083,7 +1095,7 @@ export default function Carte() {
                       cursor: nbDeplacements === 0 ? 'default' : 'pointer'
                     }}
                   >
-                    {copieSchema === 'ok' ? '✓ Schéma copié' : copieSchema === 'ko' ? '✗ Échec de la copie' : '📋 Copier le schéma'}
+                    {copieSchema === 'ok' ? '✓ Schéma copié' : copieSchema === 'ko' ? '✗ Échec de la copie' : '📋 Copier le schéma (à venir)'}
                   </button>
                   <button
                     type="button"

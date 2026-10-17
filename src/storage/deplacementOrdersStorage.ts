@@ -19,11 +19,13 @@ export function loadDeplacements(tour: number): Record<number, DeplacementEnAtte
             if (!pos || typeof pos !== 'object') continue;
             const p = pos as XY;
             if (typeof p.x === 'number' && typeof p.y === 'number') {
-                deplacements[Number(num)] = {
+                const d: DeplacementEnAttente = {
                     to: {x: p.x, y: p.y},
                     directive: typeof e.directive === 'number' ? e.directive : DIRECTIVE_DEFAUT,
                     strategy: typeof e.strategy === 'number' ? e.strategy : STRATEGIE_DEFAUT,
                 };
+                if (typeof e.cdt === 'number') d.cdt = e.cdt; // commandant visé (directive « Attaque flottes cdt »)
+                deplacements[Number(num)] = d;
             }
         }
         return deplacements;
