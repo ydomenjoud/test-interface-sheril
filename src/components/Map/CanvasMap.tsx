@@ -49,7 +49,7 @@ function withOpacity(color: string, opacity: number): string {
     if (color.startsWith('hsl')) {
         return color.replace(')', `, ${opacity})`).replace('hsl', 'hsla');
     }
-    const named: Record<string, string> = { grey: '#808080', gray: '#808080', yellow: '#ffff00' };
+    const named: Record<string, string> = { grey: '#94a3b8', gray: '#94a3b8', yellow: '#f59e0b' };
     const hex = (named[color] || (color.startsWith('#') ? color : '')).replace('#', '');
     if (/^[0-9a-fA-F]{6}$/.test(hex)) {
         const r = parseInt(hex.slice(0, 2), 16);
@@ -118,8 +118,8 @@ type Props = {
 };
 
 export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[], colorMode: 'status' | 'player' = 'status', globalData?: GlobalData) {
-    if (owners && owners?.length === 1 && owners[0] === 0) return 'grey';
-    if (!owners || owners.length === 0) return '#999';
+    if (owners && owners?.length === 1 && owners[0] === 0) return '#94a3b8';
+    if (!owners || owners.length === 0) return '#94a3b8';
 
     // si y'en a plusieurs en enlevant le neutre
     if (owners.length > 1 ){
@@ -132,21 +132,21 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
         if(colors.size === 1) {
             return colors.values().next().value;
         } else {
-            return '#ff9540';
+            return '#fb923c';
         }
         // sinon on renvoi jaune
     }
 
     const owner = owners[0];
-    if (currentPlayerId && owners.includes(currentPlayerId)) return '#09ca31';
+    if (currentPlayerId && owners.includes(currentPlayerId)) return '#10b981';
 
     if (colorMode === 'player') {
         return raceColorForOwner(globalData, owner) || getColorForPlayer(owner);
     }
 
-    if (alliances && alliances.some(a => a.commandants.includes(owner))) return '#224eff';
-    if (pna && pna.includes(owner)) return 'yellow';
-    return '#f80c0c';
+    if (alliances && alliances.some(a => a.commandants.includes(owner))) return '#3b82f6';
+    if (pna && pna.includes(owner)) return '#f59e0b';
+    return '#ef4444';
 }
 
 export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
@@ -344,7 +344,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         el.textContent = '';
         const posEl = document.createElement('span');
         posEl.textContent = `${xy.x}-${xy.y}`;
-        posEl.style.cssText = 'font-weight:bold;color:#ffe600;';
+        posEl.style.cssText = 'font-weight:bold;color:#38bdf8;';
         el.appendChild(posEl);
 
         const sys = systems.find(s => s.pos.x === xy.x && s.pos.y === xy.y);
@@ -358,13 +358,13 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     if (i > 0) {
                         const sep = document.createElement('span');
                         sep.textContent = ', ';
-                        sep.style.color = '#888';
+                        sep.style.color = '#64748b';
                         el.appendChild(sep);
                     }
                     const span = document.createElement('span');
                     const cmd = o === 0 ? undefined : global?.commandants?.find(c2 => c2.numero === o);
                     span.textContent = (i === 0 ? '  ' : '') + (o === 0 ? 'Neutre (0)' : cmd ? `${cmd.nom} (${o})` : `#${o}`);
-                    span.style.color = o === 0 ? '#999' : (ownerRaceColor(o) || '#ddd');
+                    span.style.color = o === 0 ? '#94a3b8' : (ownerRaceColor(o) || '#cbd5e1');
                     el.appendChild(span);
                 });
             }
@@ -373,7 +373,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         if (nf > 0) {
             const flEl = document.createElement('span');
             flEl.textContent = `  ${nf} flotte${nf > 1 ? 's' : ''}`;
-            flEl.style.color = '#9fc6ff';
+            flEl.style.color = '#38bdf8';
             el.appendChild(flEl);
         }
     }, [systems, fleets, global, ownerRaceColor]);
@@ -616,7 +616,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         for (let r = 0; r <= rows; r++) {
             const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
             const yPos = r * cellSize;
-            if ((xCoord - 1) % 20 === 0) ctx.strokeStyle = '#123b66'; else if ((xCoord - 1) % 5 === 0) ctx.strokeStyle = '#661212'; else ctx.strokeStyle = '#444';
+            if ((xCoord - 1) % 20 === 0) ctx.strokeStyle = '#1e3a5f'; else if ((xCoord - 1) % 5 === 0) ctx.strokeStyle = '#2d3748'; else ctx.strokeStyle = '#1e293b';
             ctx.beginPath();
             ctx.moveTo(0, yPos);
             ctx.lineTo(cols * cellSize, yPos);
@@ -624,10 +624,10 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
             // Fond opaque pour l'en-tête de ligne (surligné si c'est la ligne de la case sélectionnée)
             const rowSelected = r > 0 && selected?.x === xCoord;
-            ctx.fillStyle = rowSelected ? '#ffe600' : '#1a1a1a';
+            ctx.fillStyle = rowSelected ? '#38bdf8' : '#141c28';
             ctx.fillRect(0, yPos, cellSize, cellSize);
 
-            ctx.fillStyle = rowSelected ? '#000' : '#ccc';
+            ctx.fillStyle = rowSelected ? '#0b0f17' : '#94a3b8';
             ctx.font = 'bold 12px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -637,7 +637,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         for (let c = 0; c <= cols; c++) {
             const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
             const xPos = c * cellSize;
-            if ((yCoord - 1) % 20 === 0) ctx.strokeStyle = '#123b66'; else if ((yCoord - 1) % 5 === 0) ctx.strokeStyle = '#661212'; else ctx.strokeStyle = '#444';
+            if ((yCoord - 1) % 20 === 0) ctx.strokeStyle = '#1e3a5f'; else if ((yCoord - 1) % 5 === 0) ctx.strokeStyle = '#2d3748'; else ctx.strokeStyle = '#1e293b';
             ctx.beginPath();
             ctx.moveTo(xPos, 0);
             ctx.lineTo(xPos, rows * cellSize);
@@ -645,10 +645,10 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
             // Fond opaque pour l'en-tête de colonne (surligné si c'est la colonne de la case sélectionnée)
             const colSelected = c > 0 && selected?.y === yCoord;
-            ctx.fillStyle = colSelected ? '#ffe600' : '#1a1a1a';
+            ctx.fillStyle = colSelected ? '#38bdf8' : '#141c28';
             ctx.fillRect(xPos, 0, cellSize, cellSize);
 
-            ctx.fillStyle = colSelected ? '#000' : '#ccc';
+            ctx.fillStyle = colSelected ? '#0b0f17' : '#94a3b8';
             ctx.font = 'bold 12px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -1092,7 +1092,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         // Flèche (direction / ordre de déplacement) : trait + pointe pleine, clipée à la grille.
         // Déclarée AVANT le passage des flottes qui l'appelle via renderFleetCell (la fonction est
         // hoistée, le const lui ne l'est pas — ordre d'exécution respecté ici)
-        const drawArrow = (c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, color = '#ff9800') => {
+        const drawArrow = (c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, color = '#f59e0b') => {
             const headLen = Math.max(6, Math.floor(cellSize * 0.25));
             const angle = Math.atan2(y2 - y1, x2 - x1);
             c.save();
@@ -1181,7 +1181,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
             // Ordre de déplacement : anneau ambre autour du disque blanc (flotte « modifiée vs rapport »)
             if (fGroup.some(f => f.type === 'joueur' && deplacements && deplacements[f.num])) {
-                c2d.strokeStyle = '#ff9800';
+                c2d.strokeStyle = '#f59e0b';
                 c2d.lineWidth = 2;
                 c2d.beginPath();
                 c2d.arc(cx, cy, diameter / 2 + 3, 0, Math.PI * 2);
@@ -1260,9 +1260,9 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     const dist = getTorusDistance(f.pos, showFleetsFor);
                     const reachable = dist <= f.vitesse;
 
-                    // Couleur : vert/jaune clair si atteignable, orange clair sinon
-                    ctx.strokeStyle = reachable ? '#ccff00' : '#ffa500';
-                    ctx.fillStyle = reachable ? '#ccff0000' : '#ffa500';
+                    // Couleur : émeraude clair si atteignable, ambre sinon
+                    ctx.strokeStyle = reachable ? '#10b981' : '#f59e0b';
+                    ctx.fillStyle = reachable ? 'rgba(16, 185, 129, 0)' : '#f59e0b';
                     ctx.setLineDash([5, 5]);
 
                     // On calcule le delta le plus court sur le tore
@@ -1357,12 +1357,12 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     const py = dy * cellSize;
 
                     // Bandes discrètes sur la ligne et la colonne pour repérer la case
-                    cSel.fillStyle = 'rgba(255, 230, 0, 0.08)';
+                    cSel.fillStyle = 'rgba(56, 189, 248, 0.05)';
                     cSel.fillRect(px, cellSize, cellSize, rows * cellSize);
                     cSel.fillRect(cellSize, py, cols * cellSize, cellSize);
 
                     // Remplissage léger de la case
-                    cSel.fillStyle = 'rgba(255, 230, 0, 0.18)';
+                    cSel.fillStyle = 'rgba(56, 189, 248, 0.16)';
                     cSel.fillRect(px, py, cellSize, cellSize);
 
                     // Contour : trait sombre puis trait clair pour être lisible sur tout fond
@@ -1370,7 +1370,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     cSel.strokeStyle = 'rgba(0, 0, 0, 0.8)';
                     cSel.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
                     cSel.lineWidth = 2;
-                    cSel.strokeStyle = '#ffe600';
+                    cSel.strokeStyle = '#38bdf8';
                     cSel.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
 
                     // Coins en équerre débordant de la case
@@ -1398,10 +1398,8 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 let ddy = t.y - f.pos.y;
                 if (ddy > BOUNDS.maxY / 2) ddy -= BOUNDS.maxY;
                 if (ddy < -BOUNDS.maxY / 2) ddy += BOUNDS.maxY;
-                // Hors de la portée de la flotte : flèche rouge (à portée : verte).
-                // L'orange (#ff9800) est déjà utilisé par les flèches de direction préexistantes,
-                // d'où le vert/rouge pour les ordres de déplacement en attente.
-                const cDeplacement = getTorusDistance(f.pos, t) > f.vitesse ? '#f44336' : '#4caf50';
+                // Hors de la portée de la flotte : flèche rouge (à portée : émeraude).
+                const cDeplacement = getTorusDistance(f.pos, t) > f.vitesse ? '#ef4444' : '#10b981';
                 // La flèche part de chaque copie de la case de la flotte visible dans le viewport
                 // (viewport plus grand que le tore : mêmes copies que le passage des disques)
                 let dx = ((f.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
@@ -1461,7 +1459,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         // ligne origine→case du curseur et distance en cases. Dessiné en tout dernier, par-dessus tout.
         if (dragFleet) {
             const dDist = getTorusDistance(dragFleet.from, dragFleet.cursor);
-            const dColor = dDist <= dragFleet.vitesse ? '#4caf50' : '#f44336';
+            const dColor = dDist <= dragFleet.vitesse ? '#10b981' : '#ef4444';
             const dCtx = ctx as CanvasRenderingContext2D;
             dCtx.save();
             // Clip sur la zone de grille (jamais sur les en-têtes)
@@ -1814,9 +1812,9 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 ref={tooltipRef}
                 style={{
                     position: 'absolute', display: 'none', pointerEvents: 'none', zIndex: 200,
-                    background: 'rgba(15, 15, 20, 0.95)', border: '1px solid #555', borderRadius: 4,
-                    padding: '4px 8px', fontSize: '0.8em', color: '#ddd', whiteSpace: 'nowrap',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                    background: 'rgba(15, 23, 42, 0.95)', border: '1px solid #334155', borderRadius: 6,
+                    padding: '5px 10px', fontSize: '0.8rem', color: '#f1f5f9', whiteSpace: 'nowrap',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
                 }}
             />
         </div>);

@@ -15,7 +15,6 @@ export interface FleetPickerProps {
 
 const OFFSET = 12; // écart entre l'ancre et le panneau
 const EDGE = 6; // marge minimum par rapport au bord de la fenêtre
-const PANEL_WIDTH = 280; // largeur optimisée pour lisibilité
 const DRAG_VISIBLE_X = 40; // part du panneau restée visible (gauche/droite) pendant le drag de l'en-tête
 const DRAG_VISIBLE_Y = 24; // part du panneau restée visible (haut/bas) pendant le drag de l'en-tête
 
@@ -28,6 +27,9 @@ function clampPanelPos(left: number, top: number, w: number, h: number) {
 }
 
 export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, onClose}: FleetPickerProps) {
+    const isSingle = fleets.length === 1;
+    const panelWidth = isSingle ? 240 : 280;
+
     const panelRef = useRef<HTMLDivElement>(null);
     const [hoverNum, setHoverNum] = useState<number | undefined>(undefined);
     // Hors écran le temps de mesurer le panneau (useLayoutEffect : avant le premier paint, pas de flash)
@@ -42,14 +44,14 @@ export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, 
     useLayoutEffect(() => {
         const el = panelRef.current;
         if (!el) return;
-        const w = el.offsetWidth;
-        const h = el.offsetHeight;
+        const w = el.offsetWidth || panelWidth;
+        const h = el.offsetHeight || 140;
         let left = anchor.x + OFFSET;
         let top = anchor.y + OFFSET;
         if (left + w > window.innerWidth - EDGE) left = anchor.x - w - OFFSET;
         if (top + h > window.innerHeight - EDGE) top = anchor.y - h - OFFSET;
         setPos({left: Math.max(EDGE, left), top: Math.max(EDGE, top)});
-    }, [anchor.x, anchor.y]);
+    }, [anchor.x, anchor.y, panelWidth]);
 
     // Échap ferme le sélecteur
     useEffect(() => {
@@ -83,7 +85,7 @@ export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, 
             const s = dragPanel.current;
             if (!s) return;
             const el = panelRef.current;
-            const w = el ? el.offsetWidth : PANEL_WIDTH; // taille mesurée
+            const w = el ? el.offsetWidth : panelWidth;
             const h = el ? el.offsetHeight : 200;
             setPos(clampPanelPos(s.left + (ev.clientX - s.mouseX), s.top + (ev.clientY - s.mouseY), w, h));
         };
@@ -107,7 +109,7 @@ export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, 
                 left: pos.left,
                 top: pos.top,
                 zIndex: 300, // au-dessus du tooltip (200)
-                width: PANEL_WIDTH,
+                width: panelWidth,
                 background: 'rgba(15, 23, 42, 0.96)',
                 backdropFilter: 'blur(8px)',
                 border: '1px solid #334155',
@@ -118,6 +120,7 @@ export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, 
                 overflow: 'hidden',
             }}
         >
+            {/* En-tête : compact pour 1 flotte, complet pour plusieurs */}
             <div
                 title="Glisser pour repositionner ce panneau"
                 onMouseDown={startPanelDrag}
@@ -125,17 +128,17 @@ export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, 
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '8px 12px',
+                    padding: isSingle ? '6px 10px' : '8px 12px',
                     background: 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)',
                     borderBottom: '1px solid #334155',
                     cursor: dragging ? 'grabbing' : 'grab',
                     userSelect: 'none',
                 }}
             >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                     <IconGrip size={14} color="#94a3b8" />
-                    <span style={{ fontWeight: 600, color: '#f8fafc', fontSize: '0.875rem' }}>
-                        Déplacer une flotte
+                    <span style={{ fontWeight: 600, color: '#f8fafc', fontSize: isSingle ? '0.8rem' : '0.875rem', whiteSpace: 'nowrap' }}>
+                        {isSingle ? 'Déplacer la flotte' : `Flottes sur la case (${fleets.length})`}
                     </span>
                 </div>
                 <button
@@ -169,8 +172,8 @@ export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, 
                 </button>
             </div>
 
-            <div style={{ padding: '6px 12px 4px', fontSize: '0.75rem', color: '#94a3b8' }}>
-                Glissez une flotte vers sa destination sur la carte :
+            <div style={{ padding: '6px 10px 4px', fontSize: '0.75rem', color: '#94a3b8' }}>
+                {isSingle ? 'Glissez la carte ci-dessous vers la cible :' : 'Glissez une flotte vers sa destination :'}
             </div>
 
             <div style={{ padding: '4px 6px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>

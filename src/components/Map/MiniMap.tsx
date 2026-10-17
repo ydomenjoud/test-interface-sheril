@@ -35,7 +35,7 @@ export default function MiniMap({ onCenter, colorMode = 'status' }: Props) {
     if (!ctx) return;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
-    ctx.fillStyle = '#111';
+    ctx.fillStyle = '#0b0f17';
     ctx.fillRect(0, 0, cvs.clientWidth, cvs.clientHeight);
 
     // Si on a un centre, on centre la minimap dessus
@@ -68,7 +68,7 @@ export default function MiniMap({ onCenter, colorMode = 'status' }: Props) {
     if (viewportCols > 0 && viewportRows > 0) {
       const rectW = Math.min(1, viewportCols / BOUNDS.maxY) * cvs.clientWidth;
       const rectH = Math.min(1, viewportRows / BOUNDS.maxX) * cvs.clientHeight;
-      ctx.strokeStyle = '#71deff';
+      ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 2;
       ctx.strokeRect(midX - rectW / 2, midY - rectH / 2, rectW, rectH);
     }

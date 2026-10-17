@@ -32,6 +32,7 @@ import {
   IconClose,
   IconChevronDown,
   IconChevronRight,
+  IconChevronLeft,
   IconChevronUp,
   IconArrowRight,
 } from '../components/icons/Icons';
@@ -151,6 +152,19 @@ export default function Carte() {
     return saved !== null ? JSON.parse(saved) : false;
   });
 
+  const [infoPanelCollapsed, setInfoPanelCollapsed] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('carte_info_collapsed');
+      return saved !== null ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('carte_info_collapsed', JSON.stringify(infoPanelCollapsed));
+  }, [infoPanelCollapsed]);
+
   useEffect(() => {
     localStorage.setItem('carte_filters_expanded', JSON.stringify(filtersExpanded));
   }, [filtersExpanded]);
@@ -226,7 +240,7 @@ export default function Carte() {
   }, [rapport, stabilitySystemPos]);
 
   const noRapportMessage = !rapport ? (
-    <div className="no-rapport-hint" style={{ padding: '4px 12px', background: '#332200', color: '#ffcc00', fontSize: '0.9em' }}>
+    <div className="no-rapport-hint" style={{ padding: '6px 14px', background: 'rgba(245, 158, 11, 0.12)', color: '#fbbf24', borderBottom: '1px solid #f59e0b', fontSize: '0.85rem' }}>
       Aucun rapport chargé. Seuls les systèmes connus de la galaxie sont affichés.
     </div>
   ) : null;
@@ -314,6 +328,9 @@ export default function Carte() {
       if (e.code === 'KeyG' || e.key.toLowerCase() === 'g') {
         e.preventDefault();
         setShowGoto(true);
+      } else if (e.code === 'KeyI' || e.key.toLowerCase() === 'i') {
+        e.preventDefault();
+        setInfoPanelCollapsed(v => !v);
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault(); // sinon le navigateur revient à la page précédente / suivante
         setPlaying(false); // une navigation manuelle interrompt la lecture
@@ -511,7 +528,13 @@ export default function Carte() {
 
   const nbDeplacements = Object.keys(deplacements).length;
   return (
-    <div className="carte-wrap">
+    <div
+      className={`carte-wrap ${infoPanelCollapsed ? 'info-collapsed' : ''}`}
+      style={{
+        gridTemplateColumns: infoPanelCollapsed ? '1fr 0px' : '65vw 35vw',
+        transition: 'grid-template-columns 0.2s ease-in-out',
+      }}
+    >
       <div className="carte-toolbar">
         {/* Vue : taille des cases + position */}
         <div className="carte-toolbar-group">
@@ -613,7 +636,7 @@ export default function Carte() {
                 value={rapport?.tour ?? ''}
                 onChange={(e) => { stopPlay(); selectTour(Number(e.target.value)); }}
                 className="carte-select"
-                style={{ border: viewingPastTour ? '2px solid #ffe600' : undefined }}
+                style={{ border: viewingPastTour ? '2px solid #f59e0b' : undefined }}
                 title={viewingPastTour ? 'Tour passé : les données ne sont pas celles du dernier tour' : undefined}
               >
                 {tourOptions.map(t => (
@@ -651,8 +674,8 @@ export default function Carte() {
             {playing && (
               // Temps restant avant le tour suivant
               <div title="Temps avant le tour suivant" className="carte-toolbar-label" style={{ gap: 4 }}>
-                <div style={{ width: 50, height: 4, background: '#333', borderRadius: 2, overflow: 'hidden' }}>
-                  <div style={{ width: `${(remainingMs / playStepMs) * 100}%`, height: '100%', background: '#ffe600', transition: 'width 0.2s linear' }} />
+                <div style={{ width: 50, height: 4, background: '#1e293b', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ width: `${(remainingMs / playStepMs) * 100}%`, height: '100%', background: '#38bdf8', transition: 'width 0.2s linear' }} />
                 </div>
                 {Math.ceil(remainingMs / 1000)} s
               </div>
@@ -660,8 +683,18 @@ export default function Carte() {
           </div>
         )}
 
-        {/* Actions : import */}
+        {/* Actions : import et panneau info */}
         <div className="carte-toolbar-group" style={{ marginLeft: 'auto' }}>
+          <button
+            type="button"
+            className={infoPanelCollapsed ? 'carte-btn' : 'carte-btn active'}
+            onClick={() => setInfoPanelCollapsed(v => !v)}
+            title={infoPanelCollapsed ? "Afficher le panneau d'informations (Alt + I)" : "Masquer le panneau d'informations (Alt + I)"}
+            aria-label="Afficher ou masquer le panneau d'informations"
+          >
+            {infoPanelCollapsed ? <IconChevronLeft size={13} /> : <IconChevronRight size={13} />}
+            <span className="hideOnMobile">{infoPanelCollapsed ? 'Détails' : 'Masquer détails'}</span>
+          </button>
           <button onClick={() => setShowPaste(true)} className="carte-btn">
             Importer systèmes
           </button>
@@ -714,15 +747,29 @@ export default function Carte() {
             onFleetDragLeave={onFleetDragLeave}
             onFleetDrop={onFleetDrop}
           />
+          {/* Bouton pour ré-ouvrir le panneau info quand il est replié */}
+          {infoPanelCollapsed && (
+            <button
+              type="button"
+              className="carte-open-info-btn"
+              onClick={() => setInfoPanelCollapsed(false)}
+              title="Afficher le panneau d'informations (Alt + I)"
+              aria-label="Afficher le panneau d'informations"
+            >
+              <IconChevronLeft size={14} />
+              <span>Détails</span>
+              {selected && <span className="carte-open-info-badge">{selected.x}-{selected.y}</span>}
+            </button>
+          )}
           {showMiniMap && <MiniMap onCenter={(x, y) => setCenter({ x, y })} colorMode={colorMode} />}
           {/* Légende des couleurs (mode Alliés/Ennemis) : la carte se suffit à elle-même au coup d'œil */}
           {colorMode === 'status' && (
             <div className="map-legend" title="Couleurs de possession des systèmes et des flottes">
-              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#09ca31' }} /> moi</span>
-              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#224eff' }} /> alliance</span>
-              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#ffff00' }} /> PNA</span>
-              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#f80c0c' }} /> ennemi</span>
-              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#999999' }} /> neutre</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#10b981' }} /> moi</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#3b82f6' }} /> alliance</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#f59e0b' }} /> PNA</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#ef4444' }} /> ennemi</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#94a3b8' }} /> neutre</span>
               <span className="map-legend-item"><span className="map-legend-dot map-legend-fleet" /> flotte</span>
               <span className="map-legend-item" title="Système avec une capacité de réparation (bordure blanche épaisse sur le disque)"><span className="map-legend-dot" style={{ background: 'transparent', border: '3px solid #fff' }} /> réparation</span>
             </div>
@@ -775,7 +822,7 @@ export default function Carte() {
                   <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', minHeight: 0 }}>
                       {/* Filtre multi-sélection des commandants */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          <span style={{ fontSize: '0.85em', color: '#aaa' }}>Afficher uniquement Commandants</span>
+                          <span style={{ fontSize: '0.85em', color: '#94a3b8' }}>Afficher uniquement Commandants</span>
                           <MultiSelectDropdown
                               title=""
                               placeholder={"Choisir"}
@@ -788,7 +835,7 @@ export default function Carte() {
                       {/* Filtre par tags */}
                       {allTags.length > 0 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                              <span style={{ fontSize: '0.85em', color: '#aaa' }}>Tags</span>
+                              <span style={{ fontSize: '0.85em', color: '#94a3b8' }}>Tags</span>
                               <MultiSelectDropdown
                                   title="Tous"
                                   options={selectedTagsOption}
@@ -798,8 +845,8 @@ export default function Carte() {
                           </div>
                       )}
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #444', paddingTop: 8 }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #334155', paddingTop: 8 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               checked={showSystems}
@@ -809,7 +856,7 @@ export default function Carte() {
                           </label>
                           <label
                             title="Systèmes connus uniquement par les données publiques (data.xml), jamais détectés dans vos rapports"
-                            style={{ display: 'flex', alignItems: 'center', gap: 6, color: showSystems ? '#eee' : '#777', fontSize: '0.9em', cursor: showSystems ? 'pointer' : 'default', marginLeft: 16 }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, color: showSystems ? '#f1f5f9' : '#64748b', fontSize: '0.9em', cursor: showSystems ? 'pointer' : 'default', marginLeft: 16 }}
                           >
                             <input
                               type="checkbox"
@@ -819,7 +866,7 @@ export default function Carte() {
                             />
                             Carte galactique
                           </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               checked={showSectors}
@@ -827,7 +874,7 @@ export default function Carte() {
                             />
                             Afficher secteurs
                           </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               checked={showInfluence}
@@ -839,8 +886,8 @@ export default function Carte() {
                           {showInfluence && (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginLeft: 20 }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                      <span style={{ fontSize: '0.8em', color: '#aaa' }}>Opacité ( défaut 18% )</span>
-                                      <span style={{ fontSize: '0.8em', color: '#eee' }}>{Math.round(influenceOpacity * 100)}%</span>
+                                      <span style={{ fontSize: '0.8em', color: '#94a3b8' }}>Opacité ( défaut 18% )</span>
+                                      <span style={{ fontSize: '0.8em', color: '#f1f5f9' }}>{Math.round(influenceOpacity * 100)}%</span>
                                   </div>
                                   <input
                                       type="range"
@@ -854,7 +901,7 @@ export default function Carte() {
                               </div>
                           )}
 
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               checked={showMiniMap}
@@ -863,18 +910,18 @@ export default function Carte() {
                             Afficher minimap
                           </label>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-                              <span style={{ fontSize: '0.85em', color: '#aaa' }}>Mode de couleur</span>
+                              <span style={{ fontSize: '0.85em', color: '#94a3b8' }}>Mode de couleur</span>
                               <div style={{ display: 'flex', gap: 4 }}>
                                   <button
                                       onClick={() => setColorMode('status')}
                                       style={{
                                           flex: 1,
-                                          fontSize: '0.8em',
-                                          padding: '4px 2px',
+                                          fontSize: '0.8rem',
+                                          padding: '5px 4px',
                                           cursor: 'pointer',
-                                          backgroundColor: colorMode === 'status' ? '#555' : '#333',
-                                          color: '#eee',
-                                          border: '1px solid #666',
+                                          backgroundColor: colorMode === 'status' ? '#1e3a5f' : '#1e2530',
+                                          color: colorMode === 'status' ? '#38bdf8' : '#94a3b8',
+                                          border: colorMode === 'status' ? '1px solid #38bdf8' : '1px solid #334155',
                                           borderRadius: 4
                                       }}
                                   >
@@ -884,12 +931,12 @@ export default function Carte() {
                                       onClick={() => setColorMode('player')}
                                       style={{
                                           flex: 1,
-                                          fontSize: '0.8em',
-                                          padding: '4px 2px',
+                                          fontSize: '0.8rem',
+                                          padding: '5px 4px',
                                           cursor: 'pointer',
-                                          backgroundColor: colorMode === 'player' ? '#555' : '#333',
-                                          color: '#eee',
-                                          border: '1px solid #666',
+                                          backgroundColor: colorMode === 'player' ? '#1e3a5f' : '#1e2530',
+                                          color: colorMode === 'player' ? '#38bdf8' : '#94a3b8',
+                                          border: colorMode === 'player' ? '1px solid #38bdf8' : '1px solid #334155',
                                           borderRadius: 4
                                       }}
                                   >
@@ -897,7 +944,7 @@ export default function Carte() {
                                   </button>
                               </div>
                           </div>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               checked={showCombatBadges}
@@ -905,7 +952,7 @@ export default function Carte() {
                             />
                             Badges combats
                           </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               checked={showOwnerBadges}
@@ -913,7 +960,7 @@ export default function Carte() {
                             />
                             Badges propriétaires
                           </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               checked={showFleetBadges}
@@ -924,9 +971,9 @@ export default function Carte() {
                       </div>
 
                       {zones.length > 0 && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid #444', paddingTop: 8 }}>
-                              <span style={{ fontSize: '0.85em', color: '#aaa' }}>Zones manuelles (Alt + clic + glisser)</span>
-                              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid #334155', paddingTop: 8 }}>
+                              <span style={{ fontSize: '0.85em', color: '#94a3b8' }}>Zones manuelles (Alt + clic + glisser)</span>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
                                   <input
                                       type="checkbox"
                                       checked={showZones}
@@ -936,7 +983,7 @@ export default function Carte() {
                               </label>
                               {/* Choix par label, sans effet tant que toutes les zones sont masquées */}
                               {zoneLabels.map(label => (
-                                  <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, color: showZones ? '#eee' : '#777', fontSize: '0.9em', cursor: showZones ? 'pointer' : 'default', marginLeft: 16 }}>
+                                  <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, color: showZones ? '#f1f5f9' : '#64748b', fontSize: '0.9em', cursor: showZones ? 'pointer' : 'default', marginLeft: 16 }}>
                                       <input
                                           type="checkbox"
                                           disabled={!showZones}
@@ -953,9 +1000,9 @@ export default function Carte() {
                           </div>
                       )}
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #444', paddingTop: 8 }}>
-                          <span style={{ fontSize: '0.85em', color: '#aaa' }}>Portées Radar</span>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #334155', paddingTop: 8 }}>
+                          <span style={{ fontSize: '0.85em', color: '#94a3b8' }}>Portées Radar</span>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               checked={showSystemRadar}
@@ -963,7 +1010,7 @@ export default function Carte() {
                             />
                             Systèmes
                           </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               checked={showFleetRadar}
@@ -973,9 +1020,9 @@ export default function Carte() {
                           </label>
                       </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #444', paddingTop: 8 }}>
-                          <span style={{ fontSize: '0.85em', color: '#aaa' }}>Distance Capitale</span>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#eee', fontSize: '0.9em', cursor: 'pointer' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #334155', paddingTop: 8 }}>
+                          <span style={{ fontSize: '0.85em', color: '#94a3b8' }}>Distance Capitale</span>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
                               <input
                                   type="checkbox"
                                   checked={showStabilityZones}
@@ -987,10 +1034,11 @@ export default function Carte() {
                               value={stabilitySystemPos || ''}
                               onChange={(e) => setStabilitySystemPos(e.target.value)}
                               style={{
-                                  background: '#333',
-                                  color: '#eee',
-                                  border: '1px solid #555',
-                                  padding: '2px 4px',
+                                  background: '#1e2530',
+                                  color: '#f1f5f9',
+                                  border: '1px solid #334155',
+                                  borderRadius: 4,
+                                  padding: '4px 6px',
                                   fontSize: '0.85em'
                               }}
                           >
@@ -1013,34 +1061,15 @@ export default function Carte() {
               )}
           </div>
 
-          {/* Déplacements en attente : un seul par flotte, repliable comme le panneau Filtres
-              (toujours visible, en-tête cliquable ; l'icône ⇢ de la barre d'outils le pilote aussi).
-              Haut à gauche de la zone de carte : en haut à droite les Filtres, en bas à droite la
-              mini-carte, en bas à gauche la légende ; le panneau info est dans sa propre colonne */}
-          <div style={{
-            position: 'absolute',
-            top: 8,
-            left: 8,
-            width: deplacementsExpanded ? 580 : 180, // replié : assez large pour lire « Déplacements (n) » ; déplié : un déplacement par ligne
-            backgroundColor: 'rgba(15, 23, 42, 0.96)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid #334155',
-            borderRadius: 8,
-            boxShadow: '0 8px 20px rgba(0,0,0,0.6)',
-            zIndex: 100,
-            display: 'flex',
-            flexDirection: 'column',
-            // Le panneau ne dépasse pas la zone de la carte : l'en-tête reste accessible et le contenu défile
-            maxHeight: 'calc(100% - 16px)',
-            transition: 'width 0.25s ease'
-          }}>
+          {/* Déplacements en attente : tiroir de commandes tactique repliable au bas de la carte */}
+          <div className={`carte-deplacements-drawer ${deplacementsExpanded ? 'expanded' : 'collapsed'}`}>
             <div
               onClick={() => setDeplacementsExpanded(!deplacementsExpanded)}
               style={{
-                padding: '8px 12px',
+                padding: '8px 14px',
                 backgroundColor: '#1e2530',
                 borderBottom: deplacementsExpanded ? '1px solid #334155' : 'none',
-                borderRadius: deplacementsExpanded ? '8px 8px 0 0' : 8,
+                borderRadius: '8px 8px 0 0',
                 cursor: 'pointer',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -1049,7 +1078,8 @@ export default function Carte() {
                 fontWeight: 'bold',
                 fontSize: '0.875rem',
                 color: '#f1f5f9',
-                flexShrink: 0
+                flexShrink: 0,
+                userSelect: 'none',
               }}
             >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -1057,7 +1087,7 @@ export default function Carte() {
                 Déplacements ({nbDeplacements})
               </span>
               <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, color: '#94a3b8' }}>
-                {deplacementsExpanded ? <IconChevronDown size={15} /> : <IconChevronRight size={15} />}
+                {deplacementsExpanded ? <IconChevronDown size={15} /> : <IconChevronUp size={15} />}
               </span>
             </div>
             {deplacementsExpanded && (
@@ -1234,7 +1264,13 @@ export default function Carte() {
         </div>
       </div>
 
-      <InfoPanel selected={selected} onFleetHover={setHoverFleetPos} />
+      <div style={{ display: infoPanelCollapsed ? 'none' : 'block', height: '100%', overflow: 'hidden' }}>
+        <InfoPanel
+          selected={selected}
+          onFleetHover={setHoverFleetPos}
+          onClose={() => setInfoPanelCollapsed(true)}
+        />
+      </div>
 
       {showGoto && (
         <GotoDialog
@@ -1259,7 +1295,7 @@ export default function Carte() {
             style={{ width: '100%', height: 180 }}
           />
           {pasteFeedback && (
-            <div style={{ marginTop: 8, color: '#9f9' }}>{pasteFeedback}</div>
+            <div style={{ marginTop: 8, color: '#4ade80' }}>{pasteFeedback}</div>
           )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
             <button type="button" onClick={() => setShowPaste(false)}>Annuler</button>

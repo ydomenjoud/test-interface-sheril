@@ -116,6 +116,7 @@ panneau "Filtres", qui garde la même liste complète) :
   - L'icône ▣ dans les filtres rapides de la barre d'outils (et une case à cocher dans les Filtres) permet de
     l'afficher/masquer ; elle est affichée par défaut.
 - Header: un bouton "Capitale" recentre la carte principale sur la capitale du joueur.
+- Panneau d'informations : repliable via un bouton dédié dans la barre d'outils, le raccourci Alt + I ou le bouton de fermeture dans l'en-tête, offrant une vue pleine largeur à la carte (colonne à 0 px avec onglet d'accès rapide sur le bord droit). L'intérieur est organisé en onglets rapides (Tout / Système / Flottes / Tactique) avec badges de comptage évitant le défilement vertical infini.
 
 ### données à afficher
 
@@ -213,9 +214,10 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 
 ### geste
 
-- Un mousedown sur une case occupée par au moins une flotte du joueur ouvre le sélecteur de flotte (« Déplace une
-  flotte »), ancré sur le point de clic : il liste les flottes de la case avec leur déplacement en cours éventuel
-  (« déjà déplacée → 0_x_y »). La fenêtre est déplaçable en saisissant son en-tête (pour ne pas masquer
+- Un mousedown sur une case occupée par au moins une flotte du joueur ouvre le sélecteur de flotte (« Déplacer une
+  flotte »), ancré sur le point de clic : pour une seule flotte, il s'affiche sous forme de puce d'action compacte
+  immédiate ; pour plusieurs flottes, il liste les flottes de la case avec badges de vitesse et de composition
+  (« déjà déplacée → 0_x_y »). La fenêtre est déplaçable en saisissant sa poignée d'en-tête (pour ne pas masquer
   d'informations importantes) ; le bouton × et le drag des lignes ne sont pas affectés.
 - Un simple clic reste une sélection de case (le sélecteur se referme au mousedown suivant) ; le pan et les zones
   Alt + clic + glisser sont inchangés — un pan qui démarre sur la case annule le sélecteur, et Alt + clic n'ouvre
@@ -253,11 +255,11 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 
 ### panneau « Déplacements »
 
-- Un panneau compact en haut à gauche de la zone de carte (mini-carte en bas à droite, Filtres en haut à droite,
-  légende en bas à gauche ; le panneau info occupe sa propre colonne), repliable comme le panneau Filtres : toujours
-  visible, en-tête cliquable « Déplacements (n) » (▸/▾), largeur animée 170 px replié (assez large pour lire
-  « Déplacements (n) ») / 560 px déplié (un déplacement par ligne) ; une icône ⇢ dans la barre d'outils pilote le
-  même état. Le panneau se déplie tout seul au premier dépos.
+- Un tiroir de commandes tactique repliable au bas de la zone de carte (centré entre la légende à gauche et la
+  mini-carte à droite, pour ne plus jamais masquer les systèmes du quart haut-gauche), repliable comme le panneau Filtres :
+  toujours visible, en-tête cliquable « Déplacements (n) » (▴/▾), replié en onglet compact de 38 px / déplié en tiroir de commandes
+  s'élevant vers le haut (un déplacement par ligne) ; une icône ⇢ dans la barre d'outils pilote le même état. Le panneau se déplie tout
+  seul au premier dépos.
 - Déplié, chaque déplacement tient sur UNE ligne : nom de la flotte puis son numéro « Nom (#n) » (ou « Flotte #n » si
   la flotte n'est plus dans le rapport, tronqué avec ellipsis si trop long), origine → destination où chaque case
   s'affiche au NOM du système qui l'occupe quand il y en a un (coordonnées au survol), sinon en coordonnées x_y ;

@@ -195,6 +195,14 @@ export function IconChevronRight({ size = 16, className, style, color, strokeWid
   );
 }
 
+export function IconChevronLeft({ size = 16, className, style, color, strokeWidth = 2 }: IconProps) {
+  return (
+    <svg {...baseProps(size, color, strokeWidth)} className={className} style={style}>
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+
 export function IconChevronUp({ size = 16, className, style, color, strokeWidth = 2 }: IconProps) {
   return (
     <svg {...baseProps(size, color, strokeWidth)} className={className} style={style}>
