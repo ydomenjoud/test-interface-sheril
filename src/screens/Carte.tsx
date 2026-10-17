@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback, useMemo} from 'react';
+import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import {useReport} from '../context/ReportContext';
 import CanvasMap, {ZoneRect} from '../components/Map/CanvasMap';
 import MiniMap from '../components/Map/MiniMap';
@@ -6,18 +6,37 @@ import InfoPanel from '../components/Map/InfoPanel';
 import ZoneDialog from '../components/Map/ZoneDialog';
 import MapHelp from '../components/Map/MapHelp';
 import GotoDialog from '../components/Map/GotoDialog';
+import {FleetPicker} from '../components/Map/FleetPicker';
 import {isTypingTarget} from '../utils/keyboard';
-import {wrapX, wrapY} from '../utils/position';
+import {wrapX, wrapY, getTorusDistance, posToString} from '../utils/position';
 import Modal from '../components/utils/Modal';
-import {XY, Zone} from '../types';
+import {GlobalData, XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
+import {loadDeplacements, saveDeplacements, clearDeplacements} from '../storage/deplacementOrdersStorage';
+import {CDT_DEFAUT, DeplacementEnAttente, DeplacementOrdre, DIRECTIVE_CDT, DIRECTIVE_DEFAUT, OPTIONS_DIRECTIVES, STRATEGIE_DEFAUT, schemaDeplacements} from '../utils/ordreDeplacement';
+import {copierSchema} from '../utils/ordreSchema';
+
+// Libellé du commandant visé par la directive « Attaque flottes cdt » (infobulle du menu)
+const commandantViserLabel = (globalData: GlobalData | undefined, num: number): string =>
+    num === CDT_DEFAUT ? 'Neutre' : (globalData?.commandants.find(c => c.numero === num)?.nom ?? `cdt ${num}`);
 
 // Durée d'affichage de chaque tour pendant la lecture automatique de l'historique (en secondes, modifiable)
 const DEFAULT_PLAY_STEP_S = 2;
 const MAX_PLAY_STEP_S = 60;
 
+// Boutons du panneau des déplacements (mêmes codes que l'écran Planification des Revenus)
+const styleBoutonDeplacement: React.CSSProperties = {
+    backgroundColor: '#333',
+    color: '#fff',
+    border: '1px solid #555',
+    borderRadius: 4,
+    padding: '4px 8px',
+    fontSize: '0.85em',
+    cursor: 'pointer'
+};
+
 export default function Carte() {
-  const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText, allTags, selectedTags, setSelectedTags, zones, zoneLabels, hiddenZoneLabels, setHiddenZoneLabels, tours, selectTour } = useReport();
+  const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText, allTags, selectedTags, setSelectedTags, zones, zoneLabels, hiddenZoneLabels, setHiddenZoneLabels, tours, selectTour, importCount } = useReport();
   const [zoneDialogRect, setZoneDialogRect] = useState<ZoneRect | undefined>(undefined);
   const [zonePreview, setZonePreview] = useState<Omit<Zone, 'id'> | undefined>(undefined);
   const closeZoneDialog = useCallback(() => {
@@ -25,6 +44,8 @@ export default function Carte() {
     setZonePreview(undefined); // validée ou annulée, l'aperçu disparaît
   }, []);
   const [selected, setSelected] = useState<XY | undefined>(undefined);
+  // Case mise en surbrillance sur la carte quand on survole une ligne de flotte du panneau info
+  const [hoverFleetPos, setHoverFleetPos] = useState<XY | undefined>(undefined);
   const [showFleetsFor, setShowFleetsFor] = useState<XY | undefined>(undefined);
   const [showGoto, setShowGoto] = useState(false);
   const [selectedOwners, setSelectedOwners] = useState<(number)[]>(() => {
@@ -280,6 +301,189 @@ export default function Carte() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [tourOptions, rapport?.tour, selectTour]);
+
+  // ---- Déplacements de flottes : schéma d'ordres (glisser-déposer sur la carte) ----
+  // Les déplacements sont rattachés au tour du rapport affiché, comme la planification des revenus
+  const tour = rapport?.tour;
+  const [deplacements, setDeplacements] = useState<Record<number, DeplacementEnAttente>>(() => (tour !== undefined ? loadDeplacements(tour) : {}));
+  // Panneau des déplacements : replié par défaut (comme Filtres), s'ouvre tout seul au premier dépos
+  const [deplacementsExpanded, setDeplacementsExpanded] = useState(false);
+  // Le sélecteur de flotte, ancré sur le mousedown qui l'a ouvert (coordonnées client)
+  const [picker, setPicker] = useState<{ cell: XY; anchor: { x: number; y: number } } | null>(null);
+  // Flotte en cours de glisser-déposer ; le curseur est suivi pendant le drag pour le rendu en direct
+  const [dragState, setDragState] = useState<{ num: number; from: XY; vitesse: number } | null>(null);
+  const [dragCursor, setDragCursor] = useState<XY | null>(null);
+  // Feedback de la copie du schéma : le libellé du bouton revient à la normale au bout de 2 s
+  const [copieSchema, setCopieSchema] = useState<'ok' | 'ko' | null>(null);
+  const copieTimerRef = useRef<number | undefined>(undefined);
+
+  // Fin d'un geste de déplacement (dépos, annulation, changement de tour, mousedown sur la carte) :
+  // sélecteur et suivi de drag remis à zéro d'un seul point de passage
+  const resetFleetDrag = useCallback(() => {
+    setPicker(null);
+    setDragState(null);
+    setDragCursor(null);
+  }, []);
+  // Fermeture du sélecteur seule (bouton ×, Échap) : sans le suivi de drag
+  const fermerPicker = useCallback(() => setPicker(null), []);
+
+  // Nouveau rapport ou changement de tour : recharger les déplacements stockés pour le tour affiché
+  // (importCount : un import d'un tour plus ancien ne change pas le rapport affiché mais vide le
+  // stockage — sans ce compteur, les déplacements en mémoire ressusciteraient à la sauvegarde)
+  useEffect(() => {
+    setDeplacements(tour !== undefined ? loadDeplacements(tour) : {});
+    resetFleetDrag();
+  }, [tour, rapport, importCount, resetFleetDrag]);
+
+  // Sauvegarde à chaque modification
+  useEffect(() => {
+    if (tour !== undefined) saveDeplacements(tour, deplacements);
+  }, [deplacements, tour]);
+
+  // Le mousedown ouvre le sélecteur ; le CanvasMap appelant « tout mousedown » AVANT « mousedown sur
+  // case de flotte » dans la même tâche, les deux setPicker sont groupés et l'ouverture l'emporte —
+  // c'est le mousedown *suivant* qui referme le sélecteur
+  const onFleetCellMouseDown = useCallback((cell: XY, clientX: number, clientY: number) => {
+    setPicker({ cell, anchor: { x: clientX, y: clientY } });
+  }, []);
+  // Tout mousedown sur la carte referme le sélecteur ouvert et nettoie un suivi de drag orphelin
+  // (drag annulé par Échap sans relâchement de bouton)
+  const onAnyCanvasMouseDown = useCallback(() => {
+    resetFleetDrag();
+  }, [resetFleetDrag]);
+  // Un pan démarre sur la case : le geste de sélection est annulé (pan et zone Alt inchangés)
+  const onFleetCellGestureAbort = useCallback(() => {
+    resetFleetDrag();
+  }, [resetFleetDrag]);
+  const onFleetDragOver = useCallback((cell: XY) => {
+    // ~60 Hz pendant le drag : on ne re-render la carte que si la case change
+    setDragCursor(prev => (prev && prev.x === cell.x && prev.y === cell.y ? prev : cell));
+  }, []);
+  // Le drag quitte la carte : on masque le tracé mais on CONSERVE l'identité (num) pour le
+  // restaurer au prochain dragover (sinon le tracé ne revient plus, le num étant illisible en dragover)
+  const onFleetDragLeave = useCallback(() => {
+    setDragCursor(null);
+  }, []);
+  // Le drag d'une ligne du sélecteur démarre : on suit la flotte. Le sélecteur reste monté PENDANT
+  // le drag — le démonter dans le dragstart ferait annuler le drag par le navigateur (la source du
+  // drag disparaît de l'DOM avant que le drag ne démarre réellement) ; il se ferme à la fin du drag
+  const onSelectFleet = useCallback((fleetNum: number) => {
+    const flotte = rapport?.flottesJoueur.find(f => f.num === fleetNum);
+    if (!flotte) return;
+    setDragState({ num: flotte.num, from: flotte.pos, vitesse: flotte.vitesse });
+    setDragCursor(null);
+  }, [rapport]);
+  // Fin du drag (dépos ou annulation) : on arrête le suivi et on referme le sélecteur
+  // (la ligne du sélecteur restant montée, son dragend nous parvient bien)
+  const onDragEnd = useCallback(() => {
+    resetFleetDrag();
+  }, [resetFleetDrag]);
+  // Filet de sécurité anti-tracé-figé pour un drag annulé (Échap sans relâchement de bouton,
+  // relâchement hors fenêtre, dépôt refusé) : on guette le relâchement global du bouton GAUCHE et
+  // un dragend éventuel au niveau document
+  useEffect(() => {
+    if (!dragState) return;
+    const onMouseUp = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      setDragState(null);
+      setDragCursor(null);
+    };
+    const onDragEnd = () => {
+      setDragState(null);
+      setDragCursor(null);
+    };
+    window.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('dragend', onDragEnd);
+    return () => {
+      window.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener('dragend', onDragEnd);
+    };
+  }, [dragState]);
+  // Dépos : sur la case d'origine de la flotte = annulation ; sinon création/remplacement de son déplacement
+  // (un seul déplacement par flotte, le re-drag remplace ; un dépos hors de portée reste autorisé, marqué en rouge)
+  const onFleetDrop = useCallback((fleetNum: number, cell: XY) => {
+    const origine = rapport?.flottesJoueur.find(f => f.num === fleetNum)?.pos;
+    // Flotte absente du rapport affiché (changement de tour pendant le drag) : on ignore le
+    // dépos plutôt que de stocker un déplacement orphelin
+    if (!origine) {
+      resetFleetDrag();
+      return;
+    }
+    if (cell.x === origine.x && cell.y === origine.y) {
+      setDeplacements(d => {
+        const reste = { ...d };
+        delete reste[fleetNum];
+        return reste;
+      });
+    } else {
+      // directive/stratégie par défaut (placeholders) : la directive est modifiable dans le menu du panneau
+      setDeplacements(d => ({ ...d, [fleetNum]: { to: cell, directive: DIRECTIVE_DEFAUT, strategy: STRATEGIE_DEFAUT } }));
+      setDeplacementsExpanded(true); // on ouvre le panneau pour montrer le résultat du dépos
+    }
+    resetFleetDrag();
+  }, [rapport, resetFleetDrag]);
+
+  // Schéma d'ordres : un ordre par déplacement dont la flotte est encore dans le rapport
+  // (une flotte introuvable, ex. tour différent, est ignorée ici et en ligne repliée du panneau)
+  const ordresDeplacement = useMemo<DeplacementOrdre[]>(() => {
+    const liste: DeplacementOrdre[] = [];
+    for (const [num, deplacement] of Object.entries(deplacements)) {
+      const flotte = rapport?.flottesJoueur.find(f => f.num === Number(num));
+      if (flotte) liste.push({
+        fleetNum: flotte.num,
+        to: deplacement.to,
+        directive: deplacement.directive,
+        strategy: deplacement.strategy,
+        cdt: deplacement.cdt,
+      });
+    }
+    return liste;
+  }, [deplacements, rapport]);
+  // Cibles seules (XY) pour le rendu de la carte (flèches/anneaux) : le reste (directive/stratégie)
+  // ne concerne que le schéma d'ordres
+  const ciblesDeplacements = useMemo<Record<number, XY>>(() => {
+    const cibles: Record<number, XY> = {};
+    for (const [num, deplacement] of Object.entries(deplacements)) cibles[Number(num)] = deplacement.to;
+    return cibles;
+  }, [deplacements]);
+  // Nom du système par position (priorité : systèmes du joueur > détectés > carte galactique,
+  // premier trouvé) : les lignes du panneau Déplacements affichent le nom quand la case en porte un
+  const nomSystemeByPos = useMemo(() => {
+    const map = new Map<string, string>();
+    const add = (s: { nom?: string; pos?: { x: number; y: number } } | null | undefined) => {
+      if (!s || !s.pos || !s.nom) return;
+      const key = `${s.pos.x}_${s.pos.y}`;
+      if (!map.has(key)) map.set(key, s.nom);
+    };
+    (rapport?.systemesJoueur || []).forEach(add);
+    (rapport?.systemesDetectes || []).forEach(add);
+    (global?.systemes || []).forEach(add);
+    return map;
+  }, [rapport, global]);
+
+  const copierLeSchema = async () => {
+    const ok = await copierSchema(schemaDeplacements(ordresDeplacement));
+    setCopieSchema(ok ? 'ok' : 'ko');
+    window.clearTimeout(copieTimerRef.current);
+    copieTimerRef.current = window.setTimeout(() => setCopieSchema(null), 2000);
+  };
+  useEffect(() => () => window.clearTimeout(copieTimerRef.current), []);
+
+  const reinitialiserDeplacements = () => {
+    setDeplacements({});
+    if (tour !== undefined) clearDeplacements(tour);
+    setDeplacementsExpanded(false);
+  };
+  // Modification de la directive (ou du commandant visé) d'un déplacement existant (menus du panneau)
+  const majDeplacement = useCallback((num: number, champ: { directive?: number; cdt?: number }) => {
+    setDeplacements(d => {
+      const actuel = d[num];
+      if (!actuel) return d;
+      return { ...d, [num]: { ...actuel, ...champ } };
+    });
+  }, []);
+
+  const nbDeplacements = Object.keys(deplacements).length;
   return (
     <div className="carte-wrap">
       <div className="carte-toolbar">
@@ -316,6 +520,7 @@ export default function Carte() {
             <button type="button" className="carte-icon-btn" title="Aide et raccourcis (?)" onClick={open}>?</button>
           )} />
           <button type="button" className={filtersExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Filtres avancés" onClick={() => setFiltersExpanded(v => !v)}>⚙</button>
+          <button type="button" className={deplacementsExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'} title="Déplacements de flottes (glisser-déposer)" onClick={() => setDeplacementsExpanded(v => !v)}>⇢</button>
         </div>
         {/* Historique : tour affiché + lecture */}
         {tourOptions.length > 0 && (
@@ -400,6 +605,7 @@ export default function Carte() {
               }
             }}
             selected={selected}
+            highlightPos={hoverFleetPos}
             showFleetsFor={showFleetsFor}
             showSystems={showSystems}
             showGlobalSystems={showGlobalSystems}
@@ -416,6 +622,14 @@ export default function Carte() {
             colorMode={colorMode}
             showStabilityZones={showStabilityZones}
             stabilitySystemPos={stabilitySystemPos}
+            deplacements={ciblesDeplacements}
+            dragFleet={dragState && dragCursor ? { from: dragState.from, vitesse: dragState.vitesse, cursor: dragCursor } : null}
+            onFleetCellMouseDown={onFleetCellMouseDown}
+            onAnyCanvasMouseDown={onAnyCanvasMouseDown}
+            onFleetCellGestureAbort={onFleetCellGestureAbort}
+            onFleetDragOver={onFleetDragOver}
+            onFleetDragLeave={onFleetDragLeave}
+            onFleetDrop={onFleetDrop}
           />
           {showMiniMap && <MiniMap onCenter={(x, y) => setCenter({ x, y })} colorMode={colorMode} />}
           {/* Légende des couleurs (mode Alliés/Ennemis) : la carte se suffit à elle-même au coup d'œil */}
@@ -427,6 +641,7 @@ export default function Carte() {
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#f80c0c' }} /> ennemi</span>
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#999999' }} /> neutre</span>
               <span className="map-legend-item"><span className="map-legend-dot map-legend-fleet" /> flotte</span>
+              <span className="map-legend-item" title="Système avec une capacité de réparation (bordure blanche épaisse sur le disque)"><span className="map-legend-dot" style={{ background: 'transparent', border: '3px solid #fff' }} /> réparation</span>
             </div>
           )}
           {/* Filtres Popup en haut à droite (la mini-carte occupe le bas à droite) */}
@@ -708,10 +923,212 @@ export default function Carte() {
                   </div>
               )}
           </div>
+
+          {/* Déplacements en attente : un seul par flotte, repliable comme le panneau Filtres
+              (toujours visible, en-tête cliquable ; l'icône ⇢ de la barre d'outils le pilote aussi).
+              Haut à gauche de la zone de carte : en haut à droite les Filtres, en bas à droite la
+              mini-carte, en bas à gauche la légende ; le panneau info est dans sa propre colonne */}
+          <div style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            width: deplacementsExpanded ? 560 : 170, // replié : assez large pour lire « Déplacements (n) » ; déplié : un déplacement par ligne
+            backgroundColor: '#222',
+            border: '1px solid #444',
+            borderRadius: 8,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+            zIndex: 100,
+            display: 'flex',
+            flexDirection: 'column',
+            // Le panneau ne dépasse pas la zone de la carte : l'en-tête reste accessible et le contenu défile
+            maxHeight: 'calc(100% - 16px)',
+            transition: 'width 0.3s ease'
+          }}>
+            <div
+              onClick={() => setDeplacementsExpanded(!deplacementsExpanded)}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#333',
+                borderBottom: deplacementsExpanded ? '1px solid #444' : 'none',
+                borderRadius: deplacementsExpanded ? '8px 8px 0 0' : 8,
+                cursor: 'pointer',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 8,
+                fontWeight: 'bold',
+                fontSize: '0.9em',
+                color: '#eee',
+                flexShrink: 0
+              }}
+            >
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Déplacements ({nbDeplacements})
+              </span>
+              <span style={{ flexShrink: 0 }}>{deplacementsExpanded ? '▾' : '▸'}</span>
+            </div>
+            {deplacementsExpanded && (
+              <>
+                <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
+                  {nbDeplacements === 0 ? (
+                    <div style={{ color: '#666', fontSize: '0.85em' }}>
+                      Aucun déplacement — cliquer une case occupée par vos flottes, puis glisser une
+                      flotte sur sa case de destination.
+                    </div>
+                  ) : (
+                    Object.entries(deplacements)
+                      .map(([num, deplacement]) => ({ num: Number(num), deplacement }))
+                      .sort((a, b) => a.num - b.num)
+                      .map(({ num, deplacement }) => {
+                        const to = deplacement.to;
+                        const flotte = rapport?.flottesJoueur.find(f => f.num === num);
+                        const origine = flotte?.pos;
+                        const dist = origine ? getTorusDistance(origine, to) : undefined;
+                        const dansPortee = dist !== undefined && flotte ? dist <= flotte.vitesse : false;
+                        // Coordonnées d'une case : nom du système s'il existe (coordonnées au survol),
+                        // sinon les coordonnées seules
+                        const coordSpan = (pos: XY) => {
+                          const nom = nomSystemeByPos.get(`${pos.x}_${pos.y}`);
+                          return nom
+                            ? <span title={`${nom} (${posToString(pos)})`}>{nom}</span>
+                            : <span>{posToString(pos)}</span>;
+                        };
+                        // Un déplacement par LIGNE : nom (tronqué si long), origine → destination (distance en
+                        // rouge si hors de portée), ⚠ compacte, menus directive/stratégie, ×
+                        return (
+                          <div key={num} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div
+                              style={{ flex: 1, fontSize: '0.85em', color: '#ddd', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                              title={flotte ? `${flotte.nom} (#${num + 1})` : `Flotte #${num + 1} (absente du rapport affiché)`}
+                            >
+                              {flotte
+                                ? <><strong>{flotte.nom}</strong><span style={{ color: '#aaa' }}> (#{num + 1})</span></>
+                                : <strong>Flotte #{num + 1}</strong>}
+                            </div>
+                            <div style={{ fontFamily: 'monospace', fontSize: '0.8em', color: '#bbb', flexShrink: 0 }}>
+                              {origine ? coordSpan(origine) : '—'} → {coordSpan(to)}
+                              {dist !== undefined && (
+                                <span
+                                  title={dansPortee ? undefined : 'Hors de portée (distance > vitesse)'}
+                                  style={{ color: dansPortee ? undefined : '#f44336', fontWeight: dansPortee ? undefined : 'bold' }}
+                                >
+                                  {' '}({dist})
+                                </span>
+                              )}
+                            </div>
+                            {flotte?.direction && (
+                              <span
+                                title={`Déjà en route vers ${posToString(flotte.direction)} dans le rapport`}
+                                style={{ color: '#ff9800', flexShrink: 0, fontSize: '0.85em' }}
+                              >
+                                ⚠
+                              </span>
+                            )}
+                            {/* Menu de directive (sans libellé : évident en contexte) — libellés de la règle 4.4, ordre de
+                                résolution du jeu, libellé complet en infobulle */}
+                            <select
+                              className="carte-select"
+                              title="Directive (règle 4.4, ordre de résolution du jeu)"
+                              value={deplacement.directive}
+                              onChange={e => majDeplacement(num, { directive: Number(e.target.value) })}
+                              style={{ minWidth: 66, maxWidth: 160, flexShrink: 0 }}
+                            >
+                              {OPTIONS_DIRECTIVES.map(o => (
+                                <option key={o.value} value={o.value} title={o.full}>{o.label}</option>
+                              ))}
+                            </select>
+                            {/* La directive « Attaque flottes cdt » vise un commandant précis : menu de son numéro */}
+                            {deplacement.directive === DIRECTIVE_CDT && (
+                              <select
+                                className="carte-select"
+                                title={`Commandant visé (0 = neutre) : ${commandantViserLabel(global, deplacement.cdt ?? CDT_DEFAUT)}`}
+                                value={deplacement.cdt ?? CDT_DEFAUT}
+                                onChange={e => majDeplacement(num, { cdt: Number(e.target.value) })}
+                                style={{ width: 48, flexShrink: 0 }}
+                              >
+                                <option value={CDT_DEFAUT} title="Neutre (le jeu le considère comme un commandant)">0</option>
+                                {(global?.commandants ?? []).filter(c => typeof c.numero === 'number').map(c => (
+                                  <option key={c.numero} value={c.numero} title={`${c.nom ?? '?'} (#${c.numero})`}>{c.numero}</option>
+                                ))}
+                              </select>
+                            )}
+                            <button
+                              type="button"
+                              title="Supprimer ce déplacement"
+                              onClick={() => setDeplacements(d => {
+                                const reste = { ...d };
+                                delete reste[num];
+                                return reste;
+                              })}
+                              style={{
+                                flexShrink: 0,
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#a66',
+                                cursor: 'pointer',
+                                padding: '0 4px',
+                                fontSize: '1.1em'
+                              }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        );
+                      })
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8, padding: '8px 12px', borderTop: '1px solid #444', flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={copierLeSchema}
+                    disabled={nbDeplacements === 0}
+                    title="Copier le schéma des ordres de déplacement (placeholder) à coller dans la console d'ordres"
+                    style={{
+                      ...styleBoutonDeplacement,
+                      flex: 1,
+                      textDecoration: 'underline dotted',
+                      opacity: nbDeplacements === 0 ? 0.3 : 1,
+                      cursor: nbDeplacements === 0 ? 'default' : 'pointer'
+                    }}
+                  >
+                    {copieSchema === 'ok' ? '✓ Schéma copié' : copieSchema === 'ko' ? '✗ Échec de la copie' : '📋 Copier le schéma (à venir)'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={reinitialiserDeplacements}
+                    disabled={nbDeplacements === 0}
+                    title="Retirer tous les déplacements de ce tour"
+                    style={{
+                      ...styleBoutonDeplacement,
+                      textDecoration: 'underline dotted',
+                      opacity: nbDeplacements === 0 ? 0.3 : 1,
+                      cursor: nbDeplacements === 0 ? 'default' : 'pointer'
+                    }}
+                  >
+                    ↺ Tout réinitialiser
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Sélecteur de flotte : s'ouvre au mousedown sur une case occupée par la/les flotte(s) du joueur */}
+          {picker && rapport && (
+            <FleetPicker
+              anchor={picker.anchor}
+              fleets={rapport.flottesJoueur
+                .filter(f => f.pos.x === picker.cell.x && f.pos.y === picker.cell.y)
+                .map(f => ({ fleet: f, deplacement: deplacements[f.num]?.to }))}
+              dragNum={dragState?.num}
+              onSelectFleet={onSelectFleet}
+              onDragEnd={onDragEnd}
+              onClose={fermerPicker}
+            />
+          )}
         </div>
       </div>
 
-      <InfoPanel selected={selected} />
+      <InfoPanel selected={selected} onFleetHover={setHoverFleetPos} />
 
       {showGoto && (
         <GotoDialog

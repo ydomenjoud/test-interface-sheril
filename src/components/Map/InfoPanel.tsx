@@ -18,9 +18,12 @@ import { zoneCovers } from '../../utils/zones';
 import { isObserved, lastKnownFleets } from '../../utils/fleetHistory';
 import { lastKnownSystem } from '../../utils/systemHistory';
 import { fleetSnapshotOf } from '../../storage/rapportStore';
+import {capaciteReparation} from '../../utils/reparation';
 
 type Props = {
   selected?: XY;
+  // Survol d'une ligne de flotte dans le panneau : position de la flotte à surligner sur la carte
+  onFleetHover?: (pos: XY | undefined) => void;
 };
 
 // Formatage des nombres avec séparateur de milliers (ex. 59 485)
@@ -34,7 +37,7 @@ const StaleIcon = () => (
 
 
 
-export default function InfoPanel({ selected }: Props) {
+export default function InfoPanel({ selected, onFleetHover }: Props) {
   const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats, zones, zoneLabels, fleetSnapshots, systemSnapshots } = useReport();
 
   // Zones affichées : celles qui couvrent la case, plus celles déjà listées pour cette sélection
@@ -72,8 +75,12 @@ export default function InfoPanel({ selected }: Props) {
   const showFleetHover = (f: any) => (e: React.MouseEvent<HTMLTableRowElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     setHoverFleet({fleet: f, anchor: {top: r.top, bottom: r.bottom, left: r.left, right: r.right}});
+    onFleetHover?.(f.pos);
   };
-  const hideFleetHover = () => setHoverFleet(undefined);
+  const hideFleetHover = () => {
+    setHoverFleet(undefined);
+    onFleetHover?.(undefined);
+  };
   // Changement de sélection : ne pas garder le détail de la flotte de l'ancienne case
   useEffect(() => {
     setHoverFleet(undefined);
@@ -260,6 +267,13 @@ export default function InfoPanel({ selected }: Props) {
             {system?.nbPla != null && <>{fmt(system.nbPla)} planètes</>}
             {system?.pop != null && system?.popMax != null && <> · pop {fmt(system.pop)}/{fmt(system.popMax)}</>}
           </div>
+          {/* Capacité de réparation du système par tour (sommée sur les bâtiments de ses planètes) ;
+          les systèmes détectés peuvent n'avoir aucune planète */}
+          {Array.isArray(system.planetes) && system.planetes.length > 0 && (
+            <div style={{ fontSize: '0.85em', color: '#bbb' }}>
+              Capacité réparation : {fmt(capaciteReparation(system.planetes, global))}
+            </div>
+          )}
         </div>
       )}
 
