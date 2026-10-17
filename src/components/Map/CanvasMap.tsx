@@ -1493,7 +1493,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
-    }, [cellSize, setCenter, cellAt, onCreateZone, onSelect]);
+    }, [cellSize, setCenter, cellAt, onCreateZone, onSelect, hideTooltip]);
 
     const handleWheel = useCallback((evt: React.WheelEvent<HTMLCanvasElement>) => {
         const zoomSpeed = 0.1;
