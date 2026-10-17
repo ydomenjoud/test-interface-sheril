@@ -1,11 +1,12 @@
 import {clearPlanificationRevenu} from '../utils/planificationRevenuStorage';
+import {clearAllDeplacements} from '../storage/deplacementOrdersStorage';
 import React, {createContext, useContext, useEffect, useMemo, useRef, useState, useCallback} from 'react';
 import {GlobalData, Rapport, XY, SystemeDetecte, Note, CombatEvent, Zone} from '../types';
 import {parseRapportXml, addManualDetectedSystems, getCachedDetectedSystems} from '../parsers/parseRapport';
 import {parsePublicCombatsHtml} from '../parsers/parsePublicCombats';
 import {parseManualDetectedSystems} from '../parsers/parseManualSystems';
 import {parseDataXml} from '../parsers/parseData';
-import {CENTER} from '../utils/position';
+import {CENTER, appliquerBornesDepuisPositions, positionsDuRapport} from '../utils/position';
 import {FleetSnapshot, SystemSnapshot, fleetSnapshotOf, getFleetSnapshots, getLatestRapport, getRapport, getRapportsUpTo, getSystemSnapshots, listTours, saveRapport, systemSnapshotOf} from '../storage/rapportStore';
 
 export type ImportResult = { tour: number; affiche: boolean };
@@ -47,6 +48,7 @@ type ReportContextType = {
     updateZone: (id: string, changes: Partial<Omit<Zone, 'id'>>) => void;
     publicCombats: CombatEvent[];
     refreshStats: () => Promise<void>;
+    importCount: number; // incrémenté à chaque import de rapport (invalidation des caches par tour)
 };
 
 const ReportContext = createContext<ReportContextType | undefined>(undefined);
@@ -61,6 +63,9 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
     const latestTourRef = useRef<number | undefined>(undefined);
     // Évite qu'un changement de tour lent écrase un changement plus récent
     const selectRequestRef = useRef(0);
+    // Incrémenté à chaque import : un rapport plus ancien que le dernier affiché ne change pas
+    // l'objet rapport (donc pas les effets qui en dépendent) mais vide les stockages par tour
+    const [importCount, setImportCount] = useState(0);
     const [global, setGlobal] = useState<GlobalData | undefined>(undefined);
     const [cellSize, setCellSize] = useState<number>(32);
     // Centre de la galaxie par défaut (sans rapport) ; remplacé par la capitale au chargement d'un rapport
@@ -105,6 +110,14 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
     useEffect(() => {
         localStorage.setItem('carte_hidden_zone_labels', JSON.stringify(hiddenZoneLabels));
     }, [hiddenZoneLabels]);
+
+    // Le jeu ne donne pas la taille de la galaxie : elle est déduite du max des coordonnées
+    // observées, arrondi à la dizaine supérieure (47→50, 53→60, 60→60).
+    // Le rapport affiché fait foi (un rapport peut venir d'une galaxie de taille différente) ;
+    // à défaut de rapport, les systèmes publics de data.xml servent de base.
+    useEffect(() => {
+        if (!rapport) appliquerBornesDepuisPositions((global?.systemes ?? []).map(s => s.pos));
+    }, [global, rapport]);
 
     const zoneLabels = useMemo(
         () => Array.from(new Set(zones.map(z => z.label).filter((l): l is string => !!l))).sort(),
@@ -187,7 +200,11 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         selectRequestRef.current += 1;
         displayedTourRef.current = r.tour;
         noteLatestTour(r.tour);
-        setRapport({...r, systemesDetectes: mergeDetectedWithOwned(r)});
+        const merged = {...r, systemesDetectes: mergeDetectedWithOwned(r)};
+        // Bornes de la galaxie déduites du rapport AFFICHÉ (détections du cache comprises),
+        // avant le render, pour que la carte s'enroule correctement dès le premier dessin
+        appliquerBornesDepuisPositions(positionsDuRapport(merged));
+        setRapport(merged);
         if (recenter && r.joueur?.capitale) setCenter(r.joueur.capitale);
     }, [mergeDetectedWithOwned, noteLatestTour]);
 
@@ -232,6 +249,8 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         const latest = latestTourRef.current; // avant l'enregistrement de ce rapport
         await storeRapport(r);
         clearPlanificationRevenu(); // les choix de l'écran de planification des revenus sont à refaire sur le nouveau rapport
+        clearAllDeplacements(); // idem pour les déplacements de flottes en attente sur la carte (tous les tours)
+        setImportCount(c => c + 1); // signale l'invalidation même si le rapport affiché ne change pas
         // Seul le rapport le plus récent est affiché ; un tour plus ancien ne fait qu'enrichir l'historique
         if (latest === undefined || r.tour >= latest) {
             displayRapport(r);
@@ -239,7 +258,12 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         }
         // Si on regarde le dernier tour, il profite des systèmes détectés que lui seul ne connaissait pas
         if (displayedTourRef.current === latest) {
-            setRapport(prev => prev ? {...prev, systemesDetectes: mergeDetectedWithOwned(prev)} : prev);
+            setRapport(prev => {
+                if (!prev) return prev;
+                const updated = { ...prev, systemesDetectes: mergeDetectedWithOwned(prev) };
+                appliquerBornesDepuisPositions(positionsDuRapport(updated));
+                return updated;
+            });
         }
         return {tour: r.tour, affiche: false};
     }, [storeRapport, displayRapport, mergeDetectedWithOwned]);
@@ -254,8 +278,10 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
             setRapport(prev => {
                 if (!prev) return prev;
                 // Mettre à jour la liste des systèmes détectés depuis le cache
-                const updatedDetects = mergeDetectedWithOwned(prev);
-                return { ...prev, systemesDetectes: updatedDetects };
+                const updated = { ...prev, systemesDetectes: mergeDetectedWithOwned(prev) };
+                // Les nouvelles positions peuvent dépasser les bornes actuelles
+                appliquerBornesDepuisPositions(positionsDuRapport(updated));
+                return updated;
             });
         }
         return { added: systems.length, errors };
@@ -447,6 +473,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         global,
         publicCombats,
         refreshStats,
+        importCount,
         loadRapportFile,
         addDetectedSystemsFromText,
         ready: Boolean(global),
@@ -475,7 +502,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         addZone,
         deleteZone,
         updateZone,
-    }), [rapport, global, tours, getRapportForTour, selectTour, fleetSnapshots, systemSnapshots, publicCombats, refreshStats, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, allTags, selectedTags, addNote, deleteNote, zones, zoneLabels, hiddenZoneLabels, addZone, deleteZone, updateZone]);
+    }), [rapport, global, tours, getRapportForTour, selectTour, fleetSnapshots, systemSnapshots, publicCombats, refreshStats, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, allTags, selectedTags, addNote, deleteNote, zones, zoneLabels, hiddenZoneLabels, addZone, deleteZone, updateZone, importCount]);
 
     return <ReportContext.Provider value={value}>{children}</ReportContext.Provider>;
 }

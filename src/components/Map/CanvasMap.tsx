@@ -104,6 +104,15 @@ type Props = {
     showStabilityZones: boolean;
     stabilitySystemPos?: string;
     influenceOpacity?: number;
+    // ---- Ordres de déplacement (drag & drop de flottes) ----
+    deplacements?: Record<number, XY>; // flotteNum → cible commandée
+    dragFleet?: { from: XY; vitesse: number; cursor: XY } | null; // drag en cours : anneau de vitesse + ligne + distance
+    onAnyCanvasMouseDown?: () => void; // tout clic gauche sur la carte (avant la logique de pan)
+    onFleetCellMouseDown?: (cell: XY, clientX: number, clientY: number) => void; // clic gauche sur une case avec ≥1 flotte du joueur
+    onFleetCellGestureAbort?: () => void; // mousedown sur une case de flotte qui se transforme en pan
+    onFleetDragOver?: (cell: XY) => void; // survol HTML5 d'un drag de flotte au-dessus de la carte
+    onFleetDragLeave?: () => void; // le drag sort de la carte
+    onFleetDrop?: (fleetNum: number, cell: XY) => void; // drop d'une flotte sur une case
 };
 
 export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[], colorMode: 'status' | 'player' = 'status', globalData?: GlobalData) {
@@ -138,7 +147,8 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#f80c0c';
 }
 
-export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18}: Props) {
+export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
+                       deplacements, dragFleet, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort, onFleetDragOver, onFleetDragLeave, onFleetDrop}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     // Case survolée : dessinée sur un canvas séparé pour ne pas redessiner toute la carte à chaque mouvement de souris
@@ -152,8 +162,11 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         centerRef.current = center;
     }, [center]);
 
+    // Conteneur (pour le dragleave HTML5 : savoir si le pointeur sort vraiment de la carte)
+    const hostRef = useRef<HTMLDivElement>(null);
+
     // Gestion du drag
-    const dragRef = useRef({dragging: false, lastX: 0, lastY: 0, accX: 0, accY: 0, moved: false});
+    const dragRef = useRef({dragging: false, lastX: 0, lastY: 0, accX: 0, accY: 0, moved: false, startX: 0, startY: 0, fleetAbortFired: false});
 
     // Tracé d'une zone en cours (Alt + glisser)
     const [zoneDraft, setZoneDraft] = useState<{ start: XY; end: XY } | undefined>(undefined);
@@ -207,9 +220,13 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             });
         }
 
-        // 3. Systèmes globaux (data.xml) - si pas déjà présent et non masqués
+        // 3. Systèmes globaux (data.xml) - si pas déjà présent et non masqués.
+        // data.xml peut décrire une galaxie de taille différente du rapport affiché :
+        // seuls les systèmes à l'intérieur du tore affiché sont cohérents (les autres
+        // seraient dessinés enroulés sur une mauvaise case).
         if (showGlobalSystems && global?.systemes) {
             global.systemes.forEach(s => {
+                if (s.pos.x < 1 || s.pos.x > BOUNDS.maxX || s.pos.y < 1 || s.pos.y > BOUNDS.maxY) return;
                 const key = `${s.pos.x}_${s.pos.y}`;
                 if (!seen.has(key)) {
                     list.push({
@@ -237,7 +254,12 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
     const combats = useMemo(() => {
         const fromRapport = rapport?.combats ?? [];
-        const fromPublic = publicCombats ?? [];
+        // Les combats publics viennent de l'univers de data.xml/combats.htm : sur un rapport
+        // d'une galaxie de taille différente, ceux hors du tore affiché seraient dessinés
+        // enroulés sur une mauvaise case → on les exclut.
+        const fromPublic = (publicCombats ?? []).filter(
+            c => c.pos && c.pos.x >= 1 && c.pos.x <= BOUNDS.maxX && c.pos.y >= 1 && c.pos.y <= BOUNDS.maxY
+        );
         return [...fromRapport, ...fromPublic];
     }, [rapport, publicCombats]);
 
@@ -1039,6 +1061,32 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
         }
 
+        // Flèche (direction / ordre de déplacement) : trait + pointe pleine, clipée à la grille.
+        // Déclarée AVANT le passage des flottes qui l'appelle via renderFleetCell (la fonction est
+        // hoistée, le const lui ne l'est pas — ordre d'exécution respecté ici)
+        const drawArrow = (c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, color = '#ff9800') => {
+            const headLen = Math.max(6, Math.floor(cellSize * 0.25));
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            c.save();
+            c.beginPath();
+            c.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
+            c.clip();
+            c.strokeStyle = color;
+            c.fillStyle = color;
+            c.lineWidth = 2;
+            c.beginPath();
+            c.moveTo(x1, y1);
+            c.lineTo(x2, y2);
+            c.stroke();
+            c.beginPath();
+            c.moveTo(x2, y2);
+            c.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+            c.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+            c.closePath();
+            c.fill();
+            c.restore();
+        };
+
         // flottes : un seul marqueur par case, étiqueté au nombre total de flottes sur la case
         if (showFleetBadges) {
             const fleetCells = new Map<string, any[]>();
@@ -1103,37 +1151,29 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             c2d.textBaseline = 'middle';
             c2d.fillText(label, cx, cy + 0.5);
 
-            // Flèches de direction (une par flotte du groupe qui en a une, flottes du joueur uniquement)
+            // Ordre de déplacement : anneau ambre autour du disque blanc (flotte « modifiée vs rapport »)
+            if (fGroup.some(f => f.type === 'joueur' && deplacements && deplacements[f.num])) {
+                c2d.strokeStyle = '#ff9800';
+                c2d.lineWidth = 2;
+                c2d.beginPath();
+                c2d.arc(cx, cy, diameter / 2 + 3, 0, Math.PI * 2);
+                c2d.stroke();
+            }
+
+            // Flèches de direction (une par flotte du groupe qui en a une, flottes du joueur uniquement).
+            // Les ordres de déplacement sont dessinés dans le passage dédié plus bas (par-dessus
+            // tout le reste) : on les saute ici
             fGroup.forEach(f => {
+                if (f.type === 'joueur' && deplacements && deplacements[f.num]) return;
                 const t = f.direction;
-                if (t) {
+                // Cible identique à la position (entrée périmée après changement de tour) :
+                // pas de flèche de longueur nulle
+                if (t && !(t.x === f.pos.x && t.y === f.pos.y)) {
                     const tdx = ((t.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
                     const tdy = ((t.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
                     const tx = tdx * cellSize + cellSize / 2;
                     const ty = tdy * cellSize + cellSize / 2;
                     if (tx >= 0 && ty >= 0 && tx <= cols * cellSize && ty <= rows * cellSize) {
-                        const drawArrow = (c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) => {
-                            const headLen = Math.max(6, Math.floor(cellSize * 0.25));
-                            const angle = Math.atan2(y2 - y1, x2 - x1);
-                            c.save();
-                            c.beginPath();
-                            c.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
-                            c.clip();
-                            c.strokeStyle = '#ff9800';
-                            c.fillStyle = '#ff9800';
-                            c.lineWidth = 2;
-                            c.beginPath();
-                            c.moveTo(x1, y1);
-                            c.lineTo(x2, y2);
-                            c.stroke();
-                            c.beginPath();
-                            c.moveTo(x2, y2);
-                            c.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
-                            c.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
-                            c.closePath();
-                            c.fill();
-                            c.restore();
-                        };
                         drawArrow(c2d, cx, cy, tx, ty);
                     }
                 }
@@ -1309,9 +1349,137 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             cSel.restore();
         }
 
+        // FLÈCHES DES ORDRES DE DÉPLACEMENT : passage dédié par-dessus tout le reste (disques de flottes,
+        // marqueurs de combat, cadre de sélection) pour que la cible commandée ne soit jamais
+        // masquée. (L'anneau ambre de la case reste dessiné avec le marqueur.)
+        if (deplacements) {
+            for (const f of fleets) {
+                if (f.type !== 'joueur') continue;
+                const t = deplacements[f.num];
+                if (!t || (t.x === f.pos.x && t.y === f.pos.y)) continue;
+                // Delta le plus court sur le tore (même méthode que les flèches de portée)
+                let ddx = t.x - f.pos.x;
+                if (ddx > BOUNDS.maxX / 2) ddx -= BOUNDS.maxX;
+                if (ddx < -BOUNDS.maxX / 2) ddx += BOUNDS.maxX;
+                let ddy = t.y - f.pos.y;
+                if (ddy > BOUNDS.maxY / 2) ddy -= BOUNDS.maxY;
+                if (ddy < -BOUNDS.maxY / 2) ddy += BOUNDS.maxY;
+                // Hors de la portée de la flotte : flèche rouge (à portée : orange)
+                const cDeplacement = getTorusDistance(f.pos, t) > f.vitesse ? '#f44336' : '#ff9800';
+                // La flèche part de chaque copie de la case de la flotte visible dans le viewport
+                // (viewport plus grand que le tore : mêmes copies que le passage des disques)
+                let dx = ((f.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+                let dy = ((f.pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+                while (dx < cols) {
+                    if (dx === 0) {
+                        dx += BOUNDS.maxY;
+                        continue;
+                    }
+                    let currentDy = dy;
+                    while (currentDy < rows) {
+                        if (currentDy === 0) {
+                            currentDy += BOUNDS.maxX;
+                            continue;
+                        }
+                        const fx = dx * cellSize + cellSize / 2;
+                        const fy = currentDy * cellSize + cellSize / 2;
+                        // X = ligne (vertical), Y = colonne (horizontal)
+                        drawArrow(ctx as CanvasRenderingContext2D, fx, fy, fx + ddy * cellSize, fy + ddx * cellSize, cDeplacement);
+                        currentDy += BOUNDS.maxX;
+                    }
+                    dx += BOUNDS.maxY;
+                }
+            }
+        }
+
+        // DRAG DE FLOTTE EN COURS : anneau de vitesse (carré de Tchebyshev autour de l'origine),
+        // ligne origine→case du curseur et distance en cases. Dessiné en tout dernier, par-dessus tout.
+        if (dragFleet) {
+            const dDist = getTorusDistance(dragFleet.from, dragFleet.cursor);
+            const dColor = dDist <= dragFleet.vitesse ? '#4caf50' : '#f44336';
+            const dCtx = ctx as CanvasRenderingContext2D;
+            dCtx.save();
+            // Clip sur la zone de grille (jamais sur les en-têtes)
+            dCtx.beginPath();
+            dCtx.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
+            dCtx.clip();
+
+            // Position écran d'une case : delta signé par rapport au centre (même méthode que les flèches de portée)
+            const dScreen = (pos: XY) => {
+                let offX = pos.x - currentCenter.x;
+                if (offX > BOUNDS.maxX / 2) offX -= BOUNDS.maxX;
+                if (offX < -BOUNDS.maxX / 2) offX += BOUNDS.maxX;
+                let offY = pos.y - currentCenter.y;
+                if (offY > BOUNDS.maxY / 2) offY -= BOUNDS.maxY;
+                if (offY < -BOUNDS.maxY / 2) offY += BOUNDS.maxY;
+                return {
+                    x: (halfCols + offY) * cellSize + cellSize / 2,
+                    y: (halfRows + offX) * cellSize + cellSize / 2,
+                };
+            };
+
+            // (i) Anneau de vitesse : carré de Tchebyshev de rayon `vitesse` autour de l'origine.
+            // Enroulé sur le tore comme les zones : on dessine les 9 copies décalées d'un tour
+            // et on ne garde que celles qui touchent le viewport. (vitesse > demi-tore : toute
+            // la galaxie est déjà à portée, il n'y a pas d'anneau limite à montrer.)
+            const dR = dragFleet.vitesse;
+            if (dR > 0 && dR <= BOUNDS.maxX / 2 && dR <= BOUNDS.maxY / 2) {
+                let dOffX = (dragFleet.from.x - dR) - currentCenter.x;
+                if (dOffX > BOUNDS.maxX / 2) dOffX -= BOUNDS.maxX;
+                if (dOffX < -BOUNDS.maxX / 2) dOffX += BOUNDS.maxX;
+                let dOffY = (dragFleet.from.y - dR) - currentCenter.y;
+                if (dOffY > BOUNDS.maxY / 2) dOffY -= BOUNDS.maxY;
+                if (dOffY < -BOUNDS.maxY / 2) dOffY += BOUNDS.maxY;
+                const dSize = (2 * dR + 1) * cellSize;
+                dCtx.lineWidth = 2;
+                dCtx.strokeStyle = dColor;
+                for (const wx of [-BOUNDS.maxX, 0, BOUNDS.maxX]) {
+                    for (const wy of [-BOUNDS.maxY, 0, BOUNDS.maxY]) {
+                        const px = (halfCols + dOffY + wy) * cellSize;
+                        const py = (halfRows + dOffX + wx) * cellSize;
+                        if (px + dSize < 0 || py + dSize < 0 || px > cols * cellSize || py > rows * cellSize) continue;
+                        dCtx.strokeRect(px, py, dSize, dSize);
+                    }
+                }
+            }
+
+            // (ii) Ligne de la case d'origine vers la case sous le curseur, avec pointe de flèche à l'extrémité
+            const dStart = dScreen(dragFleet.from);
+            const dEnd = dScreen(dragFleet.cursor);
+            const dAngle = Math.atan2(dEnd.y - dStart.y, dEnd.x - dStart.x);
+            dCtx.lineWidth = 2;
+            dCtx.strokeStyle = dColor;
+            dCtx.beginPath();
+            dCtx.moveTo(dStart.x, dStart.y);
+            dCtx.lineTo(dEnd.x, dEnd.y);
+            dCtx.stroke();
+            const dHead = Math.max(8, Math.floor(cellSize * 0.3));
+            dCtx.fillStyle = dColor;
+            dCtx.beginPath();
+            dCtx.moveTo(dEnd.x, dEnd.y);
+            dCtx.lineTo(dEnd.x - dHead * Math.cos(dAngle - Math.PI / 6), dEnd.y - dHead * Math.sin(dAngle - Math.PI / 6));
+            dCtx.lineTo(dEnd.x - dHead * Math.cos(dAngle + Math.PI / 6), dEnd.y - dHead * Math.sin(dAngle + Math.PI / 6));
+            dCtx.closePath();
+            dCtx.fill();
+
+            // (iii) Distance en cases, au MILIEU du trait et décalée perpendiculairement :
+            // ne passe jamais sous le curseur (le marquage à l'extrémité sud s'y cachait)
+            const dLabel = String(dDist);
+            dCtx.font = 'bold 12px sans-serif';
+            dCtx.textAlign = 'center';
+            dCtx.textBaseline = 'middle';
+            dCtx.fillStyle = dColor;
+            const dPerpX = -Math.sin(dAngle) * 14;
+            const dPerpY = Math.cos(dAngle) * 14;
+            const dMidX = (dStart.x + dEnd.x) / 2 + dPerpX;
+            const dMidY = (dStart.y + dEnd.y) / 2 + dPerpY;
+            dCtx.fillText(dLabel, dMidX, dMidY);
+            dCtx.restore();
+        }
+
         // Le survol dépend de la géométrie (centre, taille de case) : on resynchronise l'overlay après chaque dessin
         redrawHoverOverlay();
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
@@ -1396,6 +1564,16 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
     const handleMouseDown = useCallback((evt: React.MouseEvent<HTMLCanvasElement>) => {
         if (evt.button !== 0) return; // seulement clic gauche
 
+        // Ordres de déplacement : notification pour tout clic gauche (avant la logique de pan),
+        // et détection d'une case contenant au moins une flotte du joueur (=> FleetPicker)
+        onAnyCanvasMouseDown?.();
+        const mdCell = cellAt(evt.clientX, evt.clientY);
+        const isFleetCell = !!mdCell && fleets.some(f => f.type === 'joueur' && f.pos.x === mdCell.x && f.pos.y === mdCell.y);
+        // Alt est réservé au tracé de zone : le sélecteur de flotte ne s'ouvre pas en Alt+clic
+        if (isFleetCell && mdCell && !evt.altKey) {
+            onFleetCellMouseDown?.(mdCell, evt.clientX, evt.clientY);
+        }
+
         // Alt + glisser : tracé d'une zone du coin de départ au coin de fin
         if (evt.altKey && onCreateZone) {
             const start = cellAt(evt.clientX, evt.clientY);
@@ -1438,10 +1616,25 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         dragRef.current.accX = 0;
         dragRef.current.accY = 0;
         dragRef.current.moved = false;
+        // Repère de départ du geste : sert au seuil d'annulation du FleetPicker
+        dragRef.current.startX = evt.clientX;
+        dragRef.current.startY = evt.clientY;
+        dragRef.current.fleetAbortFired = false;
         evt.preventDefault();
 
         const onMove = (e: MouseEvent) => {
             if (!dragRef.current.dragging) return;
+            // Seuil de 4 px sur le déplacement TOTAL depuis le mousedown : si le geste sur une
+            // case de flotte devient un pan, on annule le FleetPicker (une seule fois).
+            // Évalué en tête du onMove, donc AVANT tout pas de case : un pas de case exige
+            // ≥ cellSize (≥ 8 px) de déplacement accumulé, ce seuil déclenche donc toujours
+            // en premier. (Le tracé de zone Alt+glisser ne fait pas panser la carte : pas d'abort.)
+            if (isFleetCell && !dragRef.current.fleetAbortFired) {
+                if (Math.abs(e.clientX - dragRef.current.startX) >= 4 || Math.abs(e.clientY - dragRef.current.startY) >= 4) {
+                    dragRef.current.fleetAbortFired = true;
+                    onFleetCellGestureAbort?.();
+                }
+            }
             const dx = e.clientX - dragRef.current.lastX;
             const dy = e.clientY - dragRef.current.lastY;
             dragRef.current.lastX = e.clientX;
@@ -1493,7 +1686,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
-    }, [cellSize, setCenter, cellAt, onCreateZone, onSelect, hideTooltip]);
+    }, [cellSize, setCenter, cellAt, onCreateZone, onSelect, hideTooltip, fleets, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort]);
 
     const handleWheel = useCallback((evt: React.WheelEvent<HTMLCanvasElement>) => {
         const zoomSpeed = 0.1;
@@ -1504,7 +1697,36 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         }
     }, [cellSize, setCellSize]);
 
-    return (<div className="canvas-host">
+    // Drag & drop HTML5 de flottes (payload 'application/x-fleet-num' posé par le FleetPicker)
+    const handleFleetDragOver = useCallback((e: React.DragEvent<HTMLCanvasElement>) => {
+        // On ne réagit qu'à NOS drags de flottes (le types n'est lisible qu'en dragover)
+        if (!e.dataTransfer.types.includes('application/x-fleet-num')) return;
+        e.preventDefault(); // autorise le drop
+        e.dataTransfer.dropEffect = 'move';
+        const cell = cellAt(e.clientX, e.clientY);
+        if (cell) onFleetDragOver?.(cell);
+    }, [cellAt, onFleetDragOver]);
+
+    const handleFleetDrop = useCallback((e: React.DragEvent<HTMLCanvasElement>) => {
+        const raw = e.dataTransfer.getData('application/x-fleet-num');
+        if (raw === '') return;
+        e.preventDefault();
+        const fleetNum = parseInt(raw, 10);
+        if (Number.isNaN(fleetNum)) return;
+        const cell = cellAt(e.clientX, e.clientY);
+        if (cell) onFleetDrop?.(fleetNum, cell);
+    }, [cellAt, onFleetDrop]);
+
+    const handleFleetDragLeave = useCallback((e: React.DragEvent<HTMLCanvasElement>) => {
+        // dragleave déclenche aussi en traversant les enfants du conteneur ; on ne remonte
+        // l'événement que si le pointeur sort VRAIMENT de la carte (relatedTarget à l'extérieur)
+        const host = hostRef.current;
+        const rt = e.relatedTarget as Node | null;
+        if (host && rt && host.contains(rt)) return;
+        onFleetDragLeave?.();
+    }, [onFleetDragLeave]);
+
+    return (<div className="canvas-host" ref={hostRef}>
             <canvas
                 ref={canvasRef}
                 style={{width: '100%', height: '100vh'}}
@@ -1513,6 +1735,9 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 onWheel={handleWheel}
                 onMouseMove={handleMouseMove}
                 onMouseLeave={handleMouseLeave}
+                onDragOver={handleFleetDragOver}
+                onDragLeave={handleFleetDragLeave}
+                onDrop={handleFleetDrop}
             />
             {/* Surcouche transparente : contour de la case survolée */}
             <canvas

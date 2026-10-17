@@ -30,8 +30,14 @@ La taille des cases de la grille de la carte doit pouvoir être modifiée par l'
 configuration".
 Elle sont forcément carrée.
 
-Les bornes actuelles de la carte sont : 0 > X > 40 et 0 > Y > 40. Ces données doivent être centralisées pour être
-modifiable par la suite.
+Les bornes de la carte sont centralisées dans `src/utils/position.ts` (`BOUNDS`, coordonnées 1-based : 1..maxX /
+ 1..maxY). Le jeu ne donne nulle part la taille de la galaxie : les bornes sont donc recalculées au chargement d'un
+ rapport à partir du maximum des coordonnées observées (systèmes, systèmes détectés, flottes, capitale), chaque axe
+ arrondi à la dizaine supérieure (47→50, 53→60, 60→60 ; ex. un rapport 40×40 donne une galaxie 40×40). En l'absence de
+ rapport, les systèmes publics de data.xml servent de base ; la valeur par défaut avant tout chargement est 60×60.
+ Les couches issues de l'extérieur du rapport (systèmes publics de data.xml, combats publics) ne sont affichées que si
+ leurs coordonnées rentrent dans le tore affiché : sinon elles proviendraient d'une autre galaxie et seraient dessinées
+ enroulées sur une mauvaise case.
 
 La carte représente un univers "torique" en forme de donuts. Il faut donc que lorsque la carte n'a rien à afficher d'un
 côté, que l'on complete l'affichage avec les données de l'autre côté.
@@ -190,3 +196,77 @@ une case sans aucun contenu (ni système, ni flotte, ni combat, ni zone) affiche
 - combats sur la case (cartes dépliables avec les détails)
 - zones couvrant la case (éditables)
 - notes de la case (le formulaire d'ajout est replié derrière un bouton)
+
+## déplacements de flottes (schéma d'ordres)
+
+La carte permet de préparer des ordres de déplacement de ses flottes par glisser-déposer : le résultat est un
+schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Planification des Revenus pour ses ordres).
+
+### geste
+
+- Un mousedown sur une case occupée par au moins une flotte du joueur ouvre le sélecteur de flotte (« Déplace une
+  flotte »), ancré sur le point de clic : il liste les flottes de la case avec leur déplacement en cours éventuel
+  (« déjà déplacée → 0_x_y »).
+- Un simple clic reste une sélection de case (le sélecteur se referme au mousedown suivant) ; le pan et les zones
+  Alt + clic + glisser sont inchangés — un pan qui démarre sur la case annule le sélecteur, et Alt + clic n'ouvre
+  jamais le sélecteur (Alt est réservé aux zones).
+- Glisser une ligne du sélecteur vers la carte et relâcher sur une case crée (ou remplace : un seul déplacement par
+  flotte) le déplacement de cette flotte vers la case visée. Relâcher sur la case d'origine de la flotte annule le
+  déplacement. Un dépos hors de la portée de la flotte est autorisé (le déplacement reste marqué « hors portée »).
+  Une flotte déjà en route (attribut « direction » dans le rapport) peut être redirigée ; elle est signalée ⚠.
+- Le sélecteur reste ouvert pendant le glisser (il se referme à la fin du drag, au dépos ou à la touche Échap) : la
+  ligne de la flotte glissée est surlignée d'un voile clair pour repérer celle qui est déplacée, et l'image de drag
+  par défaut du navigateur (tile translucide) est remplacée par un pixel transparent.
+- Le sélecteur doit rester monté pendant tout le drag : le démonter dans le dragstart ferait annuler le drag par le
+  navigateur (source retirée du DOM avant le début effectif du drag).
+
+### feedback pendant le glisser
+
+- Une ligne relie la case d'origine de la flotte à la case sous le curseur, avec une pointe de flèche à l'extrémité
+  (curseur), la distance torique affichée au milieu du trait (décalée perpendiculairement, pour ne jamais passer
+  sous le curseur) et un anneau de portée (vitesse de la flotte) centré sur l'origine.
+- La ligne est verte (#4caf50) si la destination est atteignable (distance ≤ vitesse), rouge (#f44336) sinon.
+- Le tracé disparaît quand le glisser quitte la carte (l'identité de la flotte est conservée pour le restaurer au
+  retour sur la carte) et à la fin du drag (dépos ou annulation, y compris un Échap).
+
+### après le dépos
+
+- La flotte apparaît « modifiée par rapport au rapport » : anneau ambre (#ff9800) et flèche vers sa nouvelle
+  destination (qui remplace la direction du rapport, rappelée ⚠ « déjà en route vers x_y » dans le panneau quand
+  le rapport en avait une).
+- La flèche d'ordre de déplacement est dessinée dans un passage dédié PAR-DESSUS TOUT le reste de la carte
+  (disques de flottes, marqueurs de combat, cadre de sélection) : la cible commandée n'est jamais masquée
+  (seul le tracé du glisser en cours se dessine au-dessus).
+- Couleur de la flèche : orange (#ff9800) si la destination est à portée de la flotte, rouge (#f44336) sinon.
+
+### panneau « Déplacements »
+
+- Un panneau compact en haut à gauche de la zone de carte (mini-carte en bas à droite, Filtres en haut à droite,
+  légende en bas à gauche ; le panneau info occupe sa propre colonne), repliable comme le panneau Filtres : toujours
+  visible, en-tête cliquable « Déplacements (n) » (▸/▾), largeur animée 170 px replié (assez large pour lire
+  « Déplacements (n) ») / 560 px déplié (un déplacement par ligne) ; une icône ⇢ dans la barre d'outils pilote le
+  même état. Le panneau se déplie tout seul au premier dépos.
+- Déplié, chaque déplacement tient sur UNE ligne : numéro et nom (ou « Flotte #n » si la flotte n'est plus dans le
+  rapport, tronqué avec ellipsis si trop long), origine → destination (coordonnées x_y) suivie de la distance
+  torique en rouge quand elle est hors de portée (à distance normale sinon), un ⚠ ambre compact (infobulle « déjà en
+  route vers x_y ») si le rapport avait une direction, deux menus — « Directive » et « Stratégie » — pour choisir
+  les valeurs de l'ordre, et un bouton × pour supprimer ce déplacement.
+- Vide : mention d'aide (cliquer une case de flotte, glisser une ligne sur la destination).
+- En pied : « Copier le schéma » (retour visuel « Schéma copié » / « Échec de la copie ») et
+  « ↺ Tout réinitialiser » (efface tous les déplacements du tour et replie le panneau ; les deux boutons sont
+  estompés et désactivés quand il n'y a plus de déplacement).
+
+### schéma d'ordres
+
+- Schéma = ordres `[deplacement_flotte, num, 0_x_y, directive, stratégie]` (table, numéro de flotte, destination,
+  directive, stratégie) séparés par `%#!%`, encodés en base64, triés par numéro de flotte.
+- La directive et la stratégie sont propres à chaque ordre : par défaut 1 et 0 au dépos, modifiables dans les menus
+  du panneau.
+- PLACEHOLDER — syntaxe réelle à confirmer : la table, les valeurs par défaut et les listes proposées dans les menus
+  sont provisoires (voir `src/utils/ordreDeplacement.ts`).
+
+### persistance
+
+- Les déplacements en attente sont stockés par tour dans le localStorage, clé `deplacements_tour_<tour>` ; un
+  changement de tour recharge ceux du tour affiché.
+- Le chargement d'un nouveau rapport efface les déplacements de tous les tours (à refaire sur le nouveau rapport).
