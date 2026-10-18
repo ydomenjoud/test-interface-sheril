@@ -465,6 +465,15 @@ export default function Carte() {
     }
     resetFleetDrag();
   }, [rapport, resetFleetDrag]);
+  // Alternative clavier au glisser-déposer : le bouton « → » de « Mes flottes » (panneau info)
+  // déplace la flotte vers la case sélectionnée (même règle qu'un dépos : case d'origine = annulation)
+  const onMoveFleetToSelected = useCallback((fleetNum: number) => {
+    const flotte = rapport?.flottesJoueur.find(f => f.num === fleetNum);
+    if (!flotte || !selected) return;
+    if (flotte.pos.x === selected.x && flotte.pos.y === selected.y) return;
+    setDeplacements(d => ({ ...d, [fleetNum]: { to: selected, directive: DIRECTIVE_DEFAUT, strategy: STRATEGIE_DEFAUT } }));
+    setDeplacementsExpanded(true);
+  }, [rapport, selected]);
 
   // Schéma d'ordres : un ordre par déplacement dont la flotte est encore dans le rapport
   // (une flotte introuvable, ex. tour différent, est ignorée ici et en ligne repliée du panneau)
@@ -528,13 +537,8 @@ export default function Carte() {
 
   const nbDeplacements = Object.keys(deplacements).length;
   return (
-    <div
-      className={`carte-wrap ${infoPanelCollapsed ? 'info-collapsed' : ''}`}
-      style={{
-        gridTemplateColumns: infoPanelCollapsed ? '1fr 0px' : '65vw 35vw',
-        transition: 'grid-template-columns 0.2s ease-in-out',
-      }}
-    >
+    // Colonnes gérées par App.css (.carte-wrap / .carte-wrap.info-collapsed) : une seule source de vérité
+    <div className={`carte-wrap ${infoPanelCollapsed ? 'info-collapsed' : ''}`}>
       <div className="carte-toolbar">
         {/* Vue : taille des cases + position */}
         <div className="carte-toolbar-group">
@@ -747,11 +751,13 @@ export default function Carte() {
             onFleetDragLeave={onFleetDragLeave}
             onFleetDrop={onFleetDrop}
           />
-          {/* Bouton pour ré-ouvrir le panneau info quand il est replié */}
+          {/* Bouton pour ré-ouvrir le panneau info quand il est replié : à gauche du panneau Filtres
+              (toujours monté en haut à droite, opacité pleine, même z-index) pour rester cliquable */}
           {infoPanelCollapsed && (
             <button
               type="button"
               className="carte-open-info-btn"
+              style={{ right: filtersExpanded ? 310 : 138 }}
               onClick={() => setInfoPanelCollapsed(false)}
               title="Afficher le panneau d'informations (Alt + I)"
               aria-label="Afficher le panneau d'informations"
@@ -767,7 +773,7 @@ export default function Carte() {
             <div className="map-legend" title="Couleurs de possession des systèmes et des flottes">
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#10b981' }} /> moi</span>
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#3b82f6' }} /> alliance</span>
-              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#f59e0b' }} /> PNA</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#fde047' }} /> PNA</span>
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#ef4444' }} /> ennemi</span>
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#94a3b8' }} /> neutre</span>
               <span className="map-legend-item"><span className="map-legend-dot map-legend-fleet" /> flotte</span>
@@ -792,11 +798,16 @@ export default function Carte() {
               maxHeight: 'calc(100% - 16px)',
               transition: 'width 0.25s ease'
           }}>
-              <div
+              <button
+                  type="button"
+                  aria-expanded={filtersExpanded}
+                  aria-label={filtersExpanded ? 'Replier le panneau des filtres' : 'Déplier le panneau des filtres'}
                   onClick={() => setFiltersExpanded(!filtersExpanded)}
                   style={{
+                      width: '100%',
                       padding: '8px 12px',
                       backgroundColor: '#1e2530',
+                      border: 'none',
                       borderBottom: filtersExpanded ? '1px solid #334155' : 'none',
                       borderRadius: filtersExpanded ? '8px 8px 0 0' : 8,
                       cursor: 'pointer',
@@ -806,6 +817,8 @@ export default function Carte() {
                       fontWeight: 'bold',
                       fontSize: '0.875rem',
                       color: '#f1f5f9',
+                      textAlign: 'left',
+                      fontFamily: 'inherit',
                       flexShrink: 0
                   }}
               >
@@ -816,7 +829,7 @@ export default function Carte() {
                   <span style={{ display: 'inline-flex', alignItems: 'center', color: '#94a3b8' }}>
                     {filtersExpanded ? <IconChevronDown size={15} /> : <IconChevronUp size={15} />}
                   </span>
-              </div>
+              </button>
 
               {filtersExpanded && (
                   <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', minHeight: 0 }}>
@@ -1063,11 +1076,16 @@ export default function Carte() {
 
           {/* Déplacements en attente : tiroir de commandes tactique repliable au bas de la carte */}
           <div className={`carte-deplacements-drawer ${deplacementsExpanded ? 'expanded' : 'collapsed'}`}>
-            <div
+            <button
+              type="button"
+              aria-expanded={deplacementsExpanded}
+              aria-label={deplacementsExpanded ? 'Replier le panneau des déplacements' : 'Déplier le panneau des déplacements'}
               onClick={() => setDeplacementsExpanded(!deplacementsExpanded)}
               style={{
+                width: '100%',
                 padding: '8px 14px',
                 backgroundColor: '#1e2530',
+                border: 'none',
                 borderBottom: deplacementsExpanded ? '1px solid #334155' : 'none',
                 borderRadius: '8px 8px 0 0',
                 cursor: 'pointer',
@@ -1078,6 +1096,8 @@ export default function Carte() {
                 fontWeight: 'bold',
                 fontSize: '0.875rem',
                 color: '#f1f5f9',
+                textAlign: 'left',
+                fontFamily: 'inherit',
                 flexShrink: 0,
                 userSelect: 'none',
               }}
@@ -1089,10 +1109,12 @@ export default function Carte() {
               <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, color: '#94a3b8' }}>
                 {deplacementsExpanded ? <IconChevronDown size={15} /> : <IconChevronUp size={15} />}
               </span>
-            </div>
+            </button>
             {deplacementsExpanded && (
               <>
-                <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
+                {/* minHeight:0 : sans ça la liste ne peut pas se rétrécir sous sa taille de contenu
+                    et dépasse le tiroir (pied Copier/Réinitialiser inaccessible, pas de scroll) */}
+                <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', minHeight: 0 }}>
                   {nbDeplacements === 0 ? (
                     <div style={{ color: '#94a3b8', fontSize: '0.85rem', padding: '4px 0' }}>
                       Aucun déplacement — cliquez sur une case occupée par vos flottes, puis glissez une
@@ -1264,11 +1286,15 @@ export default function Carte() {
         </div>
       </div>
 
-      <div style={{ display: infoPanelCollapsed ? 'none' : 'block', height: '100%', overflow: 'hidden' }}>
+      {/* display:contents : le wrapper ne doit pas interposer de boîte entre la grille et .carte-info —
+          sinon le panneau n'est plus l'item de la colonne info (perte de sa hauteur de ligne et
+          de son scroll), et l'astuce « Aucun rapport chargé » se faufile dans la colonne info */}
+      <div style={{ display: infoPanelCollapsed ? 'none' : 'contents' }}>
         <InfoPanel
           selected={selected}
           onFleetHover={setHoverFleetPos}
           onClose={() => setInfoPanelCollapsed(true)}
+          onMoveFleet={onMoveFleetToSelected}
         />
       </div>
 

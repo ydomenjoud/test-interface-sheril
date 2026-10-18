@@ -19,16 +19,7 @@ code {
 .race4{ color: #009933}
 .race5{ color: #777777}
 
-.cur {
-    color: #fbbf24;
-}
-
-.cur::after {
-    content: "\00A2";
-    padding-left: 2px;
-    color: #f59e0b;
-    text-shadow: 0 0 6px rgba(245, 158, 11, 0.25);
-}
+/* .cur est défini dans App.css (pas dupliqué ici) */
 .tech-table button[disabled] {
     color: #64748b;
     opacity: 0.5;

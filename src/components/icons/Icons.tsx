@@ -17,9 +17,12 @@ const baseProps = (size: number, color?: string, strokeWidth = 2): React.SVGProp
   strokeWidth,
   strokeLinecap: 'round',
   strokeLinejoin: 'round',
+  // Icônes décoratives : les contrôles qui les contiennent portent le libellé accessible
+  'aria-hidden': true,
+  focusable: 'false',
 });
 
-/** 4-pointed celestial star representing galactic systems */
+/** Star representing galactic systems */
 export function IconSystem({ size = 16, className, style, color, strokeWidth = 2 }: IconProps) {
   return (
     <svg {...baseProps(size, color, strokeWidth)} className={className} style={style}>
@@ -62,7 +65,7 @@ export function IconMiniMap({ size = 16, className, style, color, strokeWidth = 
   return (
     <svg {...baseProps(size, color, strokeWidth)} className={className} style={style}>
       <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-      <rect x="13" y="13" width="6" height="6" rx="1" fill="currentColor" fillOpacity="0.35" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="13" y="13" width="6" height="6" rx="1" fill={color || 'currentColor'} fillOpacity="0.35" stroke={color || 'currentColor'} strokeWidth="1.5" />
     </svg>
   );
 }
@@ -109,7 +112,7 @@ export function IconFleetMove({ size = 16, className, style, color, strokeWidth 
 /** Media Play icon */
 export function IconPlay({ size = 14, className, style, color }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" className={className} style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color || 'currentColor'} stroke="none" aria-hidden="true" focusable="false" className={className} style={style}>
       <polygon points="6 3 20 12 6 21 6 3" />
     </svg>
   );
@@ -118,7 +121,7 @@ export function IconPlay({ size = 14, className, style, color }: IconProps) {
 /** Media Stop icon */
 export function IconStop({ size = 14, className, style, color }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" className={className} style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color || 'currentColor'} stroke="none" aria-hidden="true" focusable="false" className={className} style={style}>
       <rect x="5" y="5" width="14" height="14" rx="1.5" />
     </svg>
   );
@@ -214,7 +217,7 @@ export function IconChevronUp({ size = 16, className, style, color, strokeWidth 
 /** 6-dot grip handle indicating a draggable panel header */
 export function IconGrip({ size = 16, className, style, color }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color || 'currentColor'} aria-hidden="true" focusable="false" className={className} style={style}>
       <circle cx="8" cy="6" r="1.75" />
       <circle cx="16" cy="6" r="1.75" />
       <circle cx="8" cy="12" r="1.75" />

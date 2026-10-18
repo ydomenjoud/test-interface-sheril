@@ -49,7 +49,7 @@ function withOpacity(color: string, opacity: number): string {
     if (color.startsWith('hsl')) {
         return color.replace(')', `, ${opacity})`).replace('hsl', 'hsla');
     }
-    const named: Record<string, string> = { grey: '#94a3b8', gray: '#94a3b8', yellow: '#f59e0b' };
+    const named: Record<string, string> = { grey: '#94a3b8', gray: '#94a3b8' };
     const hex = (named[color] || (color.startsWith('#') ? color : '')).replace('#', '');
     if (/^[0-9a-fA-F]{6}$/.test(hex)) {
         const r = parseInt(hex.slice(0, 2), 16);
@@ -145,7 +145,8 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     }
 
     if (alliances && alliances.some(a => a.commandants.includes(owner))) return '#3b82f6';
-    if (pna && pna.includes(owner)) return '#f59e0b';
+    // Jaune (distinct de l'ambre #f59e0b réservé aux déplacements/flèches de direction)
+    if (pna && pna.includes(owner)) return '#fde047';
     return '#ef4444';
 }
 

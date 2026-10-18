@@ -116,7 +116,7 @@ panneau "Filtres", qui garde la même liste complète) :
   - L'icône ▣ dans les filtres rapides de la barre d'outils (et une case à cocher dans les Filtres) permet de
     l'afficher/masquer ; elle est affichée par défaut.
 - Header: un bouton "Capitale" recentre la carte principale sur la capitale du joueur.
-- Panneau d'informations : repliable via un bouton dédié dans la barre d'outils, le raccourci Alt + I ou le bouton de fermeture dans l'en-tête, offrant une vue pleine largeur à la carte (colonne à 0 px avec onglet d'accès rapide sur le bord droit). L'intérieur est organisé en onglets rapides (Tout / Système / Flottes / Tactique) avec badges de comptage évitant le défilement vertical infini.
+- Panneau d'informations : repliable via un bouton dédié dans la barre d'outils, le raccourci Alt + I ou le bouton de fermeture dans l'en-tête, offrant une vue pleine largeur à la carte (colonne à 0 px avec un bouton « Détails » en haut à droite, positionné à gauche du panneau Filtres pour rester cliquable). L'intérieur est organisé en onglets rapides (Tout / Système / Flottes / Tactique) avec badges de comptage évitant le défilement vertical infini ; l'onglet actif retombe sur « Tout » lors d'un changement de case (ou s'il n'a plus de contenu) et se navigue au clavier avec les flèches gauche/droite.
 
 ### données à afficher
 
@@ -200,9 +200,11 @@ une case sans aucun contenu (ni système, ni flotte, ni combat, ni zone) affiche
   - puissance
 - mes flottes : une seule liste de toutes les flottes du joueur, avec des colonnes triables (Nom, Distance,
   Vitesse, AS, AP) et la Position ; les flottes hors de portée ce tour sont en orange estompé (légende sous la
-  liste) ; survoler une ligne affiche le détail de la flotte (position, direction, vitesse, directive, AS / AP,
-  scan, nombre et composition des vaisseaux, distance et portée) ET surligne la case de la flotte sur la carte
-  (mêmes équerres blanches débordantes que la case sélectionnée, par-dessus les flèches)
+  liste) ; un bouton « → » par ligne déplace la flotte vers la case sélectionnée (création/remplacement du
+  déplacement, comme un dépos ; désactivé si la flotte est déjà sur la case) — c'est l'alternative clavier au
+  glisser-déposer ; survoler une ligne affiche le détail de la flotte (position, direction, vitesse, directive,
+  AS / AP, scan, nombre et composition des vaisseaux, distance et portée) ET surligne la case de la flotte sur
+  la carte (mêmes équerres blanches débordantes que la case sélectionnée, par-dessus les flèches)
 - combats sur la case (cartes dépliables avec les détails)
 - zones couvrant la case (éditables)
 - notes de la case (le formulaire d'ajout est replié derrière un bouton)
@@ -215,8 +217,8 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 ### geste
 
 - Un mousedown sur une case occupée par au moins une flotte du joueur ouvre le sélecteur de flotte (« Déplacer une
-  flotte »), ancré sur le point de clic : pour une seule flotte, il s'affiche sous forme de puce d'action compacte
-  immédiate ; pour plusieurs flottes, il liste les flottes de la case avec badges de vitesse et de composition
+  flotte »), ancré sur le point de clic : pour une seule flotte, le panneau est plus étroit avec un en-tête compact ;
+  pour plusieurs flottes, il liste les flottes de la case avec badges de vitesse et de composition
   (« déjà déplacée → 0_x_y »). La fenêtre est déplaçable en saisissant sa poignée d'en-tête (pour ne pas masquer
   d'informations importantes) ; le bouton × et le drag des lignes ne sont pas affectés.
 - Un simple clic reste une sélection de case (le sélecteur se referme au mousedown suivant) ; le pan et les zones
@@ -255,8 +257,9 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 
 ### panneau « Déplacements »
 
-- Un tiroir de commandes tactique repliable au bas de la zone de carte (centré entre la légende à gauche et la
-  mini-carte à droite, pour ne plus jamais masquer les systèmes du quart haut-gauche), repliable comme le panneau Filtres :
+- Un tiroir de commandes tactique repliable au bas de la zone de carte (centré horizontalement sur le canvas,
+  au-dessus de la légende ; sous 1200 px de largeur, il s'étend sur toute la largeur et remonte de 34 px, devant
+  la mini-carte), repliable comme le panneau Filtres :
   toujours visible, en-tête cliquable « Déplacements (n) » (▴/▾), replié en onglet compact de 38 px / déplié en tiroir de commandes
   s'élevant vers le haut (un déplacement par ligne) ; une icône ⇢ dans la barre d'outils pilote le même état. Le panneau se déplie tout
   seul au premier dépos.
