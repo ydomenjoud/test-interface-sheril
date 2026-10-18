@@ -88,12 +88,13 @@ panneau "Filtres", qui garde la même liste complète) :
 * ◎ : portée radar des systèmes (désactivée par défaut)
 * ◉ : portée radar des flottes (désactivée par défaut)
 * ▣ : afficher / masquer la mini-carte (affichée par défaut)
-* ? : aide et raccourcis (touche `?`)
+* ⇢ : ouvre / replie le tiroir des déplacements de flottes (avec leur nombre en attente)
 * ⚙ : ouvre / ferme le panneau "Filtres" (options avancées, fermé par défaut ; le panneau n'est monté que
   lorsqu'il est ouvert, sans onglet permanent sur la carte) : Commandants, Tags, Afficher
   systèmes, Carte galactique, Secteurs, Influence (+ opacité), Minimap, Mode de couleur, Badges (combats /
   propriétaires / flottes), Zones manuelles, Portées Radar (systèmes / flottes), Distance Capitale (zones de
   stabilité et choix du système de référence)
+* ? : aide et raccourcis (touche `?`)
 
 #### interaction
 

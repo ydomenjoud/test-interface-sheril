@@ -601,6 +601,24 @@ export default function Carte() {
           >
             <IconMiniMap size={15} />
           </button>
+          <button
+            type="button"
+            className={deplacementsExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'}
+            title={`Déplacements de flottes (${nbDeplacements}) (⇢)`}
+            aria-label="Déplacements de flottes"
+            onClick={() => setDeplacementsExpanded(v => !v)}
+          >
+            <IconFleetMove size={15} />
+          </button>
+          <button
+            type="button"
+            className={filtersExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'}
+            title="Filtres avancés (⚙)"
+            aria-label="Filtres avancés"
+            onClick={() => setFiltersExpanded(v => !v)}
+          >
+            <IconSliders size={15} />
+          </button>
           <MapHelp renderTrigger={open => (
             <button
               type="button"
@@ -612,24 +630,6 @@ export default function Carte() {
               <IconHelp size={15} />
             </button>
           )} />
-          <button
-            type="button"
-            className={filtersExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'}
-            title="Filtres avancés (⚙)"
-            aria-label="Filtres avancés"
-            onClick={() => setFiltersExpanded(v => !v)}
-          >
-            <IconSliders size={15} />
-          </button>
-          <button
-            type="button"
-            className={deplacementsExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'}
-            title={`Déplacements de flottes (${nbDeplacements}) (⇢)`}
-            aria-label="Déplacements de flottes"
-            onClick={() => setDeplacementsExpanded(v => !v)}
-          >
-            <IconFleetMove size={15} />
-          </button>
         </div>
         {/* Historique : tour affiché + lecture */}
         {tourOptions.length > 0 && (
