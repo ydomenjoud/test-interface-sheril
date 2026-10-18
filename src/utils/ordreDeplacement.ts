@@ -1,65 +1,83 @@
 import { XY } from '../types';
 import { codePositionOrdre, serialiserSchema } from './ordreSchema';
 
-// PLACEHOLDER — à remplacer par la vraie syntaxe d'ordre du jeu
-// Forme confirmée : (num de la flotte, destination, directive:int, stratégie:int)
-export const TABLE_ORDRE_DEPLACEMENT = 'deplacement_flotte'; // à remplacer
-export const DIRECTIVE_DEFAUT = 1;   // à remplacer
-export const STRATEGIE_DEFAUT = 0;   // à remplacer
+// Schéma d'ordres de déplacement (console d'ordres du jeu, table « deplacer_flotte »).
+// Principe repris de la planification de construction : un ordre par enregistrement
+// « champ:champ:… », les ordres séparés par %#!%, le tout en base64 — sans nom de table
+// (l'import côté console sait quelle table il alimente).
+//
+// Forme d'un ordre : [num de la flotte, 0_x_y, directive, stratégie]
+// - directive = code du jeu + 100 × paramètre (n° de planète ou de commandant visé) :
+//   ex. 308 = 8 + 100×3 = « attaque des flottes du commandant 3 », 705 = 5 + 100×7 = « attaque de la planète 7 » ;
+// - stratégie = identifiant de la table z_strategies du jeu (valeurs à confirmer avec la
+//   console — vide par défaut) ; champ libre sans « : » ni « %#!% » (l'import côté console
+//   rejoint la queue de l'enregistrement si besoin) ;
+// - un seul déplacement par flotte ; num = numéro de flotte du rapport (0-based).
 
-// Directives de rencontre — règle 4.4 (https://sheril.pbem-france.net/rule/4_flottes#4.4),
-// dans l'ordre de résolution du jeu (cet ordre est déterminant).
-// value = position dans le tableau (les codes réels du jeu restent à confirmer avec la console — placeholder).
-// label = abrégé pour le menu compact ; full = libellé complet pour l'infobulle.
+export const DIRECTIVE_DEFAUT = 1;  // « Attaque système » (choix arbitraire : à confirmer avec le jeu)
+export const STRATEGIE_DEFAUT = ''; // aucune stratégie par défaut (valeurs de z_strategies à confirmer)
+export const PRECISION_DEFAUT = 0;  // 0 = le neutre pour les commandants ; planète 0 sinon
+
+// Directives de rencontre — codes réels du jeu (Const.java / Messages.DIRECTIVES du serveur,
+// cohérents avec la règle 4.4 : https://sheril.pbem-france.net/rule/4_flottes#4.4),
+// affichées dans l'ordre de résolution du jeu (Combat.java : cdt → préventive → toute flotte →
+// système → pillage système → attaque planète → pillage planète → éradication ; neutre est
+// passive) — cet ordre est déterminant.
+// label = abrégé pour le menu compact ; full = libellé complet pour l'infobulle ;
+// precision = la directive porte un paramètre n° (menu affiché : commandant visé ou planète).
 export interface DirectiveOption {
-    value: number;
+    value: number;   // code réel du jeu (0..8)
     label: string;
     full: string;
-    cdt?: boolean; // la directive porte sur les flottes d'un commandant précis (menu « Cdt » affiché)
+    precision?: 'commandant' | 'planete';
 }
 export const OPTIONS_DIRECTIVES: DirectiveOption[] = [
-    { value: 0, label: 'Attaque flottes cdt', cdt: true, full: "Attaque les flottes d'un commandant particulier présentes sur la même case (le neutre est considéré comme un commandant)" },
-    { value: 1, label: 'Attaque préventive', full: 'Attaque toutes les flottes qui comptent attaquer le système (ou ses planètes) que la flotte survole' },
-    { value: 2, label: 'Attaque toute flotte', full: 'Attaque toute flotte rencontrée, sur la même case (uniquement les flottes)' },
-    { value: 3, label: 'Attaque système', full: 'Tente de prendre toutes les planètes du système' },
+    { value: 8, label: 'Attaque flottes cdt', full: "Attaque les flottes d'un commandant particulier présentes sur la même case (le neutre est considéré comme un commandant)", precision: 'commandant' },
+    { value: 2, label: 'Attaque préventive', full: 'Attaque toutes les flottes qui comptent attaquer le système (ou ses planètes) que la flotte survole' },
+    { value: 3, label: 'Attaque toute flotte', full: 'Attaque toute flotte rencontrée, sur la même case (uniquement les flottes)' },
+    { value: 1, label: 'Attaque système', full: 'Tente de prendre toutes les planètes du système' },
     { value: 4, label: 'Pillage système', full: 'Tente de piller toutes les planètes du système' },
-    { value: 5, label: 'Attaque planète', full: 'Tente de prendre une planète du système' },
-    { value: 6, label: 'Pillage planète', full: 'Tente de piller une planète du système' },
-    { value: 7, label: 'Eradication planète', full: "Tente d'éradiquer une planète du système" },
-    { value: 8, label: 'Attitude neutre', full: 'La flotte ne fait rien, mais se défend en cas d’agression' },
+    { value: 5, label: 'Attaque planète', full: 'Tente de prendre la planète n° visée du système', precision: 'planete' },
+    { value: 6, label: 'Pillage planète', full: 'Tente de piller la planète n° visée du système', precision: 'planete' },
+    { value: 7, label: 'Eradication planète', full: 'Tente d’éradiquer la planète n° visée du système', precision: 'planete' },
+    { value: 0, label: 'Attitude neutre', full: 'La flotte ne fait rien, mais se défend en cas d’agression' },
 ];
-export const DIRECTIVE_CDT = 0; // « Attaque flottes cdt » : exige le commandant visé
-export const CDT_DEFAUT = 0;    // 0 = le neutre (le jeu le considère comme un commandant)
+// « Attaque flottes cdt » : précision = commandant visé (0 = le neutre)
+export const DIRECTIVE_CDT = 8;
+// Bornes du n° de planète proposé dans le menu (bornes du jeu)
+export const PRECISION_PLANETE_MIN = 0;
+export const PRECISION_PLANETE_MAX = 19;
+
+// Code du jeu d'une directive avec son paramètre : code + 100 × paramètre
+export const codeDirective = (directive: number, precision: number): number => directive + 100 * precision;
 
 export interface DeplacementOrdre {
     fleetNum: number;  // num de la flotte (identité rapport, 0-based — l'interface affiche « #num+1 »)
     to: XY;            // destination commandée
-    directive: number; // directive commandée (int)
-    strategy: number;  // stratégie commandée (int)
-    cdt?: number;      // commandant visé (directive « Attaque flottes cdt »)
+    directive: number; // directive commandée (code du jeu 0..8)
+    strategy: string;  // stratégie commandée (z_strategies — valeurs à confirmer)
+    precision?: number; // paramètre n° de la directive (commandant visé ou planète)
 }
 
-// Déplacement en attente pour une flotte : destination + directive + stratégie (+ commandant visé)
+// Déplacement en attente pour une flotte : destination + directive + stratégie (+ paramètre n°)
 export interface DeplacementEnAttente {
     to: XY;
     directive: number;
-    strategy: number;
-    cdt?: number;
+    strategy: string;
+    precision?: number;
 }
 
-// Ordre d'un déplacement : [table, num de flotte, position destination, directive, stratégie]
-// (+ commandant visé en 6e position quand la directive est « Attaque flottes cdt » —
-// position à confirmer avec la console, placeholder)
+// Ordre d'un déplacement : [num de flotte, position destination, directive, stratégie]
+// Le paramètre n° est piqué dans la directive, uniquement pour les directives qui en ont.
 export const ordreDeplacement = (d: DeplacementOrdre): string[] => {
-    const ordre = [
-        TABLE_ORDRE_DEPLACEMENT,
+    const option = OPTIONS_DIRECTIVES.find(o => o.value === d.directive);
+    const precision = option?.precision ? (d.precision ?? PRECISION_DEFAUT) : 0;
+    return [
         String(d.fleetNum),
         codePositionOrdre(d.to),
-        String(d.directive),
-        String(d.strategy),
+        String(codeDirective(d.directive, precision)),
+        d.strategy ?? '',
     ];
-    if (d.directive === DIRECTIVE_CDT) ordre.push(String(d.cdt ?? CDT_DEFAUT));
-    return ordre;
 };
 
 // Schéma déterministe : tri par num de flotte, puis serialisation

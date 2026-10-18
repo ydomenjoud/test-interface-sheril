@@ -269,31 +269,40 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
   s'affiche au NOM du système qui l'occupe quand il y en a un (coordonnées au survol), sinon en coordonnées x_y ;
   suivi de la distance torique en rouge quand elle est hors de portée (à distance normale sinon), un ⚠ ambre compact (infobulle « déjà en
   route vers x_y ») si le rapport avait une direction, un menu de directive (sans libellé, évident en
-  contexte) pour choisir la directive de l'ordre, et un bouton × pour supprimer ce déplacement. Le menu de
-  stratégie n'existe pas encore (stratégie pas encore paramétrée, valeur par défaut conservée).
+  contexte) pour choisir la directive de l'ordre — et, si la directive en porte un, un menu de paramètre
+  n° (numéro de planète, ou commandant visé pour « Attaque flottes cdt ») — et un bouton × pour supprimer
+  ce déplacement. Le menu de stratégie n'existe pas encore (valeurs du jeu pas encore paramétrées, valeur
+  par défaut conservée).
 - Le menu de directive est alimenté par les directives de rencontre de la règle 4.4
-  (https://sheril.pbem-france.net/rule/4_flottes#4.4), dans l'ordre de résolution du jeu, avec des libellés
-  abrégés (suppression des « de », « Attaque flottes cdt » pour la première ; libellé complet en infobulle) :
-  Attaque flottes cdt, Attaque préventive, Attaque toute flotte, Attaque système, Pillage système, Attaque
-  planète, Pillage planète, Eradication planète, Attitude neutre. La directive « Attaque flottes cdt » ouvre un
-  second menu de commandant visé (0 = neutre, puis les commandants de data.xml ; nom en infobulle). Les valeurs
-  numérique/codes du jeu restent des placeholders à confirmer avec la console.
+  (https://sheril.pbem-france.net/rule/4_flottes#4.4) avec leurs codes réels du jeu (côté serveur :
+  Const/Messages), dans l'ordre de résolution du jeu, avec des libellés abrégés (suppression des « de » ;
+  libellé complet en infobulle) : Attaque flottes cdt, Attaque préventive, Attaque toute flotte,
+  Attaque système, Pillage système, Attaque planète, Pillage planète, Eradication planète, Attitude
+  neutre (passive).
+  Les directives « … planète n° » (attaque/pillage/éradication) ouvrent un second menu du numéro de
+  planète visée (0-19). La directive « Attaque flottes cdt » ouvre un
+  second menu de commandant visé (0 = neutre, puis les commandants de data.xml ; nom en infobulle).
 - Vide : mention d'aide (cliquer une case de flotte, glisser une ligne sur la destination).
-- En pied : « Copier le schéma (à venir) » (retour visuel « Schéma copié » / « Échec de la copie ») et
+- En pied : « Copier le schéma » (retour visuel « Schéma copié » / « Échec de la copie ») et
   « ↺ Tout réinitialiser » (efface tous les déplacements du tour et replie le panneau ; les deux boutons sont
-  estompés et désactivés quand il n'y a plus de déplacement). Le libellé « (à venir) » rappelle que la syntaxe
-  d'ordre est encore un placeholder à confirmer avec le jeu.
+  estompés et désactivés quand il n'y a plus de déplacement).
 
 ### schéma d'ordres
 
-- Schéma = ordres `[deplacement_flotte, num, 0_x_y, directive, stratégie]` (table, numéro de flotte, destination,
-  directive, stratégie) séparés par `%#!%`, encodés en base64, triés par numéro de flotte. `num` est le numéro
-  interne de la flotte dans le rapport (0-based — l'interface l'affiche en « #num+1 »). Quand la directive est
-  « Attaque flottes cdt », le commandant visé (0 = neutre) est ajouté en 6e position.
-- La directive et la stratégie sont propres à chaque ordre : par défaut 1 et 0 au dépos. La directive est
-  modifiable dans le panneau ; la stratégie garde sa valeur par défaut (son menu viendra plus tard).
-- PLACEHOLDER — syntaxe réelle à confirmer : la table, les valeurs par défaut et les listes proposées dans les menus
-  sont provisoires (voir `src/utils/ordreDeplacement.ts`).
+- Schéma = ordres `[num, 0_x_y, directive, stratégie]` (numéro de flotte, destination, directive, stratégie),
+  sans nom de table (même principe que le blueprint de la planification de construction : l'import côté
+  console sait quelle table il alimente — la table du jeu est `deplacer_flotte`), séparés par `%#!%`,
+  encodés en base64, triés par numéro de flotte. `num` est le numéro interne de la flotte dans le rapport
+  (0-based — l'interface l'affiche en « #num+1 »). La directive est le code du jeu + 100 × paramètre :
+  le numéro de planète pour les directives « … planète n° », le commandant visé (0 = neutre) pour
+  « Attaque flottes cdt » — ex. 308 = attaque des flottes du commandant 3 (8 + 100×3),
+  705 = attaque de la planète 7 (5 + 100×7).
+- La directive et la stratégie sont propres à chaque ordre : par défaut « Attaque système » et aucune
+  stratégie au dépos. La directive (et son paramètre n°) est modifiable dans le panneau ; la stratégie garde
+  sa valeur par défaut (pas de menu, valeurs du jeu à confirmer).
+- La syntaxe est la syntaxe réelle du jeu (table `deplacer_flotte`, codes de `Const`/`Messages` du serveur) ;
+  le point encore provisoire : les valeurs de stratégie (table `z_strategies`, voir
+  `src/utils/ordreDeplacement.ts`).
 
 ### persistance
 

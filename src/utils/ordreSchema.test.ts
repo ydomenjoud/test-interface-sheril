@@ -58,44 +58,61 @@ describe('copierSchema', () => {
 });
 
 describe('ordreDeplacement', () => {
-    it('construit [table, num de flotte, destination, directive, stratégie]', () => {
-        const d = {fleetNum: 7, to: {x: 3, y: 4}, directive: 2, strategy: 5};
-        expect(ordreDeplacement(d)).toEqual(['deplacement_flotte', '7', '0_3_4', '2', '5']);
+    it('construit [num de flotte, destination, directive, stratégie]', () => {
+        const d = {fleetNum: 7, to: {x: 3, y: 4}, directive: 2, strategy: ''};
+        expect(ordreDeplacement(d)).toEqual(['7', '0_3_4', '2', '']);
     });
 
-    it('ajoute le commandant visé en 6e position pour la directive « Attaque flottes cdt »', () => {
-        const d = {fleetNum: 7, to: {x: 3, y: 4}, directive: DIRECTIVE_CDT, strategy: 5, cdt: 3};
-        expect(ordreDeplacement(d)).toEqual(['deplacement_flotte', '7', '0_3_4', '0', '5', '3']);
+    it('emporte la stratégie quand elle est fournie', () => {
+        const d = {fleetNum: 7, to: {x: 3, y: 4}, directive: 1, strategy: 'patrouille'};
+        expect(ordreDeplacement(d)).toEqual(['7', '0_3_4', '1', 'patrouille']);
     });
 
-    it('la directive cdt sans commandant visé utilise le neutre (0)', () => {
-        const d = {fleetNum: 7, to: {x: 3, y: 4}, directive: DIRECTIVE_CDT, strategy: 5};
-        expect(ordreDeplacement(d)).toEqual(['deplacement_flotte', '7', '0_3_4', '0', '5', '0']);
+    it('pique le commandant visé dans la directive (308 = 8 + 100×3, flottes du commandant 3)', () => {
+        const d = {fleetNum: 7, to: {x: 3, y: 4}, directive: DIRECTIVE_CDT, strategy: '', precision: 3};
+        expect(ordreDeplacement(d)).toEqual(['7', '0_3_4', '308', '']);
+    });
+
+    it('pique la planète visée dans la directive (705 = 5 + 100×7, attaque de la planète 7)', () => {
+        const d = {fleetNum: 7, to: {x: 3, y: 4}, directive: 5, strategy: '', precision: 7};
+        expect(ordreDeplacement(d)).toEqual(['7', '0_3_4', '705', '']);
+    });
+
+    it('la directive cdt sans commandant visé utilise le neutre (8 = 8 + 100×0)', () => {
+        const d = {fleetNum: 7, to: {x: 3, y: 4}, directive: DIRECTIVE_CDT, strategy: ''};
+        expect(ordreDeplacement(d)).toEqual(['7', '0_3_4', '8', '']);
+    });
+
+    it('les directives sans paramètre ignorent toute précision', () => {
+        const d = {fleetNum: 7, to: {x: 3, y: 4}, directive: 1, strategy: '', precision: 9};
+        expect(ordreDeplacement(d)).toEqual(['7', '0_3_4', '1', '']);
     });
 });
 
-describe('OPTIONS_DIRECTIVES (règle 4.4)', () => {
-    it('les 9 directives de la règle, dans l\'ordre de résolution du jeu', () => {
-        expect(OPTIONS_DIRECTIVES.map(o => o.value)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+describe('OPTIONS_DIRECTIVES (codes du jeu)', () => {
+    it('les 9 directives de la règle 4.4, codes réels du jeu, dans l\'ordre de résolution du jeu', () => {
+        // ordre de Combat.java : cdt → préventive → toute flotte → système → pillage système →
+        // attaque planète → pillage planète → éradication (neutre passive, en dernier)
+        expect(OPTIONS_DIRECTIVES.map(o => o.value)).toEqual([8, 2, 3, 1, 4, 5, 6, 7, 0]);
         expect(OPTIONS_DIRECTIVES[0].label).toBe('Attaque flottes cdt');
-        expect(OPTIONS_DIRECTIVES[0].cdt).toBe(true);
+        expect(OPTIONS_DIRECTIVES[0].precision).toBe('commandant');
         expect(OPTIONS_DIRECTIVES[8].label).toBe('Attitude neutre');
-        expect(OPTIONS_DIRECTIVES.filter(o => o.cdt)).toHaveLength(1);
+        expect(OPTIONS_DIRECTIVES.filter(o => o.precision === 'planete').map(o => o.value)).toEqual([5, 6, 7]);
     });
 });
 
 describe('schemaDeplacements', () => {
     it('tri par num de flotte (1, 2, 10) et reserialise en 3 ordres (directive/stratégie propres à chaque ordre)', () => {
         const deplacements = [
-            {fleetNum: 2, to: {x: 5, y: 5}, directive: 1, strategy: 0},
-            {fleetNum: 10, to: {x: 6, y: 6}, directive: 3, strategy: 2},
-            {fleetNum: 1, to: {x: 7, y: 7}, directive: 0, strategy: 1},
+            {fleetNum: 2, to: {x: 5, y: 5}, directive: 2, strategy: ''},
+            {fleetNum: 10, to: {x: 6, y: 6}, directive: 3, strategy: ''},
+            {fleetNum: 1, to: {x: 7, y: 7}, directive: DIRECTIVE_CDT, strategy: '', precision: 2},
         ];
-        // la flotte 1 a la directive cdt (0) : son ordre porte le commandant visé en 6e position (neutre par défaut)
+        // la flotte 1 a la directive cdt : son ordre porte le commandant visé dans la directive (208 = 8 + 100×2)
         expect(deserialiserSchema(schemaDeplacements(deplacements))).toEqual([
-            ['deplacement_flotte', '1', '0_7_7', '0', '1', '0'],
-            ['deplacement_flotte', '2', '0_5_5', '1', '0'],
-            ['deplacement_flotte', '10', '0_6_6', '3', '2'],
+            ['1', '0_7_7', '208', ''],
+            ['2', '0_5_5', '2', ''],
+            ['10', '0_6_6', '3', ''],
         ]);
     });
 });
@@ -114,29 +131,35 @@ describe('deplacementOrdersStorage', () => {
         expect(loadDeplacements(42)).toEqual({});
     });
 
-    it('relit ce qui a été sauvegardé (clés numériques reconverties, directive/stratégie conservées)', () => {
+    it('relit ce qui a été sauvegardé (clés numériques reconverties, directive/stratégie/precision conservées)', () => {
         saveDeplacements(42, {
-            1: {to: {x: 1, y: 2}, directive: 4, strategy: 2},
-            10: {to: {x: 3, y: 4}, directive: 0, strategy: 0},
+            1: {to: {x: 1, y: 2}, directive: 4, strategy: 'prudence'},
+            10: {to: {x: 3, y: 4}, directive: 8, strategy: '', precision: 2},
         });
         expect(loadDeplacements(42)).toEqual({
-            1: {to: {x: 1, y: 2}, directive: 4, strategy: 2},
-            10: {to: {x: 3, y: 4}, directive: 0, strategy: 0},
+            1: {to: {x: 1, y: 2}, directive: 4, strategy: 'prudence'},
+            10: {to: {x: 3, y: 4}, directive: 8, strategy: '', precision: 2},
         });
     });
 
-    it('relit l\'ancien format (position seule) avec les directive/stratégie par défaut', () => {
+    it('relit le format le plus ancien (position seule) avec la directive par défaut et une stratégie vide', () => {
         localStorage.setItem('deplacements_tour_42', JSON.stringify({1: {x: 1, y: 2}}));
-        expect(loadDeplacements(42)).toEqual({1: {to: {x: 1, y: 2}, directive: 1, strategy: 0}});
+        expect(loadDeplacements(42)).toEqual({1: {to: {x: 1, y: 2}, directive: 1, strategy: ''}});
     });
 
-    it('conserve le commandant visé (cdt) au passage par le stockage', () => {
-        saveDeplacements(42, {1: {to: {x: 1, y: 2}, directive: 0, strategy: 2, cdt: 4}});
-        expect(loadDeplacements(42)).toEqual({1: {to: {x: 1, y: 2}, directive: 0, strategy: 2, cdt: 4}});
+    it('migre le format placeholder (codes directives provisoires, cdt, stratégie en nombre)', () => {
+        localStorage.setItem('deplacements_tour_42', JSON.stringify({
+            1: {to: {x: 1, y: 2}, directive: 3, strategy: 0},  // « Attaque système » (ancien code 3) → code réel 1
+            2: {to: {x: 3, y: 4}, directive: 0, strategy: 1, cdt: 4},  // « Attaque flottes cdt » (ancien code 0) → 8, cdt → precision
+        }));
+        expect(loadDeplacements(42)).toEqual({
+            1: {to: {x: 1, y: 2}, directive: 1, strategy: ''},
+            2: {to: {x: 3, y: 4}, directive: 8, strategy: '', precision: 4},
+        });
     });
 
     it('clearDeplacements efface le tour', () => {
-        saveDeplacements(42, {1: {to: {x: 1, y: 2}, directive: 1, strategy: 0}});
+        saveDeplacements(42, {1: {to: {x: 1, y: 2}, directive: 1, strategy: ''}});
         clearDeplacements(42);
         expect(loadDeplacements(42)).toEqual({});
     });

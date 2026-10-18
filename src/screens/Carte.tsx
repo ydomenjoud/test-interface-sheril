@@ -13,7 +13,7 @@ import Modal from '../components/utils/Modal';
 import {GlobalData, XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
 import {loadDeplacements, saveDeplacements, clearDeplacements} from '../storage/deplacementOrdersStorage';
-import {CDT_DEFAUT, DeplacementEnAttente, DeplacementOrdre, DIRECTIVE_CDT, DIRECTIVE_DEFAUT, OPTIONS_DIRECTIVES, STRATEGIE_DEFAUT, schemaDeplacements} from '../utils/ordreDeplacement';
+import {DeplacementEnAttente, DeplacementOrdre, DIRECTIVE_DEFAUT, OPTIONS_DIRECTIVES, PRECISION_DEFAUT, PRECISION_PLANETE_MAX, PRECISION_PLANETE_MIN, STRATEGIE_DEFAUT, schemaDeplacements} from '../utils/ordreDeplacement';
 import {copierSchema} from '../utils/ordreSchema';
 import {
   IconSystem,
@@ -39,7 +39,7 @@ import {
 
 // Libellé du commandant visé par la directive « Attaque flottes cdt » (infobulle du menu)
 const commandantViserLabel = (globalData: GlobalData | undefined, num: number): string =>
-    num === CDT_DEFAUT ? 'Neutre' : (globalData?.commandants.find(c => c.numero === num)?.nom ?? `cdt ${num}`);
+    num === PRECISION_DEFAUT ? 'Neutre' : (globalData?.commandants.find(c => c.numero === num)?.nom ?? `cdt ${num}`);
 
 // Durée d'affichage de chaque tour pendant la lecture automatique de l'historique (en secondes, modifiable)
 const DEFAULT_PLAY_STEP_S = 2;
@@ -459,7 +459,7 @@ export default function Carte() {
         return reste;
       });
     } else {
-      // directive/stratégie par défaut (placeholders) : la directive est modifiable dans le menu du panneau
+      // directive/stratégie par défaut : la directive (et son paramètre n°) sont modifiables dans le panneau
       setDeplacements(d => ({ ...d, [fleetNum]: { to: cell, directive: DIRECTIVE_DEFAUT, strategy: STRATEGIE_DEFAUT } }));
       setDeplacementsExpanded(true); // on ouvre le panneau pour montrer le résultat du dépos
     }
@@ -486,7 +486,7 @@ export default function Carte() {
         to: deplacement.to,
         directive: deplacement.directive,
         strategy: deplacement.strategy,
-        cdt: deplacement.cdt,
+        precision: deplacement.precision,
       });
     }
     return liste;
@@ -526,8 +526,8 @@ export default function Carte() {
     if (tour !== undefined) clearDeplacements(tour);
     setDeplacementsExpanded(false);
   };
-  // Modification de la directive (ou du commandant visé) d'un déplacement existant (menus du panneau)
-  const majDeplacement = useCallback((num: number, champ: { directive?: number; cdt?: number }) => {
+  // Modification de la directive (ou de son paramètre n°) d'un déplacement existant (menus du panneau)
+  const majDeplacement = useCallback((num: number, champ: { directive?: number; precision?: number }) => {
     setDeplacements(d => {
       const actuel = d[num];
       if (!actuel) return d;
@@ -1116,6 +1116,8 @@ export default function Carte() {
                         const origine = flotte?.pos;
                         const dist = origine ? getTorusDistance(origine, to) : undefined;
                         const dansPortee = dist !== undefined && flotte ? dist <= flotte.vitesse : false;
+                        // La directive choisie (détermine le menu de paramètre n° éventuel)
+                        const optionDirective = OPTIONS_DIRECTIVES.find(o => o.value === deplacement.directive);
                         // Coordonnées d'une case : nom du système s'il existe (coordonnées au survol),
                         // sinon les coordonnées seules
                         const coordSpan = (pos: XY) => {
@@ -1157,11 +1159,11 @@ export default function Carte() {
                                 <IconAlert size={14} />
                               </span>
                             )}
-                            {/* Menu de directive (sans libellé : évident en contexte) — libellés de la règle 4.4, ordre de
-                                résolution du jeu, libellé complet en infobulle */}
+                            {/* Menu de directive (sans libellé : évident en contexte) — codes réels du jeu, règle 4.4,
+                                ordre de résolution, libellé complet en infobulle */}
                             <select
                               className="carte-select"
-                              title="Directive (règle 4.4, ordre de résolution du jeu)"
+                              title="Directive (règle 4.4 — codes du jeu, ordre de résolution)"
                               value={deplacement.directive}
                               onChange={e => majDeplacement(num, { directive: Number(e.target.value) })}
                               style={{ minWidth: 66, maxWidth: 160, flexShrink: 0 }}
@@ -1170,16 +1172,31 @@ export default function Carte() {
                                 <option key={o.value} value={o.value} title={o.full}>{o.label}</option>
                               ))}
                             </select>
-                            {/* La directive « Attaque flottes cdt » vise un commandant précis : menu de son numéro */}
-                            {deplacement.directive === DIRECTIVE_CDT && (
+                            {/* Les directives « … planète n° » visent une planète précise : menu de son numéro */}
+                            {optionDirective?.precision === 'planete' && (
                               <select
                                 className="carte-select"
-                                title={`Commandant visé (0 = neutre) : ${commandantViserLabel(global, deplacement.cdt ?? CDT_DEFAUT)}`}
-                                value={deplacement.cdt ?? CDT_DEFAUT}
-                                onChange={e => majDeplacement(num, { cdt: Number(e.target.value) })}
+                                title={`Planète visée (n°, 0-19) : ${deplacement.precision ?? PRECISION_DEFAUT}`}
+                                value={deplacement.precision ?? PRECISION_DEFAUT}
+                                onChange={e => majDeplacement(num, { precision: Number(e.target.value) })}
                                 style={{ width: 48, flexShrink: 0 }}
                               >
-                                <option value={CDT_DEFAUT} title="Neutre (le jeu le considère comme un commandant)">0</option>
+                                {Array.from({length: PRECISION_PLANETE_MAX - PRECISION_PLANETE_MIN + 1}, (_, n) => {
+                                  const numero = PRECISION_PLANETE_MIN + n;
+                                  return <option key={numero} value={numero}>{numero}</option>;
+                                })}
+                              </select>
+                            )}
+                            {/* La directive « Attaque flottes cdt » vise un commandant précis : menu de son numéro */}
+                            {optionDirective?.precision === 'commandant' && (
+                              <select
+                                className="carte-select"
+                                title={`Commandant visé (0 = neutre) : ${commandantViserLabel(global, deplacement.precision ?? PRECISION_DEFAUT)}`}
+                                value={deplacement.precision ?? PRECISION_DEFAUT}
+                                onChange={e => majDeplacement(num, { precision: Number(e.target.value) })}
+                                style={{ width: 48, flexShrink: 0 }}
+                              >
+                                <option value={PRECISION_DEFAUT} title="Neutre (le jeu le considère comme un commandant)">0</option>
                                 {(global?.commandants ?? []).filter(c => typeof c.numero === 'number').map(c => (
                                   <option key={c.numero} value={c.numero} title={`${c.nom ?? '?'} (#${c.numero})`}>{c.numero}</option>
                                 ))}
@@ -1222,7 +1239,7 @@ export default function Carte() {
                     type="button"
                     onClick={copierLeSchema}
                     disabled={nbDeplacements === 0}
-                    title="Copier le schéma des ordres de déplacement (placeholder) à coller dans la console d'ordres"
+                    title="Copier le schéma des ordres de déplacement à coller dans la console d'ordres"
                     style={{
                       ...styleBoutonDeplacement,
                       flex: 1,
@@ -1230,12 +1247,12 @@ export default function Carte() {
                       cursor: nbDeplacements === 0 ? 'default' : 'pointer'
                     }}
                   >
-                    {copieSchema === 'ok' ? (
+{copieSchema === 'ok' ? (
                       <><IconCheck size={14} color="#4ade80" /> Schéma copié</>
                     ) : copieSchema === 'ko' ? (
                       <><IconAlert size={14} color="#f87171" /> Échec de la copie</>
                     ) : (
-                      <><IconClipboard size={14} /> Copier le schéma (à venir)</>
+                      <><IconClipboard size={14} /> Copier le schéma</>
                     )}
                   </button>
                   <button
