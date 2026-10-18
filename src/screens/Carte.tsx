@@ -751,22 +751,8 @@ export default function Carte() {
             onFleetDragLeave={onFleetDragLeave}
             onFleetDrop={onFleetDrop}
           />
-          {/* Bouton pour ré-ouvrir le panneau info quand il est replié : à gauche du panneau Filtres
-              (toujours monté en haut à droite, opacité pleine, même z-index) pour rester cliquable */}
-          {infoPanelCollapsed && (
-            <button
-              type="button"
-              className="carte-open-info-btn"
-              style={{ right: filtersExpanded ? 310 : 138 }}
-              onClick={() => setInfoPanelCollapsed(false)}
-              title="Afficher le panneau d'informations (Alt + I)"
-              aria-label="Afficher le panneau d'informations"
-            >
-              <IconChevronLeft size={14} />
-              <span>Détails</span>
-              {selected && <span className="carte-open-info-badge">{selected.x}-{selected.y}</span>}
-            </button>
-          )}
+          {/* Le ré-ouverture du panneau info se fait depuis la barre d'outils (« Détails » / Alt + I) :
+              pas de bouton en double sur la carte */}
           {showMiniMap && <MiniMap onCenter={(x, y) => setCenter({ x, y })} colorMode={colorMode} />}
           {/* Légende des couleurs (mode Alliés/Ennemis) : la carte se suffit à elle-même au coup d'œil */}
           {colorMode === 'status' && (
@@ -780,12 +766,14 @@ export default function Carte() {
               <span className="map-legend-item" title="Système avec une capacité de réparation (bordure blanche épaisse sur le disque)"><span className="map-legend-dot" style={{ background: 'transparent', border: '3px solid #fff' }} /> réparation</span>
             </div>
           )}
-          {/* Filtres Popup en haut à droite (la mini-carte occupe le bas à droite) */}
+          {/* Filtres avancés : monté uniquement quand il est ouvert (⚙ de la barre d'outils) — pas
+              d'onglet replié permanent ; la mini-carte occupe le bas à droite */}
+          {filtersExpanded && (
           <div style={{
               position: 'absolute',
               top: 8,
               right: 8,
-              width: filtersExpanded ? 290 : 120,
+              width: 290,
               backgroundColor: 'rgba(15, 23, 42, 0.96)',
               backdropFilter: 'blur(8px)',
               border: '1px solid #334155',
@@ -795,21 +783,20 @@ export default function Carte() {
               display: 'flex',
               flexDirection: 'column',
               // Le panneau ne dépasse pas la zone de la carte : l'en-tête reste accessible et le contenu défile
-              maxHeight: 'calc(100% - 16px)',
-              transition: 'width 0.25s ease'
+              maxHeight: 'calc(100% - 16px)'
           }}>
               <button
                   type="button"
-                  aria-expanded={filtersExpanded}
-                  aria-label={filtersExpanded ? 'Replier le panneau des filtres' : 'Déplier le panneau des filtres'}
-                  onClick={() => setFiltersExpanded(!filtersExpanded)}
+                  aria-expanded
+                  aria-label="Replier le panneau des filtres"
+                  onClick={() => setFiltersExpanded(false)}
                   style={{
                       width: '100%',
                       padding: '8px 12px',
                       backgroundColor: '#1e2530',
                       border: 'none',
-                      borderBottom: filtersExpanded ? '1px solid #334155' : 'none',
-                      borderRadius: filtersExpanded ? '8px 8px 0 0' : 8,
+                      borderBottom: '1px solid #334155',
+                      borderRadius: '8px 8px 0 0',
                       cursor: 'pointer',
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -827,12 +814,11 @@ export default function Carte() {
                     Filtres
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', color: '#94a3b8' }}>
-                    {filtersExpanded ? <IconChevronDown size={15} /> : <IconChevronUp size={15} />}
+                    <IconChevronDown size={15} />
                   </span>
               </button>
 
-              {filtersExpanded && (
-                  <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', minHeight: 0 }}>
+              <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', minHeight: 0 }}>
                       {/* Filtre multi-sélection des commandants */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                           <span style={{ fontSize: '0.85em', color: '#94a3b8' }}>Afficher uniquement Commandants</span>
@@ -1071,8 +1057,8 @@ export default function Carte() {
                           </select>
                       </div>
                   </div>
-              )}
           </div>
+          )}
 
           {/* Déplacements en attente : tiroir de commandes tactique repliable au bas de la carte */}
           <div className={`carte-deplacements-drawer ${deplacementsExpanded ? 'expanded' : 'collapsed'}`}>

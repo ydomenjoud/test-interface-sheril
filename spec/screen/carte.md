@@ -89,7 +89,8 @@ panneau "Filtres", qui garde la même liste complète) :
 * ◉ : portée radar des flottes (désactivée par défaut)
 * ▣ : afficher / masquer la mini-carte (affichée par défaut)
 * ? : aide et raccourcis (touche `?`)
-* ⚙ : ouvre / ferme le panneau "Filtres" (options avancées, fermé par défaut) : Commandants, Tags, Afficher
+* ⚙ : ouvre / ferme le panneau "Filtres" (options avancées, fermé par défaut ; le panneau n'est monté que
+  lorsqu'il est ouvert, sans onglet permanent sur la carte) : Commandants, Tags, Afficher
   systèmes, Carte galactique, Secteurs, Influence (+ opacité), Minimap, Mode de couleur, Badges (combats /
   propriétaires / flottes), Zones manuelles, Portées Radar (systèmes / flottes), Distance Capitale (zones de
   stabilité et choix du système de référence)
@@ -116,7 +117,7 @@ panneau "Filtres", qui garde la même liste complète) :
   - L'icône ▣ dans les filtres rapides de la barre d'outils (et une case à cocher dans les Filtres) permet de
     l'afficher/masquer ; elle est affichée par défaut.
 - Header: un bouton "Capitale" recentre la carte principale sur la capitale du joueur.
-- Panneau d'informations : repliable via un bouton dédié dans la barre d'outils, le raccourci Alt + I ou le bouton de fermeture dans l'en-tête, offrant une vue pleine largeur à la carte (colonne à 0 px avec un bouton « Détails » en haut à droite, positionné à gauche du panneau Filtres pour rester cliquable). L'intérieur est organisé en onglets rapides (Tout / Système / Flottes / Tactique) avec badges de comptage évitant le défilement vertical infini ; l'onglet actif retombe sur « Tout » lors d'un changement de case (ou s'il n'a plus de contenu) et se navigue au clavier avec les flèches gauche/droite.
+- Panneau d'informations : repliable via un bouton dédié dans la barre d'outils, le raccourci Alt + I ou le bouton de fermeture dans l'en-tête, offrant une vue pleine largeur à la carte (colonne à 0 px ; le ré-ouvre depuis la barre d'outils ou Alt + I, pas de bouton en double sur la carte). L'intérieur est organisé en onglets rapides (Tout / Système / Flottes / Tactique) avec badges de comptage évitant le défilement vertical infini ; l'onglet actif retombe sur « Tout » lors d'un changement de case (ou s'il n'a plus de contenu) et se navigue au clavier avec les flèches gauche/droite.
 
 ### données à afficher
 
@@ -259,10 +260,9 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 
 - Un tiroir de commandes tactique repliable au bas de la zone de carte (centré horizontalement sur le canvas,
   au-dessus de la légende ; sous 1200 px de largeur, il s'étend sur toute la largeur et remonte de 34 px, devant
-  la mini-carte), repliable comme le panneau Filtres :
-  toujours visible, en-tête cliquable « Déplacements (n) » (▴/▾), replié en onglet compact de 38 px / déplié en tiroir de commandes
-  s'élevant vers le haut (un déplacement par ligne) ; une icône ⇢ dans la barre d'outils pilote le même état. Le panneau se déplie tout
-  seul au premier dépos.
+  la mini-carte) : toujours visible, en-tête cliquable « Déplacements (n) » (▴/▾), replié en onglet compact de
+  38 px / déplié en tiroir de commandes s'élevant vers le haut (un déplacement par ligne) ; une icône ⇢ dans la
+  barre d'outils pilote le même état. Le panneau se déplie tout seul au premier dépos.
 - Déplié, chaque déplacement tient sur UNE ligne : nom de la flotte puis son numéro « Nom (#n) » (ou « Flotte #n » si
   la flotte n'est plus dans le rapport, tronqué avec ellipsis si trop long), origine → destination où chaque case
   s'affiche au NOM du système qui l'occupe quand il y en a un (coordonnées au survol), sinon en coordonnées x_y ;
