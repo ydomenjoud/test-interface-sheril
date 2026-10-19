@@ -92,11 +92,9 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
     setHoverFleet(undefined);
     onFleetHover?.(undefined);
   };
-  // Changement de sélection : ne pas garder le détail de la flotte de l'ancienne case,
-  // et repartir sur l'onglet « Tout » (l'onglet actif de l'ancienne case peut ne plus exister)
+  // Changement de sélection : ne pas garder le détail de la flotte de l'ancienne case
   useEffect(() => {
     setHoverFleet(undefined);
-    setActiveTab('all');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.x, selected?.y]);
 
@@ -213,32 +211,6 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
     [system, atPos.fleets.length, pastFleets, cellCombats.length, zonesHere.length]
   );
 
-  // Disponibilité de chaque onglet (mêmes conditions que le rendu des boutons ci-dessous) :
-  // si l'onglet actif n'a plus de contenu (flottes parties, zone supprimée...), on retombe sur
-  // « Tout » plutôt que d'afficher un panneau vide
-  const tabAvailable: Record<typeof activeTab, boolean> = {
-    all: true,
-    system: !!system,
-    fleets: atPos.fleets.length > 0 || atPos.playerFleets.length > 0 || !!pastFleets,
-    tactical: cellCombats.length > 0 || zonesHere.length > 0 || currentNotes.length > 0,
-  };
-  const effectiveTab: typeof activeTab = tabAvailable[activeTab] ? activeTab : 'all';
-  // Flottes de la case (actuelles ou dernières observées) : badge de l'onglet « Flottes ».
-  // (Le décompte global « Mes flottes » n'y figure pas : c'est une liste de toute la galaxie,
-  // et les flottes du joueur sur la case seraient comptées deux fois.)
-  const nbFlottesCase = atPos.fleets.length + (pastFleets?.flottes.length ?? 0);
-  // Navigation clavier entre onglets (modèle ARIA tabs : roving tabindex + flèches gauche/droite)
-  const onTablistKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-    e.preventDefault();
-    const dispo = (Object.keys(tabAvailable) as (keyof typeof tabAvailable)[]).filter(k => tabAvailable[k]);
-    if (dispo.length === 0) return;
-    const step = e.key === 'ArrowRight' ? 1 : -1;
-    const next = dispo[(dispo.indexOf(effectiveTab) + step + dispo.length) % dispo.length];
-    setActiveTab(next);
-    document.getElementById(`info-tab-${next}`)?.focus();
-  };
-
   const handleAddNote = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected || !noteText.trim()) return;
@@ -305,53 +277,39 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
       </div>
 
       {hasCellContent && (
-        <div className="info-tabs-bar" role="tablist" aria-label="Sections du panneau d'information" onKeyDown={onTablistKeyDown}>
+        <div className="info-tabs-bar" role="tablist">
           <button
             type="button"
-            id="info-tab-all"
-            role="tab"
-            aria-selected={effectiveTab === 'all'}
-            tabIndex={effectiveTab === 'all' ? 0 : -1}
-            className={`info-tab-btn ${effectiveTab === 'all' ? 'active' : ''}`}
+            className={`info-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
             onClick={() => setActiveTab('all')}
           >
             Tout
           </button>
-          {tabAvailable.system && (
+          {system && (
             <button
               type="button"
-              id="info-tab-system"
-              role="tab"
-              aria-selected={effectiveTab === 'system'}
-              tabIndex={effectiveTab === 'system' ? 0 : -1}
-              className={`info-tab-btn ${effectiveTab === 'system' ? 'active' : ''}`}
+              className={`info-tab-btn ${activeTab === 'system' ? 'active' : ''}`}
               onClick={() => setActiveTab('system')}
             >
               Système
             </button>
           )}
-          {tabAvailable.fleets && (
+          {(atPos.fleets.length > 0 || atPos.playerFleets.length > 0 || pastFleets) && (
             <button
               type="button"
-              id="info-tab-fleets"
-              role="tab"
-              aria-selected={effectiveTab === 'fleets'}
-              tabIndex={effectiveTab === 'fleets' ? 0 : -1}
-              className={`info-tab-btn ${effectiveTab === 'fleets' ? 'active' : ''}`}
+              className={`info-tab-btn ${activeTab === 'fleets' ? 'active' : ''}`}
               onClick={() => setActiveTab('fleets')}
             >
               Flottes
-              <span className="info-tab-count">{nbFlottesCase}</span>
+              <span className="info-tab-count">
+                {atPos.fleets.length + atPos.playerFleets.length}
+              </span>
             </button>
           )}
-          {tabAvailable.tactical && (
+          {(cellCombats.length > 0 || zonesHere.length > 0 || currentNotes.length > 0) && (
             <button
               type="button"
-              id="info-tab-tactical"
-              role="tab"
-              aria-selected={effectiveTab === 'tactical'}
-              tabIndex={effectiveTab === 'tactical' ? 0 : -1}
-              className={`info-tab-btn ${effectiveTab === 'tactical' ? 'active' : ''}`}
+              className={`info-tab-btn ${activeTab === 'tactical' ? 'active' : ''}`}
               onClick={() => setActiveTab('tactical')}
             >
               Tactique
@@ -371,7 +329,7 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
 
       {/* Récapitulatif du système de la case (affiché seulement s'il y a un système : sans système,
       les sections ci-dessous suffisent) */}
-      {(effectiveTab === 'all' || effectiveTab === 'system') && system && (
+      {(activeTab === 'all' || activeTab === 'system') && system && (
         <div className="info-block" style={{ borderLeft: `4px solid ${summaryColor}`, paddingLeft: 10 }}>
           {system && (
             <>
@@ -409,7 +367,7 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
 
       {/* Le détail système (nom, possesseurs, planètes, population) est dans le récapitulatif en tête de panneau */}
 
-      {(effectiveTab === 'all' || effectiveTab === 'fleets') && (atPos.fleets.length > 0 || pastFleets) && (
+      {(activeTab === 'all' || activeTab === 'fleets') && (atPos.fleets.length > 0 || pastFleets) && (
       <div className="info-block">
         <h4>Flottes</h4>
         <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -461,7 +419,7 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
       </div>
       )}
 
-      {(effectiveTab === 'all' || effectiveTab === 'fleets') && atPos.playerFleets.length > 0 && (
+      {(activeTab === 'all' || activeTab === 'fleets') && atPos.playerFleets.length > 0 && (
         <div className="info-block">
           <h4>Mes flottes</h4>
           <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -523,7 +481,7 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
           <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 6 }}>orange estompé = hors de portée ce tour · → = déplacer vers la case sélectionnée</div>
         </div>
       )}
-      {(effectiveTab === 'all' || effectiveTab === 'tactical') && cellCombats.length > 0 && (
+      {(activeTab === 'all' || activeTab === 'tactical') && cellCombats.length > 0 && (
       <div className="info-block">
         <h4>Combats</h4>
         <p className="combat-legend">
@@ -538,7 +496,7 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
       </div>
       )}
 
-      {(effectiveTab === 'all' || effectiveTab === 'tactical') && zonesHere.length > 0 && (
+      {(activeTab === 'all' || activeTab === 'tactical') && zonesHere.length > 0 && (
       <div className="info-block">
         <h4>Zones</h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -550,7 +508,7 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
       </div>
       )}
 
-      {(effectiveTab === 'all' || effectiveTab === 'tactical') && (
+      {(activeTab === 'all' || activeTab === 'tactical') && (
       <div className="info-block">
         <h4>Notes</h4>
 

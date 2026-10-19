@@ -118,7 +118,7 @@ panneau "Filtres", qui garde la même liste complète) :
   - L'icône ▣ dans les filtres rapides de la barre d'outils (et une case à cocher dans les Filtres) permet de
     l'afficher/masquer ; elle est affichée par défaut.
 - Header: un bouton "Capitale" recentre la carte principale sur la capitale du joueur.
-- Panneau d'informations : repliable via un bouton dédié dans la barre d'outils, le raccourci Alt + I ou le bouton de fermeture dans l'en-tête, offrant une vue pleine largeur à la carte (colonne à 0 px ; le ré-ouvre depuis la barre d'outils ou Alt + I, pas de bouton en double sur la carte). L'intérieur est organisé en onglets rapides (Tout / Système / Flottes / Tactique) avec badges de comptage évitant le défilement vertical infini ; l'onglet actif retombe sur « Tout » lors d'un changement de case (ou s'il n'a plus de contenu) et se navigue au clavier avec les flèches gauche/droite.
+- Panneau d'informations : repliable via un bouton dédié dans la barre d'outils, le raccourci Alt + I ou le bouton de fermeture dans l'en-tête, offrant une vue pleine largeur à la carte (colonne à 0 px ; le ré-ouvre depuis la barre d'outils ou Alt + I, pas de bouton en double sur la carte). L'intérieur est organisé en onglets rapides (Tout / Système / Flottes / Tactique) avec badges de comptage évitant le défilement vertical infini.
 
 ### données à afficher
 
