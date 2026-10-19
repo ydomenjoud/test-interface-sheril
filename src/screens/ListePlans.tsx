@@ -3,7 +3,7 @@ import Commandant from '../components/utils/Commandant';
 import { useReport } from '../context/ReportContext';
 import { PlanVaisseau, Technologie } from '../types';
 import {Link, useNavigate} from 'react-router-dom';
-import {encodeBluePrint} from "../utils/global";
+import {encodeBluePrint, romanFromNiv} from "../utils/global";
 
 type SortKey = 'nom' | 'concepteur' | 'marque' | 'tour' | 'taille' | 'vitesse' | 'pc' | 'minerai' | 'prix' | 'composants';
 type SortDir = 'asc' | 'desc';
@@ -32,7 +32,7 @@ export default function ListePlans() {
 
   const techLabelByCode = useMemo(() => {
     const map = new Map<string, string>();
-    (global?.technologies ?? []).forEach((t: Technologie) => map.set(t.code, t.nom));
+    (global?.technologies ?? []).forEach((t: Technologie) => map.set(t.code, t.nom + ' ' + romanFromNiv(t.niv)));
     return map;
   }, [global]);
 
