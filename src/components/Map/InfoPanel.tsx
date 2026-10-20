@@ -19,7 +19,7 @@ import { isObserved, lastKnownFleets } from '../../utils/fleetHistory';
 import { lastKnownSystem } from '../../utils/systemHistory';
 import { fleetSnapshotOf } from '../../storage/rapportStore';
 import {capaciteReparation} from '../../utils/reparation';
-import {IconAlert, IconArrowRight, IconChevronRight} from '../icons/Icons';
+import {IconAlert, IconArrowRight} from '../icons/Icons';
 
 type Props = {
   selected?: XY;
@@ -28,6 +28,7 @@ type Props = {
   onClose?: () => void;
   // Alternative clavier au glisser-déposer : déplacer la flotte vers la case sélectionnée
   onMoveFleet?: (fleetNum: number) => void;
+  colorMode?: 'status' | 'race' | 'player';
 };
 
 // Formatage des nombres avec séparateur de milliers (ex. 59 485)
@@ -46,7 +47,7 @@ const StaleIcon = () => (
 
 
 
-export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet }: Props) {
+export default function InfoPanel({ selected, onFleetHover, onMoveFleet, colorMode = 'status' }: Props) {
   const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats, zones, zoneLabels, fleetSnapshots, systemSnapshots } = useReport();
 
   // Zones affichées : celles qui couvrent la case, plus celles déjà listées pour cette sélection
@@ -144,13 +145,31 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
     }) : [];
 
     // Tri
+    const sortNum = (x: number, y: number, asc: boolean) => {
+      const res = (x ?? 0) - (y ?? 0);
+      return asc ? res : -res;
+    };
     playerFleets.sort((a, b) => {
-      let valA = sortField === 'id' ? a.num + 1 : a[sortField] ?? 0;
-      let valB = sortField === 'id' ? b.num + 1 : b[sortField] ?? 0;
-
-      if (valA === valB) return 0;
-      const res = valA < valB ? -1 : 1;
-      return sortOrder === 'asc' ? res : -res;
+      switch (sortField) {
+        case 'id':
+          return sortNum(a.num + 1, b.num + 1, sortOrder === 'asc');
+        case 'dist': {
+          const d = sortNum(a.dist, b.dist, sortOrder === 'asc');
+          return d !== 0 ? d : sortNum(b.vitesse, a.vitesse, true);
+        }
+        case 'nom':
+          return sortOrder === 'asc'
+            ? a.nom.localeCompare(b.nom)
+            : b.nom.localeCompare(a.nom);
+        case 'vitesse':
+          return sortNum(a.vitesse, b.vitesse, sortOrder === 'asc');
+        case 'as':
+          return sortNum(a.as ?? 0, b.as ?? 0, sortOrder === 'asc');
+        case 'ap':
+          return sortNum(a.ap ?? 0, b.ap ?? 0, sortOrder === 'asc');
+        default:
+          return 0;
+      }
     });
 
     return { systems, fleets, playerFleets };
@@ -184,10 +203,10 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
   // Couleur de possession du système (bordure du récapitulatif de case)
   const summaryColor = useMemo(() => {
     if (system?.proprietaires?.length) {
-      return colorForOwnership(rapport?.joueur?.numero, system.proprietaires, rapport?.joueur?.alliances, rapport?.joueur?.pna) || '#555';
+      return colorForOwnership(rapport?.joueur?.numero, system.proprietaires, rapport?.joueur?.alliances, rapport?.joueur?.pna, colorMode, global) || '#555';
     }
     return '#555';
-  }, [system, rapport]);
+  }, [system, rapport, colorMode, global]);
 
   const currentNotes = useMemo(() => {
     if (!selected) return [];
@@ -233,36 +252,6 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
               </span>
             )}
           </h3>
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              title="Masquer le panneau d'informations (Alt + I)"
-              aria-label="Masquer le panneau"
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#94a3b8',
-                cursor: 'pointer',
-                padding: '4px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 4,
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.color = '#fff';
-                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.color = '#94a3b8';
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              <IconChevronRight size={16} />
-            </button>
-          )}
         </div>
         {rapport && staleFromTour !== undefined && (
           <div style={{ marginTop: 6, padding: '6px 10px', background: 'rgba(245, 158, 11, 0.12)', color: '#fbbf24', borderLeft: '3px solid #f59e0b', borderRadius: '0 4px 4px 0', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}>

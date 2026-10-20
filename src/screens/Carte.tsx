@@ -929,9 +929,9 @@ export default function Carte() {
                                           border: colorMode === 'status' ? '1px solid #38bdf8' : '1px solid #334155',
                                           borderRadius: 4
                                       }}
-                                  >
-Par diplo
-                                  </button>
+>
+par diplo
+                                   </button>
                                   <button
                                       onClick={() => setColorMode('race')}
                                       style={{
@@ -1309,6 +1309,7 @@ Par diplo
           onFleetHover={setHoverFleetPos}
           onClose={() => setInfoPanelCollapsed(true)}
           onMoveFleet={onMoveFleetToSelected}
+          colorMode={colorMode}
         />
       </div>
 
