@@ -49,8 +49,6 @@ const StaleIcon = () => (
 export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet }: Props) {
   const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats, zones, zoneLabels, fleetSnapshots, systemSnapshots } = useReport();
 
-  const [activeTab, setActiveTab] = useState<'all' | 'system' | 'fleets' | 'tactical'>('all');
-
   // Zones affichées : celles qui couvrent la case, plus celles déjà listées pour cette sélection
   // (une zone déplacée ou réduite hors de la case reste éditable jusqu'au prochain clic)
   const [keptZoneIds, setKeptZoneIds] = useState<string[]>([]);
@@ -276,51 +274,6 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
         )}
       </div>
 
-      {hasCellContent && (
-        <div className="info-tabs-bar" role="tablist">
-          <button
-            type="button"
-            className={`info-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
-            onClick={() => setActiveTab('all')}
-          >
-            Tout
-          </button>
-          {system && (
-            <button
-              type="button"
-              className={`info-tab-btn ${activeTab === 'system' ? 'active' : ''}`}
-              onClick={() => setActiveTab('system')}
-            >
-              Système
-            </button>
-          )}
-          {(atPos.fleets.length > 0 || atPos.playerFleets.length > 0 || pastFleets) && (
-            <button
-              type="button"
-              className={`info-tab-btn ${activeTab === 'fleets' ? 'active' : ''}`}
-              onClick={() => setActiveTab('fleets')}
-            >
-              Flottes
-              <span className="info-tab-count">
-                {atPos.fleets.length + atPos.playerFleets.length}
-              </span>
-            </button>
-          )}
-          {(cellCombats.length > 0 || zonesHere.length > 0 || currentNotes.length > 0) && (
-            <button
-              type="button"
-              className={`info-tab-btn ${activeTab === 'tactical' ? 'active' : ''}`}
-              onClick={() => setActiveTab('tactical')}
-            >
-              Tactique
-              <span className="info-tab-count">
-                {cellCombats.length + zonesHere.length + currentNotes.length}
-              </span>
-            </button>
-          )}
-        </div>
-      )}
-
       {!hasCellContent && (
         <div className="info-block" style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.9em' }}>
           Case vide.
@@ -329,7 +282,7 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
 
       {/* Récapitulatif du système de la case (affiché seulement s'il y a un système : sans système,
       les sections ci-dessous suffisent) */}
-      {(activeTab === 'all' || activeTab === 'system') && system && (
+      {system && (
         <div className="info-block" style={{ borderLeft: `4px solid ${summaryColor}`, paddingLeft: 10 }}>
           {system && (
             <>
@@ -367,7 +320,7 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
 
       {/* Le détail système (nom, possesseurs, planètes, population) est dans le récapitulatif en tête de panneau */}
 
-      {(activeTab === 'all' || activeTab === 'fleets') && (atPos.fleets.length > 0 || pastFleets) && (
+      {(atPos.fleets.length > 0 || pastFleets) && (
       <div className="info-block">
         <h4>Flottes</h4>
         <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -419,7 +372,7 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
       </div>
       )}
 
-      {(activeTab === 'all' || activeTab === 'fleets') && atPos.playerFleets.length > 0 && (
+      {atPos.playerFleets.length > 0 && (
         <div className="info-block">
           <h4>Mes flottes</h4>
           <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -481,7 +434,7 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
           <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 6 }}>orange estompé = hors de portée ce tour · → = déplacer vers la case sélectionnée</div>
         </div>
       )}
-      {(activeTab === 'all' || activeTab === 'tactical') && cellCombats.length > 0 && (
+      {cellCombats.length > 0 && (
       <div className="info-block">
         <h4>Combats</h4>
         <p className="combat-legend">
@@ -496,7 +449,7 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
       </div>
       )}
 
-      {(activeTab === 'all' || activeTab === 'tactical') && zonesHere.length > 0 && (
+      {zonesHere.length > 0 && (
       <div className="info-block">
         <h4>Zones</h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -508,7 +461,6 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
       </div>
       )}
 
-      {(activeTab === 'all' || activeTab === 'tactical') && (
       <div className="info-block">
         <h4>Notes</h4>
 
@@ -614,7 +566,6 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
           </button>
         )}
       </div>
-      )}
 
       {hoverFleet && (() => {
         const f = hoverFleet.fleet as any;
