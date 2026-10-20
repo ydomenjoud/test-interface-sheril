@@ -12,7 +12,7 @@ import Commandant from "../utils/Commandant";
 import Position from "../utils/Position";
 import {colorForOwnership} from "./CanvasMap";
 import {getDescriptionPuissance, getPuissance, getPuissanceFromString} from "../../utils/puissance";
-import { NavLink } from 'react-router-dom';
+
 import ZoneEditor from './ZoneEditor';
 import { zoneCovers } from '../../utils/zones';
 import { isObserved, lastKnownFleets } from '../../utils/fleetHistory';
@@ -66,10 +66,10 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
   // Le formulaire d'ajout est replié derrière un bouton pour laisser la place aux notes existantes
   const [showNoteForm, setShowNoteForm] = useState(false);
 
-  const [sortField, setSortField] = useState<'dist' | 'num' | 'vitesse' | 'as' | 'ap'>('dist');
+  const [sortField, setSortField] = useState<'dist' | 'id' | 'nom' | 'vitesse' | 'as' | 'ap'>('dist');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   // En-tête triable de la liste "Mes flottes"
-  const sortTh = (field: 'num' | 'dist' | 'vitesse' | 'as' | 'ap', label: string) => (
+  const sortTh = (field: 'nom' | 'dist' | 'vitesse' | 'as' | 'ap', label: string) => (
     <th
       style={{ cursor: 'pointer', userSelect: 'none' }}
       onClick={() => {
@@ -145,8 +145,8 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
 
     // Tri
     playerFleets.sort((a, b) => {
-      let valA = a[sortField] ?? 0;
-      let valB = b[sortField] ?? 0;
+      let valA = sortField === 'id' ? a.num + 1 : a[sortField] ?? 0;
+      let valB = sortField === 'id' ? b.num + 1 : b[sortField] ?? 0;
 
       if (valA === valB) return 0;
       const res = valA < valB ? -1 : 1;
@@ -180,8 +180,6 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
     if (known.length > 0) return Math.min(...known);
     return staleTour; // 'inconnu' ou undefined
   }, [staleTour, pastFleets]);
-
-  const isOwner = useMemo(() => system?.proprietaires?.some((p: any) => p === rapport?.joueur?.numero), [system, rapport])
 
   // Couleur de possession du système (bordure du récapitulatif de case)
   const summaryColor = useMemo(() => {
@@ -291,11 +289,6 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
                   {staleTour !== undefined && <StaleIcon />}
                   {system.nom}
                 </strong>
-                {isOwner && (
-                  <NavLink to={`/player-system-detail/${selected.x}-${selected.y}`} style={{ fontSize: '0.85em' }}>
-                    détails
-                  </NavLink>
-                )}
               </div>
               <div style={{ fontSize: '0.9em', color: '#cbd5e1' }}>
                 {Array.isArray(system.proprietaires) && system.proprietaires.length
@@ -326,6 +319,7 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
         <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
           <tr>
+            <th style={{ width: 36, textAlign: 'right' }}>#</th>
             <th>Nom</th>
             <th>Propriétaire</th>
             <th>Vaisseaux</th>
@@ -350,7 +344,8 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
             }
             return (
               <tr key={`flt-${i}`} {...(f.type === 'joueur' ? { onMouseEnter: showFleetHover(f), onMouseLeave: hideFleetHover } : {})}>
-                <td>{f.nom} ({f.num+1})</td>
+                <td style={{ textAlign: 'right' }}>{f.num + 1}</td>
+                <td>{f.nom}</td>
                 <td style={{ textAlign: 'right' }}>
                   {typeof owner === 'number' ? <Commandant num={owner} /> : '—'}
                 </td>
@@ -361,7 +356,8 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
           })}
           {pastFleets?.flottes.map((f, i) => (
             <tr key={`old-${i}`} style={staleRowStyle}>
-              <td><StaleIcon />{f.nom} ({f.num+1})</td>
+              <td style={{ textAlign: 'right' }}>{f.num + 1}</td>
+              <td><StaleIcon />{f.nom}</td>
               <td style={{ textAlign: 'right' }}><Commandant num={f.proprio} /></td>
               <td>{f.nbVso}</td>
               <td style={{ textAlign: 'right' }}>{`${getPuissanceFromString(f.puiss)} - ${f.puiss}`}</td>
@@ -378,8 +374,14 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
           <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
             <tr>
-              {sortTh('num', 'Nom')}
-              {sortTh('dist', 'Distance')}
+              <th style={{ cursor: 'pointer', userSelect: 'none', width: 36, textAlign: 'right' }} onClick={() => {
+                if (sortField === 'id') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                else { setSortField('id'); setSortOrder('asc'); }
+              }}>
+                # {sortField === 'id' && (sortOrder === 'asc' ? '▲' : '▼')}
+              </th>
+              {sortTh('nom', 'Nom')}
+              {sortTh('dist', 'Δ')}
               {sortTh('vitesse', 'Vitesse')}
               {sortTh('as', 'AS')}
               {sortTh('ap', 'AP')}
@@ -394,7 +396,8 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
               const rowStyle = !f.reachable && !isHere ? { opacity: 0.5, color: '#f59e0b' } : {};
               return (
                 <tr key={`player-flt-${i}`} style={rowStyle} onMouseEnter={showFleetHover(f)} onMouseLeave={hideFleetHover}>
-                  <td>{f.nom} ({f.num+1})</td>
+                  <td style={{ textAlign: 'right' }}>{f.num + 1}</td>
+                  <td>{f.nom}</td>
                   <td style={{ textAlign: 'right' }}>{isHere ? '—' : f.dist}</td>
                   <td style={{ textAlign: 'right' }}>{f.vitesse}</td>
                   <td style={{ textAlign: 'right' }}>{f.as ?? 0}</td>
@@ -584,7 +587,7 @@ export default function InfoPanel({ selected, onFleetHover, onClose, onMoveFleet
         const lbl: React.CSSProperties = { color: '#94a3b8', paddingRight: 12, whiteSpace: 'nowrap' };
         return (
           <div style={{ position: 'fixed', left, top, width, zIndex: 300, pointerEvents: 'none', background: 'rgba(15, 23, 42, 0.97)', border: '1px solid #334155', borderRadius: 6, padding: '8px 10px', fontSize: '0.82em', color: '#cbd5e1', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)' }}>
-            <div style={{ fontWeight: 'bold', color: '#f8fafc', marginBottom: 6 }}>{f.nom} ({f.num + 1})</div>
+            <div style={{ fontWeight: 'bold', color: '#f8fafc', marginBottom: 6 }}>{f.nom}</div>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
                 <tr><td style={lbl}>Position</td><td style={{ textAlign: 'right' }}><Position pos={f.pos} /></td></tr>

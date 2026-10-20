@@ -1,6 +1,5 @@
 import React, {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {FlotteJoueur, XY} from '../../types';
-import {codePositionOrdre} from '../../utils/ordreSchema';
 import {isTypingTarget} from '../../utils/keyboard';
 import {IconAlert, IconClose, IconFleetMove, IconGrip} from '../icons/Icons';
 
@@ -242,7 +241,7 @@ export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, 
                                     color: '#cbd5e1',
                                     border: '1px solid #1e293b',
                                 }}>
-                                    {fleet.nbVso} vaisseau{fleet.nbVso > 1 ? 'x' : ''}
+                                    AS: {fleet.as ?? 0} / AP: {fleet.ap ?? 0}
                                 </span>
                             </div>
 
@@ -257,7 +256,7 @@ export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, 
                                     fontWeight: 500,
                                 }}>
                                     <IconAlert size={12} style={{ flexShrink: 0 }} />
-                                    <span>Déjà déplacée → {codePositionOrdre(deplacement)}</span>
+                                    <span>Déjà déplacée → {deplacement.x}-{deplacement.y}</span>
                                 </div>
                             )}
                         </div>

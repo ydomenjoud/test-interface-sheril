@@ -1144,8 +1144,8 @@ Par diplo
                         const coordSpan = (pos: XY) => {
                           const nom = nomSystemeByPos.get(`${pos.x}_${pos.y}`);
                           return nom
-                            ? <span title={`${nom} (${posToString(pos)})`}>{nom}</span>
-                            : <span>{posToString(pos)}</span>;
+                            ? <><span>{nom}</span> <span style={{ color: '#64748b' }}>({pos.x}-{pos.y})</span></>
+                            : <span>{pos.x}-{pos.y}</span>;
                         };
                         // Un déplacement par LIGNE : nom (tronqué si long), origine → destination (distance en
                         // rouge si hors de portée), ⚠ compacte, menus directive/stratégie, ×
@@ -1153,24 +1153,16 @@ Par diplo
                           <div key={num} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0' }}>
                             <div
                               style={{ flex: 1, fontSize: '0.85rem', color: '#f1f5f9', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                              title={flotte ? `${flotte.nom} (#${num + 1})` : `Flotte #${num + 1} (absente du rapport affiché)`}
+                              title={flotte ? `#${String(num + 1).padStart(2, '0')} ${flotte.nom}` : `#Flotte ${num + 1} (absente du rapport affiché)`}
                             >
                               {flotte
-                                ? <><strong>{flotte.nom}</strong><span style={{ color: '#94a3b8', marginLeft: 4 }}>(#{num + 1})</span></>
+                                ? <><span style={{ color: '#94a3b8', marginRight: 4 }}>#{String(num + 1).padStart(2, '0')}</span><strong>{flotte.nom}</strong></>
                                 : <strong>Flotte #{num + 1}</strong>}
                             </div>
                             <div style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#cbd5e1', flexShrink: 0, display: 'inline-flex', alignItems: 'center' }}>
                               {origine ? coordSpan(origine) : '—'}
                               <IconArrowRight size={11} style={{ margin: '0 4px', color: '#64748b' }} />
                               {coordSpan(to)}
-                              {dist !== undefined && (
-                                <span
-                                  title={dansPortee ? undefined : 'Hors de portée (distance > vitesse)'}
-                                  style={{ color: dansPortee ? '#94a3b8' : '#f87171', fontWeight: dansPortee ? undefined : 'bold', marginLeft: 4 }}
-                                >
-                                  ({dist})
-                                </span>
-                              )}
                             </div>
                             {flotte?.direction && (
                               <span
