@@ -15,6 +15,7 @@ const SECTIONS: { title: string; items: Shortcut[] }[] = [
             {keys: [['Molette']], description: 'Zoomer / dézoomer'},
             {keys: [['Clic sur la minicarte']], description: 'Centrer la carte sur ce point'},
             {keys: [['Alt', 'G']], description: 'Aller à une case : saisir ses coordonnées (ex. 52-4) pour centrer la carte dessus'},
+            {keys: [['Alt', 'Y']], description: 'Déplier / replier le panneau des déplacements'},
         ],
     },
     {
@@ -22,6 +23,7 @@ const SECTIONS: { title: string; items: Shortcut[] }[] = [
         items: [
             {keys: [['Alt', '←']], description: 'Afficher le tour précédent (plus ancien)'},
             {keys: [['Alt', '→']], description: 'Afficher le tour suivant (plus récent)'},
+            {keys: [['Alt', 'O']], description: 'Déplier / replier le panneau des filtres'},
         ],
     },
     {

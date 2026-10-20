@@ -101,7 +101,7 @@ type Props = {
     showSectors: boolean;
     showZones?: boolean; // zones manuelles (toutes)
     showInfluence: boolean;
-    colorMode?: 'status' | 'player';
+    colorMode?: 'status' | 'race' | 'player';
     showStabilityZones: boolean;
     stabilitySystemPos?: string;
     influenceOpacity?: number;
@@ -117,7 +117,7 @@ type Props = {
     onFleetDrop?: (fleetNum: number, cell: XY) => void; // drop d'une flotte sur une case
 };
 
-export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[], colorMode: 'status' | 'player' = 'status', globalData?: GlobalData) {
+export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[], colorMode: 'status' | 'race' | 'player' = 'status', globalData?: GlobalData) {
     if (owners && owners?.length === 1 && owners[0] === 0) return '#94a3b8';
     if (!owners || owners.length === 0) return '#94a3b8';
 
@@ -140,8 +140,11 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     const owner = owners[0];
     if (currentPlayerId && owners.includes(currentPlayerId)) return '#10b981';
 
-    if (colorMode === 'player') {
+    if (colorMode === 'race') {
         return raceColorForOwner(globalData, owner) || getColorForPlayer(owner);
+    }
+    if (colorMode === 'player') {
+        return getColorForPlayer(owner);
     }
 
     if (alliances && alliances.some(a => a.commandants.includes(owner))) return '#3b82f6';
@@ -559,7 +562,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 // Couche Influence - dessinée après le damier pour plus de clarté
                 if (showInfluence && influenceGrid[r] && influenceGrid[r][c] !== -1) {
                     const closestOwner = influenceGrid[r][c];
-                    const baseColor = colorMode === 'player' ? (ownerRaceColor(closestOwner) || getColorForPlayer(closestOwner)) : getColorForPlayer(closestOwner);
+                    const baseColor = colorMode === 'race' ? (ownerRaceColor(closestOwner) || getColorForPlayer(closestOwner)) : colorMode === 'player' ? getColorForPlayer(closestOwner) : getColorForPlayer(closestOwner);
                     // Rend la couleur semi-transparente (couleurs HSL des joueurs ou hexa des races)
                     ctx.fillStyle = withOpacity(baseColor, influenceOpacity);
                     ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);

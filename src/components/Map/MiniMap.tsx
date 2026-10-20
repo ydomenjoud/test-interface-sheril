@@ -5,7 +5,7 @@ import {colorForOwnership} from "./CanvasMap";
 
 type Props = {
   onCenter: (x: number, y: number) => void;
-  colorMode?: 'status' | 'player';
+  colorMode?: 'status' | 'race' | 'player';
 };
 
 function torusDelta(a: number, b: number, max: number): number {

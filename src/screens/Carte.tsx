@@ -131,9 +131,9 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_influence_opacity');
     return saved !== null ? JSON.parse(saved) : 0.18;
   });
-  const [colorMode, setColorMode] = useState<'status' | 'player'>(() => {
+  const [colorMode, setColorMode] = useState<'status' | 'race' | 'player'>(() => {
     const saved = localStorage.getItem('carte_color_mode');
-    return saved !== null ? (saved as 'status' | 'player') : 'status';
+    return saved !== null ? (saved as 'status' | 'race' | 'player') : 'status';
   });
   const [showStabilityZones, setShowStabilityZones] = useState(() => {
     const saved = localStorage.getItem('carte_show_stability_zones');
@@ -321,7 +321,7 @@ export default function Carte() {
     return () => window.removeEventListener('keydown', onKey);
   }, [selected, center]);
 
-  // Raccourcis : Alt + G (aller à une case), Alt + ← / → (tour précédent / suivant de l'historique)
+  // Raccourcis : Alt + G (aller à une case), Alt + Y (déplacements), Alt + O (filtres), Alt + I (panneau info), Alt + ← / → (tour précédent / suivant de l'historique)
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (!e.altKey || e.ctrlKey || e.metaKey || isTypingTarget(e.target)) return;
@@ -331,6 +331,12 @@ export default function Carte() {
       } else if (e.code === 'KeyI' || e.key.toLowerCase() === 'i') {
         e.preventDefault();
         setInfoPanelCollapsed(v => !v);
+      } else if (e.code === 'KeyY' || e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        setDeplacementsExpanded(v => !v);
+      } else if (e.code === 'KeyO' || e.key.toLowerCase() === 'o') {
+        e.preventDefault();
+        setFiltersExpanded(v => !v);
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault(); // sinon le navigateur revient à la page précédente / suivante
         setPlaying(false); // une navigation manuelle interrompt la lecture
@@ -604,7 +610,7 @@ export default function Carte() {
           <button
             type="button"
             className={deplacementsExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'}
-            title={`Déplacements de flottes (${nbDeplacements}) (⇢)`}
+            title={`Déplacements de flottes (${nbDeplacements}) (⇢) — Alt+Y`}
             aria-label="Déplacements de flottes"
             onClick={() => setDeplacementsExpanded(v => !v)}
           >
@@ -613,7 +619,7 @@ export default function Carte() {
           <button
             type="button"
             className={filtersExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'}
-            title="Filtres avancés (⚙)"
+            title="Filtres avancés (⚙) — Alt+O"
             aria-label="Filtres avancés"
             onClick={() => setFiltersExpanded(v => !v)}
           >
@@ -754,7 +760,7 @@ export default function Carte() {
           {/* Le ré-ouverture du panneau info se fait depuis la barre d'outils (« Détails » / Alt + I) :
               pas de bouton en double sur la carte */}
           {showMiniMap && <MiniMap onCenter={(x, y) => setCenter({ x, y })} colorMode={colorMode} />}
-          {/* Légende des couleurs (mode Alliés/Ennemis) : la carte se suffit à elle-même au coup d'œil */}
+          {/* Légende des couleurs (mode Par diplo) : la carte se suffit à elle-même au coup d'œil */}
           {colorMode === 'status' && (
             <div className="map-legend" title="Couleurs de possession des systèmes et des flottes">
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#10b981' }} /> moi</span>
@@ -924,7 +930,22 @@ export default function Carte() {
                                           borderRadius: 4
                                       }}
                                   >
-                                      Alliés/Ennemis
+Par diplo
+                                  </button>
+                                  <button
+                                      onClick={() => setColorMode('race')}
+                                      style={{
+                                          flex: 1,
+                                          fontSize: '0.8rem',
+                                          padding: '5px 4px',
+                                          cursor: 'pointer',
+                                          backgroundColor: colorMode === 'race' ? '#1e3a5f' : '#1e2530',
+                                          color: colorMode === 'race' ? '#38bdf8' : '#94a3b8',
+                                          border: colorMode === 'race' ? '1px solid #38bdf8' : '1px solid #334155',
+                                          borderRadius: 4
+                                      }}
+                                  >
+                                      par race
                                   </button>
                                   <button
                                       onClick={() => setColorMode('player')}
@@ -939,7 +960,7 @@ export default function Carte() {
                                           borderRadius: 4
                                       }}
                                   >
-                                      Par Joueur
+                                      par joueur
                                   </button>
                               </div>
                           </div>

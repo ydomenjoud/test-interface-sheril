@@ -71,7 +71,7 @@ conséquence.
 
 Une légende compacte (couleurs de possession moi / alliance / PNA / ennemi / neutre, marqueur flotte, et
 « réparation » = bordure blanche du disque) est affichée en bas à gauche de la carte, au ras du bord, en mode
-de couleur "Alliés/Ennemis".
+de couleur "Par diplo".
 
 Les portées radar (systèmes et flottes) sont désactivées par défaut pour ne pas voiler la carte ; elles peuvent
 être activées par les boutons ◎ et ◉ de la barre d'outils (filtres rapides).
@@ -151,12 +151,13 @@ Si le système est :
 * possédé par un autre joueur qui ne rentre pas dans les autres cas : bordure rouge.
 * sans propriétaire connu: bordure grise.
 
-Deux modes de couleur existent (boutons "Alliés/Ennemis" / "Par Joueur", mode par défaut "Alliés/Ennemis") :
+Trois modes de couleur existent (boutons "Par diplo" / "par race" / "par joueur", mode par défaut "Par diplo") :
 
-* Alliés/Ennemis : les règles ci-dessus ; un système à plusieurs propriétaires de couleurs différentes est partagé
+* Par diplo : les règles ci-dessus ; un système à plusieurs propriétaires de couleurs différentes est partagé
   en parts.
-* Par Joueur : chaque système est coloré à la couleur de la race de son propriétaire (le même code couleur que les
+* par race : chaque système est coloré à la couleur de la race de son propriétaire (le même code couleur que les
   noms de joueurs) ; les systèmes du joueur courant restent verts. La mini-carte et les flottes suivent le même mode.
+* par joueur : même logique qu'Par diplo, mais toujours basé sur le joueur courant (pas de bascule dynamique).
 
 #### flotte
 
