@@ -8,7 +8,7 @@ import MapHelp from '../components/Map/MapHelp';
 import GotoDialog from '../components/Map/GotoDialog';
 import {FleetPicker} from '../components/Map/FleetPicker';
 import {isTypingTarget} from '../utils/keyboard';
-import {wrapX, wrapY, getTorusDistance, posToString} from '../utils/position';
+import {wrapX, wrapY, posToString} from '../utils/position';
 import Modal from '../components/utils/Modal';
 import {GlobalData, XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
@@ -1135,8 +1135,6 @@ Par diplo
                         const to = deplacement.to;
                         const flotte = rapport?.flottesJoueur.find(f => f.num === num);
                         const origine = flotte?.pos;
-                        const dist = origine ? getTorusDistance(origine, to) : undefined;
-                        const dansPortee = dist !== undefined && flotte ? dist <= flotte.vitesse : false;
                         // La directive choisie (détermine le menu de paramètre n° éventuel)
                         const optionDirective = OPTIONS_DIRECTIVES.find(o => o.value === deplacement.directive);
                         // Coordonnées d'une case : nom du système s'il existe (coordonnées au survol),
