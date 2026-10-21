@@ -5,9 +5,10 @@ import {capaciteReparation} from '../../utils/reparation';
 import {getSectorNumber, isSectorLabelCell, sectorBackgroundColor, sectorLabelColor} from '../../utils/sectors';
 import {countCombatsByKind} from '../../parsers/parseCombatMessages';
 import {drawCombatMarkers} from '../../utils/combatMarkers';
-import {Alliance, GlobalData, XY, Zone} from '../../types';
+import {Alliance, FlotteJoueur, GlobalData, XY, Zone} from '../../types';
 import {lightenHexColor, getColorForPlayer} from "../../utils/global";
 import {isTypingTarget} from '../../utils/keyboard';
+import {getDescriptionPuissance, getPuissance} from '../../utils/puissance';
 
 const OWNER_BADGE_COLORS: Record<number, string> = {
     1: '#0066CC',
@@ -66,6 +67,167 @@ function withOpacity(color: string, opacity: number): string {
     return color;
 }
 
+
+// Les filtres restent volontairement proches des termes du rapport. Ce sont des bandes
+// d'affichage, pas une estimation de puissance calculée par l'interface.
+export type FleetSizeBand = 'weak' | 'petite' | 'moyenne' | 'grande' | 'massive' | 'unknown';
+
+export const FLEET_SIZE_BAND_OPTIONS: { value: FleetSizeBand; label: string; title: string }[] = [
+    {value: 'weak', label: 'Faible', title: 'Insignifiante, ridicule, très petite ou faible'},
+    {value: 'petite', label: 'Petite', title: 'Petite'},
+    {value: 'moyenne', label: 'Moyenne', title: 'Moyenne'},
+    {value: 'grande', label: 'Grande', title: 'Assez grande ou grande'},
+    {value: 'massive', label: 'Très grande +', title: 'Très grande, gigantesque, titanesque ou inimaginable'},
+    {value: 'unknown', label: '?', title: 'Puissance inconnue'},
+];
+
+export const ALL_FLEET_SIZE_BANDS = FLEET_SIZE_BAND_OPTIONS.map(option => option.value);
+
+type FleetStrength = {
+    label: string;       // libellé direct du rapport / des seuils existants du jeu
+    normalized: string;  // stable pour le regroupement, accents retirés
+    band: FleetSizeBand;
+    rank: number;        // taille visuelle 0..4
+    priority: number;    // ordre exact des libellés de puissance du jeu
+    shortLabel: string;
+};
+
+type FleetComposition = FleetStrength & {
+    fleets: any[];
+    count: number;
+    shipCount: number;
+};
+
+// Un seul compteur par commandant et par case. Sa classe principale est la plus grande
+// taille encore visible ; les autres tailles restent dans « composition », jamais fusionnées.
+type FleetFormation = {
+    owner: number;
+    fleets: any[];
+    count: number;
+    shipCount: number;
+    composition: FleetComposition[];
+    primary: FleetStrength;
+    detected: boolean;
+};
+
+function normalizeFleetStrength(value?: string): string {
+    return (value || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+}
+
+function strengthFromLabel(rawLabel?: string): FleetStrength {
+    const label = rawLabel?.trim() || 'inconnue';
+    const normalized = normalizeFleetStrength(label);
+    if (!normalized || normalized.includes('inconn') || normalized === '??????') {
+        return {label: 'inconnue', normalized: 'inconnue', band: 'unknown', rank: 0, priority: -1, shortLabel: '?'};
+    }
+    if (normalized.includes('inimaginable')) return {label, normalized, band: 'massive', rank: 4, priority: 10, shortLabel: '!'};
+    if (normalized.includes('titanesque')) return {label, normalized, band: 'massive', rank: 4, priority: 9, shortLabel: 'T'};
+    if (normalized.includes('gigantesque')) return {label, normalized, band: 'massive', rank: 4, priority: 8, shortLabel: 'GI'};
+    if (normalized.includes('tres grande')) return {label, normalized, band: 'massive', rank: 4, priority: 7, shortLabel: 'TG'};
+    if (normalized.includes('assez grande')) return {label, normalized, band: 'grande', rank: 3, priority: 5, shortLabel: 'AG'};
+    if (normalized.includes('grande')) return {label, normalized, band: 'grande', rank: 3, priority: 6, shortLabel: 'G'};
+    if (normalized.includes('moyenne')) return {label, normalized, band: 'moyenne', rank: 2, priority: 4, shortLabel: 'M'};
+    if (normalized.includes('tres petite')) return {label, normalized, band: 'weak', rank: 0, priority: 2, shortLabel: 'TP'};
+    if (normalized.includes('petite')) return {label, normalized, band: 'petite', rank: 1, priority: 3, shortLabel: 'P'};
+    if (normalized.includes('faible')) return {label, normalized, band: 'weak', rank: 0, priority: 2, shortLabel: 'F'};
+    if (normalized.includes('ridicule')) return {label, normalized, band: 'weak', rank: 0, priority: 1, shortLabel: 'R'};
+    if (normalized.includes('insignifiante')) return {label, normalized, band: 'weak', rank: 0, priority: 0, shortLabel: 'I'};
+    // Valeur nouvelle/non reconnue dans un rapport : ne pas la faire passer pour une force faible.
+    return {label, normalized, band: 'unknown', rank: 0, priority: -1, shortLabel: '?'};
+}
+
+function fleetStrength(fleet: any): FleetStrength {
+    // Pour nos flottes, on passe par les seuils de puissance déjà utilisés ailleurs dans
+    // l'application. Pour une détection, on affiche strictement le texte fourni par le rapport.
+    const label = fleet.type === 'joueur'
+        ? getDescriptionPuissance(getPuissance(fleet as FlotteJoueur))
+        : fleet.puiss;
+    return strengthFromLabel(label);
+}
+
+function buildFleetFormations(fleetGroup: any[], visibleBands: FleetSizeBand[]): FleetFormation[] {
+    type OwnerAccumulator = {
+        owner: number;
+        fleets: any[];
+        shipCount: number;
+        byStrength: Map<string, FleetComposition>;
+    };
+    const byOwner = new Map<number, OwnerAccumulator>();
+    fleetGroup.forEach(fleet => {
+        const strength = fleetStrength(fleet);
+        // Le filtre est appliqué AVANT le résumé : AG + M devient AG si M est masquée.
+        if (!visibleBands.includes(strength.band)) return;
+        const owner = Number(fleet.owner ?? fleet.proprio ?? 0);
+        let accumulator = byOwner.get(owner);
+        if (!accumulator) {
+            accumulator = {owner, fleets: [], shipCount: 0, byStrength: new Map()};
+            byOwner.set(owner, accumulator);
+        }
+        const ships = Math.max(0, Number(fleet.nbVso) || 0);
+        accumulator.fleets.push(fleet);
+        accumulator.shipCount += ships;
+        const existing = accumulator.byStrength.get(strength.normalized);
+        if (existing) {
+            existing.fleets.push(fleet);
+            existing.count += 1;
+            existing.shipCount += ships;
+        } else {
+            accumulator.byStrength.set(strength.normalized, {
+                ...strength,
+                fleets: [fleet],
+                count: 1,
+                shipCount: ships,
+            });
+        }
+    });
+
+    const formations = Array.from(byOwner.values()).map(accumulator => {
+        const composition = Array.from(accumulator.byStrength.values()).sort((a, b) =>
+            b.priority - a.priority || b.count - a.count || a.label.localeCompare(b.label)
+        );
+        return {
+            owner: accumulator.owner,
+            fleets: accumulator.fleets,
+            count: accumulator.fleets.length,
+            shipCount: accumulator.shipCount,
+            composition,
+            primary: composition[0],
+            detected: accumulator.fleets.every(fleet => fleet.type !== 'joueur'),
+        };
+    });
+
+    // L'ordre est graphique seulement : aucune puissance de plusieurs flottes n'est additionnée.
+    return formations.sort((a, b) =>
+        b.primary.priority - a.primary.priority ||
+        Number(b.fleets.some(fleet => fleet.type === 'joueur')) - Number(a.fleets.some(fleet => fleet.type === 'joueur')) ||
+        b.count - a.count ||
+        a.owner - b.owner
+    );
+}
+
+// Le rang est directement celui des seuils de puissance du jeu (0–10), pas une somme de flottes.
+function formationRank(formation: FleetFormation): number | undefined {
+    return formation.primary.priority >= 0 ? formation.primary.priority : undefined;
+}
+
+// Le complément décrit uniquement les autres flottes encore visibles après filtrage :
+// « ×2+3 » = deux au rang maximal et trois d'un rang inférieur.
+function formationSupplementLabel(formation: FleetFormation): string {
+    const sameRankCount = formation.composition[0].count;
+    const additionalCount = formation.count - sameRankCount;
+    return `${sameRankCount > 1 ? `×${sameRankCount}` : ''}${additionalCount > 0 ? `+${additionalCount > 1 ? additionalCount : ''}` : ''}`;
+}
+
+function verboseCompositionLabel(formation: FleetFormation): string {
+    return formation.composition
+        .map(category => `${category.label} ×${category.count}`)
+        .join(' · ');
+}
+
 export type ZoneRect = { x: number; y: number; width: number; height: number };
 
 // Rectangle (coin haut-gauche + taille) couvrant deux cases opposées, en prenant le plus court chemin sur le tore
@@ -96,6 +258,10 @@ type Props = {
     showCombatBadges: boolean;
     showOwnerBadges: boolean;
     showFleetBadges: boolean;
+    // Mode tactique : les flottes deviennent la couche dominante, les systèmes se font discrets.
+    fleetFocus?: boolean;
+    // Bandes de puissance visibles (libellés directs du rapport, regroupés uniquement pour les filtres).
+    fleetSizeBands?: FleetSizeBand[];
     showSystemRadar: boolean;
     showFleetRadar: boolean;
     showSectors: boolean;
@@ -153,7 +319,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#ef4444';
 }
 
-export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
+export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, fleetFocus = false, fleetSizeBands = ALL_FLEET_SIZE_BANDS, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
                        deplacements, dragFleet, highlightPos, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort, onFleetDragOver, onFleetDragLeave, onFleetDrop}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -373,14 +539,42 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 });
             }
         }
-        const nf = fleets.filter(f => f.pos.x === xy.x && f.pos.y === xy.y).length;
-        if (nf > 0) {
-            const flEl = document.createElement('span');
-            flEl.textContent = `  ${nf} flotte${nf > 1 ? 's' : ''}`;
-            flEl.style.color = '#38bdf8';
-            el.appendChild(flEl);
+        const fleetsHere = fleets.filter(f => f.pos.x === xy.x && f.pos.y === xy.y);
+        if (fleetsHere.length > 0) {
+            const title = document.createElement('span');
+            title.textContent = `  ${fleetsHere.length} flotte${fleetsHere.length > 1 ? 's' : ''}`;
+            title.style.color = '#38bdf8';
+            el.appendChild(title);
+
+            const formations = buildFleetFormations(fleetsHere, fleetSizeBands);
+            formations.forEach(formation => {
+                el.appendChild(document.createElement('br'));
+                const commander = formation.owner === 0 ? undefined : global?.commandants?.find(c => c.numero === formation.owner);
+                const ownerName = formation.owner === currentPlayerId
+                    ? 'Vous'
+                    : formation.owner === 0 ? 'Neutre'
+                    : commander ? commander.nom : `#${formation.owner}`;
+                const source = formation.detected ? 'détection' : 'seuil joueur';
+                const row = document.createElement('span');
+                row.textContent = `  ${ownerName} : ${verboseCompositionLabel(formation)} · ${formation.shipCount} vaisseaux · ${source}`;
+                row.style.color = colorForOwnership(
+                    currentPlayerId,
+                    [formation.owner],
+                    rapport?.joueur.alliances,
+                    rapport?.joueur.pna,
+                    colorMode,
+                    global,
+                ) || '#cbd5e1';
+                el.appendChild(row);
+            });
+            if (formations.length === 0) {
+                const filtered = document.createElement('span');
+                filtered.textContent = '  (masquées par le filtre de puissance)';
+                filtered.style.color = '#94a3b8';
+                el.appendChild(filtered);
+            }
         }
-    }, [systems, fleets, global, ownerRaceColor]);
+    }, [systems, fleets, global, ownerRaceColor, currentPlayerId, rapport, colorMode, fleetSizeBands]);
 
     // Ancré sous le curseur (survol)
     const showTooltipAtMouse = useCallback((clientX: number, clientY: number, xy: XY | undefined) => {
@@ -1012,7 +1206,8 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             const t = Math.max(10, Math.min(20, nbPla));
             const baseFactor = 0.45 + ((t - 10) * (0.5 / 10)); // 10 -> 0.5, 20 -> 1.0
             const factor = isGlobalOnly ? baseFactor * 0.5 : baseFactor; // Taille plus petite par défaut si global uniquement
-            const diameter = cellSize * factor;
+            // En focus flottes, les systèmes deviennent du contexte plutôt que le premier signal lu.
+            const diameter = cellSize * factor * (fleetFocus ? 0.68 : 1);
             const radius = diameter / 2;
 
             const cx = px + cellSize / 2;
@@ -1020,6 +1215,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
             const c2d = ctx as CanvasRenderingContext2D;
             c2d.save();
+            if (fleetFocus) c2d.globalAlpha = 0.42;
             if (!isSystemSelected(owners)) {
                 // éléments non sélectionnés en niveaux de gris
                 c2d.filter = 'opacity(0.15)';
@@ -1076,6 +1272,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 const ringColor = lightenHexColor(col || '#000000', 100);
                 const cRing = ctx as CanvasRenderingContext2D;
                 cRing.save();
+                if (fleetFocus) cRing.globalAlpha = 0.5;
                 cRing.strokeStyle = ringColor;
                 cRing.lineWidth = 1.5;
                 cRing.beginPath();
@@ -1096,6 +1293,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 const cr = Math.max(2, chip * 0.25);
                 const cRep = ctx as CanvasRenderingContext2D;
                 cRep.save();
+                if (fleetFocus) cRep.globalAlpha = 0.55;
                 cRep.beginPath();
                 cRep.moveTo(bx + cr, by);
                 cRep.arcTo(bx + chip, by, bx + chip, by + chip, cr);
@@ -1138,6 +1336,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     const badgeX = px + cellSize - badgePadding - (badgeSize + badgeSpacing) * (index + 1);
                     const badgeColor = ownerRaceColor(owner) || '#000000';
                     c2d.save();
+                    if (fleetFocus) c2d.globalAlpha = 0.55;
                     c2d.fillStyle = badgeColor;
                     c2d.strokeStyle = '#000000';
                     c2d.lineWidth = 1;
@@ -1154,6 +1353,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 if (extraOwners > 0) {
                     const badgeX = px + cellSize - badgePadding - (badgeSize + badgeSpacing) * (visibleOwners.length + 1);
                     c2d.save();
+                    if (fleetFocus) c2d.globalAlpha = 0.55;
                     c2d.fillStyle = '#222';
                     c2d.strokeStyle = '#000000';
                     c2d.lineWidth = 1;
@@ -1195,7 +1395,8 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             c.restore();
         };
 
-        // flottes : un seul marqueur par case, étiqueté au nombre total de flottes sur la case
+        // FLOTTES : une formation est un groupe « même commandant + même taille rapportée ».
+        // On ne somme et n'estime jamais les puissances : P/M/G/TG sont les libellés source.
         if (showFleetBadges) {
             const fleetCells = new Map<string, any[]>();
             fleets.forEach(f => {
@@ -1228,77 +1429,211 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         }
 
         function renderFleetCell(fGroup: any[], px: number, py: number) {
-            const count = fGroup.length;
-            const diameter = Math.max(10, Math.floor(cellSize / 3));
+            const c2d = ctx as CanvasRenderingContext2D;
+            const formations = buildFleetFormations(fGroup, fleetSizeBands);
+            if (formations.length === 0) return; // filtre de puissance : on cache réellement les formations
+
+            const maxVisible = fleetFocus ? 4 : (cellSize < 20 ? 2 : 3);
+            const visibleFormations = formations.slice(0, maxVisible);
             const cx = px + cellSize / 2;
             const cy = py + cellSize / 2;
-            const c2d = ctx as CanvasRenderingContext2D;
-            const owners = Array.from(new Set(fGroup.map(f => f.owner)));
-            const isSelected = fGroup.some(f => isFleetSelected(f.owner));
+            const offsets = visibleFormations.length === 1
+                ? [{x: 0, y: 0}]
+                : visibleFormations.length === 2
+                    ? [{x: -0.20, y: 0}, {x: 0.20, y: 0}]
+                    : visibleFormations.length === 3
+                        ? [{x: -0.19, y: -0.17}, {x: 0.19, y: -0.17}, {x: 0, y: 0.22}]
+                        : [{x: -0.18, y: -0.18}, {x: 0.18, y: -0.18}, {x: -0.18, y: 0.18}, {x: 0.18, y: 0.18}];
+            // La forme reste volontairement très grande en focus : c'est une vue tactique,
+            // pas un badge ajouté à une carte de systèmes.
+            const compactFactor = visibleFormations.length > 1 ? (fleetFocus ? 0.84 : 0.76) : 1;
+            const normalSizeByRank = [0.52, 0.64, 0.76, 0.90, 1.02];
+            const focusSizeByRank = [0.66, 0.78, 0.90, 1.04, 1.16];
+            const sizeByRank = fleetFocus ? focusSizeByRank : normalSizeByRank;
+            const positioned = visibleFormations.map((formation, index) => {
+                const offset = offsets[index];
+                const rank = Math.max(0, formation.primary.rank);
+                const baseSize = formation.primary.band === 'unknown' ? (fleetFocus ? 0.62 : 0.48) : sizeByRank[rank];
+                return {
+                    formation,
+                    x: cx + offset.x * cellSize,
+                    y: cy + offset.y * cellSize,
+                    size: Math.max(fleetFocus ? 8 : 6, cellSize * baseSize * compactFactor),
+                    selected: isFleetSelected(formation.owner),
+                };
+            });
 
-            c2d.save();
-            if (!isSelected) {
-                c2d.filter = 'grayscale(1)';
-            }
-
-            const ownerColor = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global) || '#000000';
-            c2d.fillStyle = '#ffffff';
-            c2d.beginPath();
-            c2d.arc(cx, cy, diameter / 2, 0, Math.PI * 2);
-            c2d.fill();
-
-            c2d.strokeStyle = ownerColor;
-            c2d.lineWidth = Math.max(1, Math.floor(cellSize * 0.06));
-            c2d.stroke();
-
-            // Étiquette : nombre total de flottes sur la case (toujours le même type d'information)
-            const label = String(count);
-            c2d.fillStyle = '#000000';
-            c2d.font = `bold ${Math.max(8, Math.floor(diameter * (label.length > 1 ? 0.45 : 0.55)))}px sans-serif`;
-            c2d.textAlign = 'center';
-            c2d.textBaseline = 'middle';
-            c2d.fillText(label, cx, cy + 0.5);
-
-            // Ordre de déplacement : anneau ambre autour du disque blanc (flotte « modifiée vs rapport »)
-            if (fGroup.some(f => f.type === 'joueur' && deplacements && deplacements[f.num])) {
-                c2d.strokeStyle = '#f59e0b';
-                c2d.lineWidth = 2;
+            // Triangle de puissance : la catégorie principale (F, P, M, G, AG…) avec le '+'
+            // rattaché directement. L'opacité indique la visibilité, pas le type de données.
+            const fleetFramePath = (x: number, y: number, size: number) => {
+                const halfW = size * 0.45;
+                const halfH = size * 0.45;
                 c2d.beginPath();
-                c2d.arc(cx, cy, diameter / 2 + 3, 0, Math.PI * 2);
-                c2d.stroke();
-            }
+                c2d.moveTo(x, y - halfH);
+                c2d.lineTo(x + halfW, y + halfH);
+                c2d.lineTo(x - halfW, y + halfH);
+                c2d.closePath();
+            };
 
-            // Flèches de direction (une par flotte du groupe qui en a une, flottes du joueur uniquement).
-            // Les ordres de déplacement sont dessinés dans le passage dédié plus bas (par-dessus
-            // tout le reste) : on les saute ici
-            fGroup.forEach(f => {
-                if (f.type === 'joueur' && deplacements && deplacements[f.num]) return;
-                const t = f.direction;
-                // Cible identique à la position (entrée périmée après changement de tour) :
-                // pas de flèche de longueur nulle
-                if (t && !(t.x === f.pos.x && t.y === f.pos.y)) {
-                    const tdx = ((t.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
-                    const tdy = ((t.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
-                    const tx = tdx * cellSize + cellSize / 2;
-                    const ty = tdy * cellSize + cellSize / 2;
-                    if (tx >= 0 && ty >= 0 && tx <= cols * cellSize && ty <= rows * cellSize) {
-                        drawArrow(c2d, cx, cy, tx, ty);
+            const drawFleetMarker = (
+                x: number,
+                y: number,
+                size: number,
+                ownerColor: string,
+                formation: FleetFormation,
+                markerSelected: boolean,
+            ) => {
+                const selectedByOwnerFilter = markerSelected && !!selectedOwners?.length;
+                c2d.save();
+                if (!markerSelected) c2d.filter = 'grayscale(1)';
+
+                const halfW = size * 0.45;
+                const halfH = size * 0.45;
+
+                // Triangle principal
+                c2d.beginPath();
+                c2d.moveTo(x, y - halfH);
+                c2d.lineTo(x + halfW, y + halfH);
+                c2d.lineTo(x - halfW, y + halfH);
+                c2d.closePath();
+
+                if (fleetFocus) {
+                    c2d.fillStyle = 'rgba(2, 6, 23, 0.76)';
+                    c2d.fill();
+                }
+                c2d.strokeStyle = ownerColor;
+                c2d.globalAlpha = selectedByOwnerFilter ? 0.92 : 1;
+                c2d.lineWidth = Math.max(1, Math.min(2.5, cellSize * 0.052));
+                c2d.stroke();
+                c2d.globalAlpha = 1;
+
+                // Indice de puissance (0–10) : le plus grand possible dans le triangle.
+                if (cellSize >= 20 && size >= 11) {
+                    const rank = formationRank(formation);
+                    const text = rank === undefined ? '?' : String(rank);
+                    const fontSize = Math.max(10, Math.min(18, Math.floor(size * 0.55)));
+                    c2d.font = `800 ${fontSize}px system-ui, sans-serif`;
+                    c2d.fillStyle = ownerColor;
+                    c2d.textAlign = 'center';
+                    c2d.textBaseline = 'bottom';
+                    c2d.fillText(text, x, y + halfH - 2);
+
+                    // Deux petits triangles en haut pour les catégories complémentaires
+                    if (formation.composition.length > 1) {
+                        const smallR = size * 0.18;
+                        const baseY = y - halfH * 0.3;
+                        for (let i = 0; i < 2; i++) {
+                            const offsetX = (i - 0.5) * size * 0.36;
+                            c2d.beginPath();
+                            c2d.moveTo(x + offsetX - smallR * 1.4, baseY);
+                            c2d.lineTo(x + offsetX + smallR * 1.4, baseY);
+                            c2d.lineTo(x + offsetX, baseY - smallR * 2.5);
+                            c2d.closePath();
+                            c2d.fillStyle = withOpacity(ownerColor, 0.55);
+                            c2d.fill();
+                            c2d.strokeStyle = ownerColor;
+                            c2d.lineWidth = Math.max(1, size * 0.035);
+                            c2d.stroke();
+                        }
                     }
                 }
-            });
-            c2d.restore();
 
-            // Contour fin si la flotte correspond au filtre (remplace l'ancien halo lumineux)
-            if (isSelected) {
-                const col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global);
-                const cRing = ctx as CanvasRenderingContext2D;
-                cRing.save();
-                cRing.strokeStyle = col || '#000000';
-                cRing.lineWidth = 1;
-                cRing.beginPath();
-                cRing.arc(cx, cy, diameter / 2 + 2, 0, Math.PI * 2);
-                cRing.stroke();
-                cRing.restore();
+                if (selectedByOwnerFilter) {
+                    c2d.beginPath();
+                    c2d.arc(x, y, size * 0.49, 0, Math.PI * 2);
+                    c2d.strokeStyle = ownerColor;
+                    c2d.lineWidth = 2;
+                    c2d.stroke();
+                }
+                c2d.restore();
+            };
+
+            // Les directions du rapport se regroupent par cible à l'intérieur d'une même formation.
+            // Les ordres saisis restent rendus dans le passage dédié plus bas, au-dessus de la carte.
+            positioned.forEach(marker => {
+                const directionGroups = new Map<string, { target: XY; count: number }>();
+                marker.formation.fleets.forEach(fleet => {
+                    if (fleet.type === 'joueur' && deplacements && deplacements[fleet.num]) return;
+                    const target = fleet.direction as XY | undefined;
+                    if (!target || (target.x === fleet.pos.x && target.y === fleet.pos.y)) return;
+                    const key = `${target.x}_${target.y}`;
+                    const group = directionGroups.get(key);
+                    if (group) group.count += 1; else directionGroups.set(key, {target, count: 1});
+                });
+                directionGroups.forEach(({target, count}) => {
+                    const tdx = ((target.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+                    const tdy = ((target.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+                    const tx = tdx * cellSize + cellSize / 2;
+                    const ty = tdy * cellSize + cellSize / 2;
+                    if (tx < 0 || ty < 0 || tx > cols * cellSize || ty > rows * cellSize) return;
+                    drawArrow(c2d, marker.x, marker.y, tx, ty, marker.selected ? '#f59e0b' : 'rgba(148, 163, 184, 0.55)');
+                    if (count > 1 && cellSize >= 34) {
+                        c2d.save();
+                        c2d.fillStyle = marker.selected ? '#fbbf24' : '#94a3b8';
+                        c2d.font = '600 9px system-ui, sans-serif';
+                        c2d.textAlign = 'center';
+                        c2d.textBaseline = 'middle';
+                        c2d.fillText(`×${count}`, (marker.x + tx) / 2, (marker.y + ty) / 2 - 7);
+                        c2d.restore();
+                    }
+                });
+            });
+
+            positioned.forEach(marker => {
+                const {formation, x, y, size, selected: formationSelected} = marker;
+                const ownerColor = colorForOwnership(
+                    currentPlayerId,
+                    [formation.owner],
+                    rapport?.joueur.alliances,
+                    rapport?.joueur.pna,
+                    colorMode,
+                    global,
+                ) || '#94a3b8';
+                const hasPendingOrder = formation.fleets.some(fleet => fleet.type === 'joueur' && deplacements && deplacements[fleet.num]);
+                const hasOutOfRangeOrder = formation.fleets.some(fleet => {
+                    const target = fleet.type === 'joueur' && deplacements ? deplacements[fleet.num] : undefined;
+                    return !!target && getTorusDistance(fleet.pos, target) > fleet.vitesse;
+                });
+
+                drawFleetMarker(x, y, size, ownerColor, formation, formationSelected);
+
+                // Déplacement saisi : bord vert si atteignable, rouge si hors portée.
+                if (hasPendingOrder) {
+                    c2d.save();
+                    c2d.strokeStyle = hasOutOfRangeOrder ? '#ef4444' : '#10b981';
+                    c2d.lineWidth = fleetFocus ? 2.5 : 2;
+                    fleetFramePath(x, y, size + Math.max(4, cellSize * 0.13));
+                    c2d.stroke();
+                    c2d.restore();
+                }
+                if (formationSelected && selectedOwners && selectedOwners.length > 0) {
+                    c2d.save();
+                    c2d.strokeStyle = '#f8fafc';
+                    c2d.lineWidth = 1;
+                    fleetFramePath(x, y, size + 2);
+                    c2d.stroke();
+                    c2d.restore();
+                }
+            });
+
+            // Un groupe de plus que ce que la cellule peut lisiblement afficher reste signalé.
+            const hiddenCount = formations.length - visibleFormations.length;
+            if (hiddenCount > 0 && cellSize >= 20) {
+                const label = `+${hiddenCount}`;
+                const w = Math.max(14, 5 + label.length * 7);
+                const h = 13;
+                c2d.save();
+                c2d.fillStyle = 'rgba(2, 6, 23, 0.94)';
+                c2d.strokeStyle = '#64748b';
+                c2d.lineWidth = 1;
+                c2d.fillRect(cx - w / 2, py + cellSize - h - 2, w, h);
+                c2d.strokeRect(cx - w / 2, py + cellSize - h - 2, w, h);
+                c2d.fillStyle = '#e2e8f0';
+                c2d.font = '700 9px system-ui, sans-serif';
+                c2d.textAlign = 'center';
+                c2d.textBaseline = 'middle';
+                c2d.fillText(label, cx, py + cellSize - h / 2 - 2);
+                c2d.restore();
             }
         }
 
@@ -1622,7 +1957,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         // Le survol dépend de la géométrie (centre, taille de case) : on resynchronise l'overlay après chaque dessin
         redrawHoverOverlay();
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, fleetFocus, fleetSizeBands, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {

@@ -1,6 +1,6 @@
 import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import {useReport} from '../context/ReportContext';
-import CanvasMap, {ZoneRect} from '../components/Map/CanvasMap';
+import CanvasMap, {ALL_FLEET_SIZE_BANDS, FleetSizeBand, FLEET_SIZE_BAND_OPTIONS, ZoneRect} from '../components/Map/CanvasMap';
 import MiniMap from '../components/Map/MiniMap';
 import InfoPanel from '../components/Map/InfoPanel';
 import ZoneDialog from '../components/Map/ZoneDialog';
@@ -95,6 +95,24 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_fleet_badges');
     return saved !== null ? JSON.parse(saved) : true;
   });
+  // Mode tactique : les formations de flottes deviennent dominantes et les systèmes passent au second plan.
+  const [fleetFocus, setFleetFocus] = useState<boolean>(() => {
+    const saved = localStorage.getItem('carte_fleet_focus');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+  // Filtres directement issus des termes de puissance du jeu, regroupés en bandes pratiques.
+  const [fleetSizeBands, setFleetSizeBands] = useState<FleetSizeBand[]>(() => {
+    try {
+      const saved = localStorage.getItem('carte_fleet_size_bands');
+      if (!saved) return [...ALL_FLEET_SIZE_BANDS];
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [...ALL_FLEET_SIZE_BANDS];
+      const valid = parsed.filter((band): band is FleetSizeBand => ALL_FLEET_SIZE_BANDS.includes(band));
+      return valid.length > 0 ? valid : [];
+    } catch {
+      return [...ALL_FLEET_SIZE_BANDS];
+    }
+  });
   // Portées radar : désactivées par défaut (voile bleu sur la carte) ; à activer dans les Filtres si besoin
   const [showSystemRadar, setShowSystemRadar] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_show_system_radar');
@@ -188,6 +206,13 @@ export default function Carte() {
   useEffect(() => {
     localStorage.setItem('carte_show_fleet_badges', JSON.stringify(showFleetBadges));
   }, [showFleetBadges]);
+  useEffect(() => {
+    localStorage.setItem('carte_fleet_focus', JSON.stringify(fleetFocus));
+  }, [fleetFocus]);
+
+  useEffect(() => {
+    localStorage.setItem('carte_fleet_size_bands', JSON.stringify(fleetSizeBands));
+  }, [fleetSizeBands]);
 
   useEffect(() => {
     localStorage.setItem('carte_show_system_radar', JSON.stringify(showSystemRadar));
@@ -542,6 +567,19 @@ export default function Carte() {
   }, []);
 
   const nbDeplacements = Object.keys(deplacements).length;
+
+  const toggleFleetSizeBand = (band: FleetSizeBand) => {
+    setFleetSizeBands(current => current.includes(band)
+      ? current.filter(value => value !== band)
+      : [...current, band]);
+  };
+  const setFleetSizePreset = (bands: FleetSizeBand[]) => setFleetSizeBands(bands);
+  const toggleFleetFocus = () => {
+    setFleetFocus(current => !current);
+    // Un mode focus sans couche flottes n'aurait aucun effet utile.
+    if (!showFleetBadges) setShowFleetBadges(true);
+  };
+
   return (
     // Colonnes gérées par App.css (.carte-wrap / .carte-wrap.info-collapsed) : une seule source de vérité
     <div className={`carte-wrap ${infoPanelCollapsed ? 'info-collapsed' : ''}`}>
@@ -606,6 +644,15 @@ export default function Carte() {
             onClick={() => setShowMiniMap(v => !v)}
           >
             <IconMiniMap size={15} />
+          </button>
+          <button
+            type="button"
+            className={fleetFocus ? 'carte-icon-btn active' : 'carte-icon-btn'}
+            title="Mode tactique flottes : grandes formations, systèmes atténués"
+            aria-label="Activer ou désactiver le mode tactique flottes"
+            onClick={toggleFleetFocus}
+          >
+            <IconFleetMove size={15} />
           </button>
           <button
             type="button"
@@ -739,6 +786,8 @@ export default function Carte() {
             showCombatBadges={showCombatBadges}
             showOwnerBadges={showOwnerBadges}
             showFleetBadges={showFleetBadges}
+            fleetFocus={fleetFocus}
+            fleetSizeBands={fleetSizeBands}
             showSystemRadar={showSystemRadar}
             showFleetRadar={showFleetRadar}
             showSectors={showSectors}
@@ -993,11 +1042,86 @@ par diplo
                             <input
                               type="checkbox"
                               checked={showFleetBadges}
-                              onChange={(e) => setShowFleetBadges(e.target.checked)}
+                              onChange={(e) => {
+                                setShowFleetBadges(e.target.checked);
+                                if (!e.target.checked) setFleetFocus(false);
+                              }}
                             />
                             Badges flottes
                           </label>
                       </div>
+                      {/* Couche tactique des flottes : une formation est filtrée avec les libellés de puissance du rapport. */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #334155', paddingTop: 8 }}>
+                          <span style={{ fontSize: '0.85em', color: '#94a3b8' }}>Flottes</span>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={fleetFocus}
+                              onChange={(e) => {
+                                setFleetFocus(e.target.checked);
+                                if (e.target.checked) setShowFleetBadges(true);
+                              }}
+                            />
+                            Mode focus
+                          </label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                            {FLEET_SIZE_BAND_OPTIONS.map(option => {
+                              const active = fleetSizeBands.includes(option.value);
+                              return (
+                                <button
+                                  key={option.value}
+                                  type="button"
+                                  title={option.title}
+                                  disabled={!showFleetBadges}
+                                  onClick={() => toggleFleetSizeBand(option.value)}
+                                  style={{
+                                    padding: '4px 7px',
+                                    borderRadius: 4,
+                                    cursor: showFleetBadges ? 'pointer' : 'default',
+                                    background: active ? '#1e3a5f' : '#1e2530',
+                                    color: active ? '#e0f2fe' : '#94a3b8',
+                                    border: active ? '1px solid #38bdf8' : '1px solid #334155',
+                                    opacity: showFleetBadges ? 1 : 0.45,
+                                    fontSize: '0.78rem',
+                                  }}
+                                >
+                                  {option.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                            {([
+                              {label: 'Tout', bands: ALL_FLEET_SIZE_BANDS},
+                              {label: 'Moyenne +', bands: ['moyenne', 'grande', 'massive'] as FleetSizeBand[]},
+                              {label: 'Grande +', bands: ['grande', 'massive'] as FleetSizeBand[]},
+                              {label: '?', bands: ['unknown'] as FleetSizeBand[]},
+                            ]).map(preset => {
+                              const active = preset.bands.length === fleetSizeBands.length && preset.bands.every(band => fleetSizeBands.includes(band));
+                              return (
+                                <button
+                                  key={preset.label}
+                                  type="button"
+                                  disabled={!showFleetBadges}
+                                  onClick={() => setFleetSizePreset(preset.bands)}
+                                  style={{
+                                    padding: '3px 6px',
+                                    borderRadius: 4,
+                                    cursor: showFleetBadges ? 'pointer' : 'default',
+                                    background: active ? 'rgba(16, 185, 129, 0.16)' : 'transparent',
+                                    color: active ? '#6ee7b7' : '#94a3b8',
+                                    border: active ? '1px solid #10b981' : '1px solid #334155',
+                                    opacity: showFleetBadges ? 1 : 0.45,
+                                    fontSize: '0.74rem',
+                                  }}
+                                >
+                                  {preset.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                      </div>
+
 
                       {zones.length > 0 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid #334155', paddingTop: 8 }}>
