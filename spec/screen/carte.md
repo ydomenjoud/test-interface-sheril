@@ -30,8 +30,14 @@ La taille des cases de la grille de la carte doit pouvoir être modifiée par l'
 configuration".
 Elle sont forcément carrée.
 
-Les bornes actuelles de la carte sont : 0 > X > 40 et 0 > Y > 40. Ces données doivent être centralisées pour être
-modifiable par la suite.
+Les bornes de la carte sont centralisées dans `src/utils/position.ts` (`BOUNDS`, coordonnées 1-based : 1..maxX /
+ 1..maxY). Le jeu ne donne nulle part la taille de la galaxie : les bornes sont donc recalculées au chargement d'un
+ rapport à partir du maximum des coordonnées observées (systèmes, systèmes détectés, flottes, capitale), chaque axe
+ arrondi à la dizaine supérieure (47→50, 53→60, 60→60 ; ex. un rapport 40×40 donne une galaxie 40×40). En l'absence de
+ rapport, les systèmes publics de data.xml servent de base ; la valeur par défaut avant tout chargement est 60×60.
+ Les couches issues de l'extérieur du rapport (systèmes publics de data.xml, combats publics) ne sont affichées que si
+ leurs coordonnées rentrent dans le tore affiché : sinon elles proviendraient d'une autre galaxie et seraient dessinées
+ enroulées sur une mauvaise case.
 
 La carte représente un univers "torique" en forme de donuts. Il faut donc que lorsque la carte n'a rien à afficher d'un
 côté, que l'on complete l'affichage avec les données de l'autre côté.
@@ -63,8 +69,9 @@ si la borne max X est 40 : les coordonnées représentée vont de 33 à 12 en pa
 La carte occupe toute la hauteur disponible (pas de scroll vertical de la page), la grille se redimensionne en
 conséquence.
 
-Une légende compacte des couleurs de possession (moi / alliance / PNA / ennemi / neutre / flotte) est affichée en
-bas à gauche de la carte, au ras du bord, en mode de couleur "Alliés/Ennemis".
+Une légende compacte (couleurs de possession moi / alliance / PNA / ennemi / neutre, marqueur flotte, et
+« réparation » = bordure blanche du disque) est affichée en bas à gauche de la carte, au ras du bord, en mode
+de couleur "Par diplo".
 
 Les portées radar (systèmes et flottes) sont désactivées par défaut pour ne pas voiler la carte ; elles peuvent
 être activées par les boutons ◎ et ◉ de la barre d'outils (filtres rapides).
@@ -81,11 +88,13 @@ panneau "Filtres", qui garde la même liste complète) :
 * ◎ : portée radar des systèmes (désactivée par défaut)
 * ◉ : portée radar des flottes (désactivée par défaut)
 * ▣ : afficher / masquer la mini-carte (affichée par défaut)
-* ? : aide et raccourcis (touche `?`)
-* ⚙ : ouvre / ferme le panneau "Filtres" (options avancées, fermé par défaut) : Commandants, Tags, Afficher
+* ⇢ : ouvre / replie le tiroir des déplacements de flottes (avec leur nombre en attente)
+* ⚙ : ouvre / ferme le panneau "Filtres" (options avancées, fermé par défaut ; le panneau n'est monté que
+  lorsqu'il est ouvert, sans onglet permanent sur la carte) : Commandants, Tags, Afficher
   systèmes, Carte galactique, Secteurs, Influence (+ opacité), Minimap, Mode de couleur, Badges (combats /
   propriétaires / flottes), Zones manuelles, Portées Radar (systèmes / flottes), Distance Capitale (zones de
   stabilité et choix du système de référence)
+* ? : aide et raccourcis (touche `?`)
 
 #### interaction
 
@@ -109,6 +118,7 @@ panneau "Filtres", qui garde la même liste complète) :
   - L'icône ▣ dans les filtres rapides de la barre d'outils (et une case à cocher dans les Filtres) permet de
     l'afficher/masquer ; elle est affichée par défaut.
 - Header: un bouton "Capitale" recentre la carte principale sur la capitale du joueur.
+- Panneau d'informations : repliable via un bouton dédié dans la barre d'outils, le raccourci Alt + I ou le bouton de fermeture dans l'en-tête, offrant une vue pleine largeur à la carte (colonne à 0 px ; le ré-ouvre depuis la barre d'outils ou Alt + I, pas de bouton en double sur la carte). L'intérieur est organisé en onglets rapides (Tout / Système / Flottes / Tactique) avec badges de comptage évitant le défilement vertical infini.
 
 ### données à afficher
 
@@ -127,6 +137,10 @@ La taille du disque varie avec le nombre de planètes (10 planètes : 50 % de la
 100 %, linéaire entre les deux) ; les systèmes connus uniquement de la carte galactique (jamais détectés)
 s'affichent à moitié taille.
 
+Un système dont la capacité de réparation par tour est > 0 (somme des caractéristiques « capacité réparation
+vaisseaux » des bâtiments de ses planètes) reçoit une bordure blanche épaisse autour de son disque, pour le
+repérer d'un coup d'œil (entrée « réparation » de la légende).
+
 il faut utiliser une image correspondante à sa propriété "typeEtoile" et utiliser l'image
 public/img/etoile{typeEtoile}.gif (images pack étoiles).
 Si le système est :
@@ -137,12 +151,13 @@ Si le système est :
 * possédé par un autre joueur qui ne rentre pas dans les autres cas : bordure rouge.
 * sans propriétaire connu: bordure grise.
 
-Deux modes de couleur existent (boutons "Alliés/Ennemis" / "Par Joueur", mode par défaut "Alliés/Ennemis") :
+Trois modes de couleur existent (boutons "Par diplo" / "par race" / "par joueur", mode par défaut "Par diplo") :
 
-* Alliés/Ennemis : les règles ci-dessus ; un système à plusieurs propriétaires de couleurs différentes est partagé
+* Par diplo : les règles ci-dessus ; un système à plusieurs propriétaires de couleurs différentes est partagé
   en parts.
-* Par Joueur : chaque système est coloré à la couleur de la race de son propriétaire (le même code couleur que les
+* par race : chaque système est coloré à la couleur de la race de son propriétaire (le même code couleur que les
   noms de joueurs) ; les systèmes du joueur courant restent verts. La mini-carte et les flottes suivent le même mode.
+* par joueur : même logique qu'Par diplo, mais toujours basé sur le joueur courant (pas de bascule dynamique).
 
 #### flotte
 
@@ -170,6 +185,9 @@ panneau : il permet de voir l'essentiel en un coup d'œil.
 - coordonnées (+ tour d'où viennent les données, et avertissement si les données sont d'un tour précédent)
 - récapitulatif du système (affiché uniquement s'il y a un système sur la case) :
   - nom du système, liste des propriétaires (numéro de commandant), nombre de planètes, population
+  - capacité de réparation par tour (sommée sur les bâtiments des planètes : caractéristique « capacité
+    réparation vaisseaux » de data.xml — p. ex. chantier naval +20, centre de réparation spatial I +100, II +400,
+    III +1350, IV +3200, V +6250) ; affichée uniquement si le système a des planètes connues
   - si le système est possédé par le joueur : lien "détails" vers l'écran de détail du système (planètes, bâtiments,
     populations, minerai, points de construction)
   - si le système n'est plus dans les données du tour affiché (vu dans un tour précédent) : les dernières
@@ -185,8 +203,110 @@ une case sans aucun contenu (ni système, ni flotte, ni combat, ni zone) affiche
   - puissance
 - mes flottes : une seule liste de toutes les flottes du joueur, avec des colonnes triables (Nom, Distance,
   Vitesse, AS, AP) et la Position ; les flottes hors de portée ce tour sont en orange estompé (légende sous la
-  liste) ; survoler une ligne affiche le détail de la flotte (position, direction, vitesse, directive, AS / AP,
-  scan, nombre et composition des vaisseaux, distance et portée)
+  liste) ; un bouton « → » par ligne déplace la flotte vers la case sélectionnée (création/remplacement du
+  déplacement, comme un dépos ; désactivé si la flotte est déjà sur la case) — c'est l'alternative clavier au
+  glisser-déposer ; survoler une ligne affiche le détail de la flotte (position, direction, vitesse, directive,
+  AS / AP, scan, nombre et composition des vaisseaux, distance et portée) ET surligne la case de la flotte sur
+  la carte (mêmes équerres blanches débordantes que la case sélectionnée, par-dessus les flèches)
 - combats sur la case (cartes dépliables avec les détails)
 - zones couvrant la case (éditables)
 - notes de la case (le formulaire d'ajout est replié derrière un bouton)
+
+## déplacements de flottes (schéma d'ordres)
+
+La carte permet de préparer des ordres de déplacement de ses flottes par glisser-déposer : le résultat est un
+schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Planification des Revenus pour ses ordres).
+
+### geste
+
+- Un mousedown sur une case occupée par au moins une flotte du joueur ouvre le sélecteur de flotte (« Déplacer une
+  flotte »), ancré sur le point de clic : pour une seule flotte, le panneau est plus étroit avec un en-tête compact ;
+  pour plusieurs flottes, il liste les flottes de la case avec badges de vitesse et de composition
+  (« déjà déplacée → 0_x_y »). La fenêtre est déplaçable en saisissant sa poignée d'en-tête (pour ne pas masquer
+  d'informations importantes) ; le bouton × et le drag des lignes ne sont pas affectés.
+- Un simple clic reste une sélection de case (le sélecteur se referme au mousedown suivant) ; le pan et les zones
+  Alt + clic + glisser sont inchangés — un pan qui démarre sur la case annule le sélecteur, et Alt + clic n'ouvre
+  jamais le sélecteur (Alt est réservé aux zones).
+- Glisser une ligne du sélecteur vers la carte et relâcher sur une case crée (ou remplace : un seul déplacement par
+  flotte) le déplacement de cette flotte vers la case visée. Relâcher sur la case d'origine de la flotte annule le
+  déplacement. Un dépos hors de la portée de la flotte est autorisé (le déplacement reste marqué « hors portée »).
+  Une flotte déjà en route (attribut « direction » dans le rapport) peut être redirigée ; elle est signalée ⚠.
+- Le sélecteur reste ouvert pendant le glisser (il se referme à la fin du drag, au dépos ou à la touche Échap) : la
+  ligne de la flotte glissée est surlignée d'un voile clair pour repérer celle qui est déplacée, et l'image de drag
+  par défaut du navigateur (tile translucide) est remplacée par un pixel transparent.
+- Le sélecteur doit rester monté pendant tout le drag : le démonter dans le dragstart ferait annuler le drag par le
+  navigateur (source retirée du DOM avant le début effectif du drag).
+
+### feedback pendant le glisser
+
+- Une ligne relie la case d'origine de la flotte à la case sous le curseur, avec une pointe de flèche à l'extrémité
+(curseur), la distance torique affichée au milieu du trait (décalée perpendiculairement, pour ne jamais passer
+   sous le curseur) et un contour de portée — un carré de Tchebychev de rayon égal à la vitesse de la flotte —
+   centré sur l'origine.
+- La ligne est verte (#4caf50) si la destination est atteignable (distance ≤ vitesse), rouge (#f44336) sinon.
+- Le tracé disparaît quand le glisser quitte la carte (l'identité de la flotte est conservée pour le restaurer au
+  retour sur la carte) et à la fin du drag (dépos ou annulation, y compris un Échap).
+
+### après le dépos
+
+- La flotte apparaît « modifiée par rapport au rapport » : anneau ambre (#ff9800) et flèche vers sa nouvelle
+  destination (qui remplace la direction du rapport, rappelée ⚠ « déjà en route vers x_y » dans le panneau quand
+  le rapport en avait une).
+- La flèche d'ordre de déplacement est dessinée dans un passage dédié PAR-DESSUS TOUT le reste de la carte
+  (disques de flottes, marqueurs de combat, cadre de sélection) : la cible commandée n'est jamais masquée
+  (seuls le tracé du glisser en cours et la surbrillance de survol d'une flotte se dessinent au-dessus).
+- Couleur de la flèche : verte (#4caf50) si la destination est à portée de la flotte ce tour, rouge (#f44336) sinon.
+  L'orange (#ff9800) est réservé aux flèches de « direction » préexistantes du rapport.
+
+### panneau « Déplacements »
+
+- Un tiroir de commandes tactique repliable au bas de la zone de carte (centré horizontalement sur le canvas,
+  au-dessus de la légende ; sous 1200 px de largeur, il s'étend sur toute la largeur et remonte de 34 px, devant
+  la mini-carte) : toujours visible, en-tête cliquable « Déplacements (n) » (▴/▾), replié en onglet compact de
+  38 px / déplié en tiroir de commandes s'élevant vers le haut (un déplacement par ligne) ; une icône ⇢ dans la
+  barre d'outils pilote le même état. Le panneau se déplie tout seul au premier dépos.
+- Déplié, chaque déplacement tient sur UNE ligne : nom de la flotte puis son numéro « Nom (#n) » (ou « Flotte #n » si
+  la flotte n'est plus dans le rapport, tronqué avec ellipsis si trop long), origine → destination où chaque case
+  s'affiche au NOM du système qui l'occupe quand il y en a un (coordonnées au survol), sinon en coordonnées x_y ;
+  suivi de la distance torique en rouge quand elle est hors de portée (à distance normale sinon), un ⚠ ambre compact (infobulle « déjà en
+  route vers x_y ») si le rapport avait une direction, un menu de directive (sans libellé, évident en
+  contexte) pour choisir la directive de l'ordre — et, si la directive en porte un, un menu de paramètre
+  n° (numéro de planète, ou commandant visé pour « Attaque flottes cdt ») — et un bouton × pour supprimer
+  ce déplacement. Le menu de stratégie n'existe pas encore (valeurs du jeu pas encore paramétrées, valeur
+  par défaut conservée).
+- Le menu de directive est alimenté par les directives de rencontre de la règle 4.4
+  (https://sheril.pbem-france.net/rule/4_flottes#4.4) avec leurs codes réels du jeu (côté serveur :
+  Const/Messages), dans l'ordre de résolution du jeu, avec des libellés abrégés (suppression des « de » ;
+  libellé complet en infobulle) : Attaque flottes cdt, Attaque préventive, Attaque toute flotte,
+  Attaque système, Pillage système, Attaque planète, Pillage planète, Eradication planète, Attitude
+  neutre (passive).
+  Les directives « … planète n° » (attaque/pillage/éradication) ouvrent un second menu du numéro de
+  planète visée (0-19). La directive « Attaque flottes cdt » ouvre un
+  second menu de commandant visé (0 = neutre, puis les commandants de data.xml ; nom en infobulle).
+- Vide : mention d'aide (cliquer une case de flotte, glisser une ligne sur la destination).
+- En pied : « Copier le schéma » (retour visuel « Schéma copié » / « Échec de la copie ») et
+  « ↺ Tout réinitialiser » (efface tous les déplacements du tour et replie le panneau ; les deux boutons sont
+  estompés et désactivés quand il n'y a plus de déplacement).
+
+### schéma d'ordres
+
+- Schéma = ordres `[num, 0_x_y, directive, stratégie]` (numéro de flotte, destination, directive, stratégie),
+  sans nom de table (même principe que le blueprint de la planification de construction : l'import côté
+  console sait quelle table il alimente — la table du jeu est `deplacer_flotte`), séparés par `%#!%`,
+  encodés en base64, triés par numéro de flotte. `num` est le numéro interne de la flotte dans le rapport
+  (0-based — l'interface l'affiche en « #num+1 »). La directive est le code du jeu + 100 × paramètre :
+  le numéro de planète pour les directives « … planète n° », le commandant visé (0 = neutre) pour
+  « Attaque flottes cdt » — ex. 308 = attaque des flottes du commandant 3 (8 + 100×3),
+  705 = attaque de la planète 7 (5 + 100×7).
+- La directive et la stratégie sont propres à chaque ordre : par défaut « Attaque système » et aucune
+  stratégie au dépos. La directive (et son paramètre n°) est modifiable dans le panneau ; la stratégie garde
+  sa valeur par défaut (pas de menu, valeurs du jeu à confirmer).
+- La syntaxe est la syntaxe réelle du jeu (table `deplacer_flotte`, codes de `Const`/`Messages` du serveur) ;
+  le point encore provisoire : les valeurs de stratégie (table `z_strategies`, voir
+  `src/utils/ordreDeplacement.ts`).
+
+### persistance
+
+- Les déplacements en attente sont stockés par tour dans le localStorage, clé `deplacements_tour_<tour>` ; un
+  changement de tour recharge ceux du tour affiché.
+- Le chargement d'un nouveau rapport efface les déplacements de tous les tours (à refaire sur le nouveau rapport).

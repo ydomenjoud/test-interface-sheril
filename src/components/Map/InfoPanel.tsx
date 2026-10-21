@@ -12,29 +12,42 @@ import Commandant from "../utils/Commandant";
 import Position from "../utils/Position";
 import {colorForOwnership} from "./CanvasMap";
 import {getDescriptionPuissance, getPuissance, getPuissanceFromString} from "../../utils/puissance";
-import { NavLink } from 'react-router-dom';
+
 import ZoneEditor from './ZoneEditor';
 import { zoneCovers } from '../../utils/zones';
 import { isObserved, lastKnownFleets } from '../../utils/fleetHistory';
 import { lastKnownSystem } from '../../utils/systemHistory';
 import { fleetSnapshotOf } from '../../storage/rapportStore';
+import {capaciteReparation} from '../../utils/reparation';
+import {IconAlert, IconArrowRight} from '../icons/Icons';
 
 type Props = {
   selected?: XY;
+  // Survol d'une ligne de flotte dans le panneau : position de la flotte à surligner sur la carte
+  onFleetHover?: (pos: XY | undefined) => void;
+  onClose?: () => void;
+  // Alternative clavier au glisser-déposer : déplacer la flotte vers la case sélectionnée
+  onMoveFleet?: (fleetNum: number) => void;
+  colorMode?: 'status' | 'race' | 'player';
 };
 
 // Formatage des nombres avec séparateur de milliers (ex. 59 485)
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
 // Ligne issue d'un tour précédent : texte grisé et icône d'avertissement à côté du nom
-const staleRowStyle: React.CSSProperties = { color: '#999' };
+const staleRowStyle: React.CSSProperties = { color: '#94a3b8' };
 const StaleIcon = () => (
-  <span title="Information d'un tour précédent, peut-être obsolète" style={{ marginRight: 6, color: '#ffb000', cursor: 'help' }}>⚠</span>
+  <span
+    title="Information d'un tour précédent, peut-être obsolète"
+    style={{ display: 'inline-flex', alignItems: 'center', marginRight: 6, color: '#f59e0b', verticalAlign: -1, cursor: 'help' }}
+  >
+    <IconAlert size={14} />
+  </span>
 );
 
 
 
-export default function InfoPanel({ selected }: Props) {
+export default function InfoPanel({ selected, onFleetHover, onMoveFleet, colorMode = 'status' }: Props) {
   const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats, zones, zoneLabels, fleetSnapshots, systemSnapshots } = useReport();
 
   // Zones affichées : celles qui couvrent la case, plus celles déjà listées pour cette sélection
@@ -54,10 +67,10 @@ export default function InfoPanel({ selected }: Props) {
   // Le formulaire d'ajout est replié derrière un bouton pour laisser la place aux notes existantes
   const [showNoteForm, setShowNoteForm] = useState(false);
 
-  const [sortField, setSortField] = useState<'dist' | 'num' | 'vitesse' | 'as' | 'ap'>('dist');
+  const [sortField, setSortField] = useState<'dist' | 'id' | 'nom' | 'vitesse' | 'as' | 'ap'>('dist');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   // En-tête triable de la liste "Mes flottes"
-  const sortTh = (field: 'num' | 'dist' | 'vitesse' | 'as' | 'ap', label: string) => (
+  const sortTh = (field: 'nom' | 'dist' | 'vitesse' | 'as' | 'ap', label: string) => (
     <th
       style={{ cursor: 'pointer', userSelect: 'none' }}
       onClick={() => {
@@ -72,8 +85,12 @@ export default function InfoPanel({ selected }: Props) {
   const showFleetHover = (f: any) => (e: React.MouseEvent<HTMLTableRowElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     setHoverFleet({fleet: f, anchor: {top: r.top, bottom: r.bottom, left: r.left, right: r.right}});
+    onFleetHover?.(f.pos);
   };
-  const hideFleetHover = () => setHoverFleet(undefined);
+  const hideFleetHover = () => {
+    setHoverFleet(undefined);
+    onFleetHover?.(undefined);
+  };
   // Changement de sélection : ne pas garder le détail de la flotte de l'ancienne case
   useEffect(() => {
     setHoverFleet(undefined);
@@ -128,13 +145,31 @@ export default function InfoPanel({ selected }: Props) {
     }) : [];
 
     // Tri
+    const sortNum = (x: number, y: number, asc: boolean) => {
+      const res = (x ?? 0) - (y ?? 0);
+      return asc ? res : -res;
+    };
     playerFleets.sort((a, b) => {
-      let valA = a[sortField] ?? 0;
-      let valB = b[sortField] ?? 0;
-
-      if (valA === valB) return 0;
-      const res = valA < valB ? -1 : 1;
-      return sortOrder === 'asc' ? res : -res;
+      switch (sortField) {
+        case 'id':
+          return sortNum(a.num + 1, b.num + 1, sortOrder === 'asc');
+        case 'dist': {
+          const d = sortNum(a.dist, b.dist, sortOrder === 'asc');
+          return d !== 0 ? d : sortNum(b.vitesse, a.vitesse, true);
+        }
+        case 'nom':
+          return sortOrder === 'asc'
+            ? a.nom.localeCompare(b.nom)
+            : b.nom.localeCompare(a.nom);
+        case 'vitesse':
+          return sortNum(a.vitesse, b.vitesse, sortOrder === 'asc');
+        case 'as':
+          return sortNum(a.as ?? 0, b.as ?? 0, sortOrder === 'asc');
+        case 'ap':
+          return sortNum(a.ap ?? 0, b.ap ?? 0, sortOrder === 'asc');
+        default:
+          return 0;
+      }
     });
 
     return { systems, fleets, playerFleets };
@@ -165,15 +200,13 @@ export default function InfoPanel({ selected }: Props) {
     return staleTour; // 'inconnu' ou undefined
   }, [staleTour, pastFleets]);
 
-  const isOwner = useMemo(() => system?.proprietaires?.some((p: any) => p === rapport?.joueur?.numero), [system, rapport])
-
   // Couleur de possession du système (bordure du récapitulatif de case)
   const summaryColor = useMemo(() => {
     if (system?.proprietaires?.length) {
-      return colorForOwnership(rapport?.joueur?.numero, system.proprietaires, rapport?.joueur?.alliances, rapport?.joueur?.pna) || '#555';
+      return colorForOwnership(rapport?.joueur?.numero, system.proprietaires, rapport?.joueur?.alliances, rapport?.joueur?.pna, colorMode, global) || '#555';
     }
     return '#555';
-  }, [system, rapport]);
+  }, [system, rapport, colorMode, global]);
 
   const currentNotes = useMemo(() => {
     if (!selected) return [];
@@ -210,24 +243,26 @@ export default function InfoPanel({ selected }: Props) {
   return (
     <div className="carte-info">
       <div className="info-block">
-        <h3>
-          Case <Position pos={selected} />
-          {rapport && (
-            <span style={{ marginLeft: 10, fontSize: '0.7em', fontWeight: 'normal', color: '#aaa' }}>
-              {/* tour d'où viennent les données : celui d'une ancienne observation, sinon le tour consulté */}
-              information tour {staleFromTour === undefined ? rapport.tour : staleFromTour}
-            </span>
-          )}
-        </h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0 }}>
+            Case <Position pos={selected} />
+            {rapport && (
+              <span style={{ marginLeft: 10, fontSize: '0.8rem', fontWeight: 'normal', color: '#94a3b8' }}>
+                tour {staleFromTour === undefined ? rapport.tour : staleFromTour}
+              </span>
+            )}
+          </h3>
+        </div>
         {rapport && staleFromTour !== undefined && (
-          <div style={{ marginTop: 6, padding: '4px 8px', background: '#332200', color: '#ffcc00', borderLeft: '3px solid #ffb000', fontSize: '0.85em' }}>
-            ⚠ Données affichées provenant {staleFromTour === 'inconnu' ? "d'un tour inconnu" : `du tour ${staleFromTour}`} (dernier {rapport.tour})
+          <div style={{ marginTop: 6, padding: '6px 10px', background: 'rgba(245, 158, 11, 0.12)', color: '#fbbf24', borderLeft: '3px solid #f59e0b', borderRadius: '0 4px 4px 0', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <IconAlert size={15} style={{ flexShrink: 0 }} />
+            <span>Données affichées provenant {staleFromTour === 'inconnu' ? "d'un tour inconnu" : `du tour ${staleFromTour}`} (dernier {rapport.tour})</span>
           </div>
         )}
       </div>
 
       {!hasCellContent && (
-        <div className="info-block" style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em' }}>
+        <div className="info-block" style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.9em' }}>
           Case vide.
         </div>
       )}
@@ -243,23 +278,25 @@ export default function InfoPanel({ selected }: Props) {
                   {staleTour !== undefined && <StaleIcon />}
                   {system.nom}
                 </strong>
-                {isOwner && (
-                  <NavLink to={`/player-system-detail/${selected.x}-${selected.y}`} style={{ fontSize: '0.85em' }}>
-                    détails
-                  </NavLink>
-                )}
               </div>
-              <div style={{ fontSize: '0.9em', color: '#ccc' }}>
+              <div style={{ fontSize: '0.9em', color: '#cbd5e1' }}>
                 {Array.isArray(system.proprietaires) && system.proprietaires.length
                   ? system.proprietaires.map((p: number, key: number) => <Commandant num={p} key={key} />)
                   : null}
               </div>
             </>
           )}
-          <div style={{ fontSize: '0.85em', color: '#bbb' }}>
+          <div style={{ fontSize: '0.85em', color: '#94a3b8' }}>
             {system?.nbPla != null && <>{fmt(system.nbPla)} planètes</>}
             {system?.pop != null && system?.popMax != null && <> · pop {fmt(system.pop)}/{fmt(system.popMax)}</>}
           </div>
+          {/* Capacité de réparation du système par tour (sommée sur les bâtiments de ses planètes) ;
+          les systèmes détectés peuvent n'avoir aucune planète */}
+          {Array.isArray(system.planetes) && system.planetes.length > 0 && (
+            <div style={{ fontSize: '0.85em', color: '#94a3b8' }}>
+              Capacité réparation : {fmt(capaciteReparation(system.planetes, global))}
+            </div>
+          )}
         </div>
       )}
 
@@ -271,6 +308,7 @@ export default function InfoPanel({ selected }: Props) {
         <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
           <tr>
+            <th style={{ width: 36, textAlign: 'right' }}>#</th>
             <th>Nom</th>
             <th>Propriétaire</th>
             <th>Vaisseaux</th>
@@ -295,7 +333,8 @@ export default function InfoPanel({ selected }: Props) {
             }
             return (
               <tr key={`flt-${i}`} {...(f.type === 'joueur' ? { onMouseEnter: showFleetHover(f), onMouseLeave: hideFleetHover } : {})}>
-                <td>{f.nom} ({f.num+1})</td>
+                <td style={{ textAlign: 'right' }}>{f.num + 1}</td>
+                <td>{f.nom}</td>
                 <td style={{ textAlign: 'right' }}>
                   {typeof owner === 'number' ? <Commandant num={owner} /> : '—'}
                 </td>
@@ -306,7 +345,8 @@ export default function InfoPanel({ selected }: Props) {
           })}
           {pastFleets?.flottes.map((f, i) => (
             <tr key={`old-${i}`} style={staleRowStyle}>
-              <td><StaleIcon />{f.nom} ({f.num+1})</td>
+              <td style={{ textAlign: 'right' }}>{f.num + 1}</td>
+              <td><StaleIcon />{f.nom}</td>
               <td style={{ textAlign: 'right' }}><Commandant num={f.proprio} /></td>
               <td>{f.nbVso}</td>
               <td style={{ textAlign: 'right' }}>{`${getPuissanceFromString(f.puiss)} - ${f.puiss}`}</td>
@@ -323,33 +363,67 @@ export default function InfoPanel({ selected }: Props) {
           <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
             <tr>
-              {sortTh('num', 'Nom')}
-              {sortTh('dist', 'Distance')}
+              <th style={{ cursor: 'pointer', userSelect: 'none', width: 36, textAlign: 'right' }} onClick={() => {
+                if (sortField === 'id') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                else { setSortField('id'); setSortOrder('asc'); }
+              }}>
+                # {sortField === 'id' && (sortOrder === 'asc' ? '▲' : '▼')}
+              </th>
+              {sortTh('nom', 'Nom')}
+              {sortTh('dist', 'Δ')}
               {sortTh('vitesse', 'Vitesse')}
               {sortTh('as', 'AS')}
               {sortTh('ap', 'AP')}
               <th>Position</th>
+              <th style={{ width: 40 }} aria-label="Déplacer vers la case sélectionnée" title="Déplacer vers la case sélectionnée (alternative clavier au glisser-déposer)">→</th>
             </tr>
             </thead>
             <tbody>
             {atPos.playerFleets.map((f: any, i: number) => {
               const isHere = f.pos.x === selected.x && f.pos.y === selected.y;
               // Hors de portée ce tour : ligne orangée et estompée
-              const rowStyle = !f.reachable && !isHere ? { opacity: 0.5, color: '#ffa500' } : {};
+              const rowStyle = !f.reachable && !isHere ? { opacity: 0.5, color: '#f59e0b' } : {};
               return (
                 <tr key={`player-flt-${i}`} style={rowStyle} onMouseEnter={showFleetHover(f)} onMouseLeave={hideFleetHover}>
-                  <td>{f.nom} ({f.num+1})</td>
+                  <td style={{ textAlign: 'right' }}>{f.num + 1}</td>
+                  <td>{f.nom}</td>
                   <td style={{ textAlign: 'right' }}>{isHere ? '—' : f.dist}</td>
                   <td style={{ textAlign: 'right' }}>{f.vitesse}</td>
                   <td style={{ textAlign: 'right' }}>{f.as ?? 0}</td>
                   <td style={{ textAlign: 'right' }}>{f.ap ?? 0}</td>
                   <td style={{ textAlign: 'right' }}><Position pos={f.pos} /></td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button
+                      type="button"
+                      disabled={isHere}
+                      onClick={() => onMoveFleet?.(f.num)}
+                      title={isHere
+                        ? 'La flotte est déjà sur la case sélectionnée'
+                        : `Déplacer vers la case sélectionnée (${selected.x}-${selected.y})`}
+                      aria-label={isHere
+                        ? undefined
+                        : `Déplacer la flotte ${f.nom} vers la case sélectionnée ${selected.x}-${selected.y}`}
+                      style={{
+                        background: isHere ? 'transparent' : '#1e2530',
+                        border: '1px solid #334155',
+                        color: isHere ? '#64748b' : '#38bdf8',
+                        cursor: isHere ? 'default' : 'pointer',
+                        borderRadius: 4,
+                        padding: '2px 6px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <IconArrowRight size={14} />
+                    </button>
+                  </td>
                 </tr>
               );
             })}
             </tbody>
           </table>
-          <div style={{ fontSize: '0.75em', color: '#888', marginTop: 4 }}>orange estompé = hors de portée ce tour</div>
+          <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 6 }}>orange estompé = hors de portée ce tour · → = déplacer vers la case sélectionnée</div>
         </div>
       )}
       {cellCombats.length > 0 && (
@@ -401,10 +475,11 @@ export default function InfoPanel({ selected }: Props) {
                   {note.tag && (
                     <span style={{
                       display: 'inline-block',
-                      background: '#345',
-                      color: '#ccc',
-                      padding: '1px 5px',
-                      borderRadius: 3,
+                      background: '#1e293b',
+                      color: '#cbd5e1',
+                      border: '1px solid #334155',
+                      padding: '1px 6px',
+                      borderRadius: 4,
                       fontSize: '0.8em',
                       marginRight: 6,
                       verticalAlign: 'middle'
@@ -419,7 +494,7 @@ export default function InfoPanel({ selected }: Props) {
                   style={{
                     background: 'transparent',
                     border: 'none',
-                    color: '#a66',
+                    color: '#f87171',
                     cursor: 'pointer',
                     padding: '0 4px',
                     fontSize: '1.1em'
@@ -432,7 +507,7 @@ export default function InfoPanel({ selected }: Props) {
             ))}
           </div>
         ) : (
-          <div style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9em', marginBottom: 8 }}>Aucune note pour cette case.</div>
+          <div style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.9em', marginBottom: 8 }}>Aucune note pour cette case.</div>
         )}
 
         {showNoteForm ? (
@@ -451,7 +526,7 @@ export default function InfoPanel({ selected }: Props) {
                 onChange={(e) => setNoteTag(e.target.value)}
                 placeholder="Tag..."
                 list="tags-list"
-                style={{ width: 80, padding: '4px 8px', background: '#123', color: '#eee', border: '1px solid #345' }}
+                style={{ width: 80, padding: '4px 8px', background: '#1e2530', color: '#f1f5f9', border: '1px solid #334155', borderRadius: 4 }}
               />
               <datalist id="tags-list">
                 {allTags.map(tag => (
@@ -463,12 +538,12 @@ export default function InfoPanel({ selected }: Props) {
                 value={noteText}
                 onChange={(e) => setNoteText(e.target.value)}
                 placeholder="Ajouter une note..."
-                style={{ flex: 1, padding: '4px 8px', background: '#123', color: '#eee', border: '1px solid #345' }}
+                style={{ flex: 1, padding: '4px 8px', background: '#1e2530', color: '#f1f5f9', border: '1px solid #334155', borderRadius: 4 }}
               />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="submit" style={{ padding: '4px 12px' }}>Ajouter</button>
-              <button type="button" onClick={() => setShowNoteForm(false)} style={{ padding: '4px 12px', background: 'transparent', color: '#aaa', border: '1px solid #555', borderRadius: 4 }}>
+              <button type="button" onClick={() => setShowNoteForm(false)} style={{ padding: '4px 12px', background: 'transparent', color: '#94a3b8', border: '1px solid #334155', borderRadius: 4 }}>
                 Annuler
               </button>
             </div>
@@ -477,7 +552,7 @@ export default function InfoPanel({ selected }: Props) {
           <button
             type="button"
             onClick={() => setShowNoteForm(true)}
-            style={{ padding: '4px 12px', cursor: 'pointer', backgroundColor: '#333', color: '#eee', border: '1px solid #555', borderRadius: 4, fontSize: '0.85em' }}
+            style={{ padding: '4px 12px', cursor: 'pointer', backgroundColor: '#1e2530', color: '#f1f5f9', border: '1px solid #334155', borderRadius: 4, fontSize: '0.85em' }}
           >
             + Ajouter une note
           </button>
@@ -498,10 +573,10 @@ export default function InfoPanel({ selected }: Props) {
         const comp: Record<string, number> = {};
         (f.vaisseaux || []).forEach((v: any) => { comp[v.type] = (comp[v.type] || 0) + 1; });
         const compEntries = Object.entries(comp);
-        const lbl: React.CSSProperties = { color: '#999', paddingRight: 12, whiteSpace: 'nowrap' };
+        const lbl: React.CSSProperties = { color: '#94a3b8', paddingRight: 12, whiteSpace: 'nowrap' };
         return (
-          <div style={{ position: 'fixed', left, top, width, zIndex: 300, pointerEvents: 'none', background: 'rgba(15,15,20,0.97)', border: '1px solid #555', borderRadius: 6, padding: '8px 10px', fontSize: '0.82em', color: '#ddd', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
-            <div style={{ fontWeight: 'bold', color: '#eee', marginBottom: 6 }}>{f.nom} ({f.num + 1})</div>
+          <div style={{ position: 'fixed', left, top, width, zIndex: 300, pointerEvents: 'none', background: 'rgba(15, 23, 42, 0.97)', border: '1px solid #334155', borderRadius: 6, padding: '8px 10px', fontSize: '0.82em', color: '#cbd5e1', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)' }}>
+            <div style={{ fontWeight: 'bold', color: '#f8fafc', marginBottom: 6 }}>{f.nom}</div>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
                 <tr><td style={lbl}>Position</td><td style={{ textAlign: 'right' }}><Position pos={f.pos} /></td></tr>
@@ -517,11 +592,11 @@ export default function InfoPanel({ selected }: Props) {
               </tbody>
             </table>
             {compEntries.length > 0 && (
-              <div style={{ marginTop: 6, borderTop: '1px solid #333', paddingTop: 6 }}>
+              <div style={{ marginTop: 6, borderTop: '1px solid #334155', paddingTop: 6 }}>
                 {compEntries.slice(0, 8).map(([type, nb]) => (
                   <div key={type} style={{ display: 'flex', justifyContent: 'space-between' }}><span>{type}</span><span>× {nb}</span></div>
                 ))}
-                {compEntries.length > 8 && <div style={{ color: '#888' }}>… +{compEntries.length - 8} autres</div>}
+                {compEntries.length > 8 && <div style={{ color: '#64748b' }}>… +{compEntries.length - 8} autres</div>}
               </div>
             )}
           </div>

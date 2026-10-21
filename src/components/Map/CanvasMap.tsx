@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
 import {BOUNDS, CENTER, getTorusDistance, torusDelta, wrapX, wrapY} from '../../utils/position';
+import {capaciteReparation} from '../../utils/reparation';
 import {getSectorNumber, isSectorLabelCell, sectorBackgroundColor, sectorLabelColor} from '../../utils/sectors';
 import {countCombatsByKind} from '../../parsers/parseCombatMessages';
 import {drawCombatMarkers} from '../../utils/combatMarkers';
@@ -48,7 +49,7 @@ function withOpacity(color: string, opacity: number): string {
     if (color.startsWith('hsl')) {
         return color.replace(')', `, ${opacity})`).replace('hsl', 'hsla');
     }
-    const named: Record<string, string> = { grey: '#808080', gray: '#808080', yellow: '#ffff00' };
+    const named: Record<string, string> = { grey: '#94a3b8', gray: '#94a3b8' };
     const hex = (named[color] || (color.startsWith('#') ? color : '')).replace('#', '');
     if (/^[0-9a-fA-F]{6}$/.test(hex)) {
         const r = parseInt(hex.slice(0, 2), 16);
@@ -100,15 +101,25 @@ type Props = {
     showSectors: boolean;
     showZones?: boolean; // zones manuelles (toutes)
     showInfluence: boolean;
-    colorMode?: 'status' | 'player';
+    colorMode?: 'status' | 'race' | 'player';
     showStabilityZones: boolean;
     stabilitySystemPos?: string;
     influenceOpacity?: number;
+    // ---- Ordres de déplacement (drag & drop de flottes) ----
+    deplacements?: Record<number, XY>; // flotteNum → cible commandée
+    dragFleet?: { from: XY; vitesse: number; cursor: XY } | null; // drag en cours : anneau de vitesse + ligne + distance
+    highlightPos?: XY; // case à surbriller (survol d'une flotte dans le panneau info)
+    onAnyCanvasMouseDown?: () => void; // tout clic gauche sur la carte (avant la logique de pan)
+    onFleetCellMouseDown?: (cell: XY, clientX: number, clientY: number) => void; // clic gauche sur une case avec ≥1 flotte du joueur
+    onFleetCellGestureAbort?: () => void; // mousedown sur une case de flotte qui se transforme en pan
+    onFleetDragOver?: (cell: XY) => void; // survol HTML5 d'un drag de flotte au-dessus de la carte
+    onFleetDragLeave?: () => void; // le drag sort de la carte
+    onFleetDrop?: (fleetNum: number, cell: XY) => void; // drop d'une flotte sur une case
 };
 
-export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[], colorMode: 'status' | 'player' = 'status', globalData?: GlobalData) {
-    if (owners && owners?.length === 1 && owners[0] === 0) return 'grey';
-    if (!owners || owners.length === 0) return '#999';
+export function colorForOwnership(currentPlayerId?: number, owners?: number[], alliances?: Alliance[], pna?: number[], colorMode: 'status' | 'race' | 'player' = 'status', globalData?: GlobalData) {
+    if (owners && owners?.length === 1 && owners[0] === 0) return '#94a3b8';
+    if (!owners || owners.length === 0) return '#94a3b8';
 
     // si y'en a plusieurs en enlevant le neutre
     if (owners.length > 1 ){
@@ -121,24 +132,29 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
         if(colors.size === 1) {
             return colors.values().next().value;
         } else {
-            return '#ff9540';
+            return '#fb923c';
         }
         // sinon on renvoi jaune
     }
 
     const owner = owners[0];
-    if (currentPlayerId && owners.includes(currentPlayerId)) return '#09ca31';
+    if (currentPlayerId && owners.includes(currentPlayerId)) return '#10b981';
 
-    if (colorMode === 'player') {
+    if (colorMode === 'race') {
         return raceColorForOwner(globalData, owner) || getColorForPlayer(owner);
     }
+    if (colorMode === 'player') {
+        return getColorForPlayer(owner);
+    }
 
-    if (alliances && alliances.some(a => a.commandants.includes(owner))) return '#224eff';
-    if (pna && pna.includes(owner)) return 'yellow';
-    return '#f80c0c';
+    if (alliances && alliances.some(a => a.commandants.includes(owner))) return '#3b82f6';
+    // Jaune (distinct de l'ambre #f59e0b réservé aux déplacements/flèches de direction)
+    if (pna && pna.includes(owner)) return '#fde047';
+    return '#ef4444';
 }
 
-export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18}: Props) {
+export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
+                       deplacements, dragFleet, highlightPos, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort, onFleetDragOver, onFleetDragLeave, onFleetDrop}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     // Case survolée : dessinée sur un canvas séparé pour ne pas redessiner toute la carte à chaque mouvement de souris
@@ -152,8 +168,11 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         centerRef.current = center;
     }, [center]);
 
+    // Conteneur (pour le dragleave HTML5 : savoir si le pointeur sort vraiment de la carte)
+    const hostRef = useRef<HTMLDivElement>(null);
+
     // Gestion du drag
-    const dragRef = useRef({dragging: false, lastX: 0, lastY: 0, accX: 0, accY: 0, moved: false});
+    const dragRef = useRef({dragging: false, lastX: 0, lastY: 0, accX: 0, accY: 0, moved: false, startX: 0, startY: 0, fleetAbortFired: false});
 
     // Tracé d'une zone en cours (Alt + glisser)
     const [zoneDraft, setZoneDraft] = useState<{ start: XY; end: XY } | undefined>(undefined);
@@ -207,9 +226,13 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             });
         }
 
-        // 3. Systèmes globaux (data.xml) - si pas déjà présent et non masqués
+        // 3. Systèmes globaux (data.xml) - si pas déjà présent et non masqués.
+        // data.xml peut décrire une galaxie de taille différente du rapport affiché :
+        // seuls les systèmes à l'intérieur du tore affiché sont cohérents (les autres
+        // seraient dessinés enroulés sur une mauvaise case).
         if (showGlobalSystems && global?.systemes) {
             global.systemes.forEach(s => {
+                if (s.pos.x < 1 || s.pos.x > BOUNDS.maxX || s.pos.y < 1 || s.pos.y > BOUNDS.maxY) return;
                 const key = `${s.pos.x}_${s.pos.y}`;
                 if (!seen.has(key)) {
                     list.push({
@@ -237,9 +260,27 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
     const combats = useMemo(() => {
         const fromRapport = rapport?.combats ?? [];
-        const fromPublic = publicCombats ?? [];
+        // Les combats publics viennent de l'univers de data.xml/combats.htm : sur un rapport
+        // d'une galaxie de taille différente, ceux hors du tore affiché seraient dessinés
+        // enroulés sur une mauvaise case → on les exclut.
+        const fromPublic = (publicCombats ?? []).filter(
+            c => c.pos && c.pos.x >= 1 && c.pos.x <= BOUNDS.maxX && c.pos.y >= 1 && c.pos.y <= BOUNDS.maxY
+        );
         return [...fromRapport, ...fromPublic];
     }, [rapport, publicCombats]);
+
+    // Capacité de réparation par position (somme des caractéristiques « capacité réparation
+    // vaisseaux » des bâtiments des planètes) : les systèmes à capacité > 0 reçoivent un bord
+    // blanc épais sur leur disque (légende « réparation »)
+    const reparationByPos = useMemo(() => {
+        const map = new Map<string, number>();
+        systems.forEach(s => {
+            if (Array.isArray(s.planetes) && s.planetes.length > 0) {
+                map.set(`${s.pos.x}_${s.pos.y}`, capaciteReparation(s.planetes, global));
+            }
+        });
+        return map;
+    }, [systems, global]);
 
     // Redessine uniquement le contour de la case survolée (sur le canvas dédié).
     // La géométrie est recalculée pour rester alignée avec la carte principale (tore, centre, taille de case).
@@ -307,7 +348,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         el.textContent = '';
         const posEl = document.createElement('span');
         posEl.textContent = `${xy.x}-${xy.y}`;
-        posEl.style.cssText = 'font-weight:bold;color:#ffe600;';
+        posEl.style.cssText = 'font-weight:bold;color:#38bdf8;';
         el.appendChild(posEl);
 
         const sys = systems.find(s => s.pos.x === xy.x && s.pos.y === xy.y);
@@ -321,13 +362,13 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     if (i > 0) {
                         const sep = document.createElement('span');
                         sep.textContent = ', ';
-                        sep.style.color = '#888';
+                        sep.style.color = '#64748b';
                         el.appendChild(sep);
                     }
                     const span = document.createElement('span');
                     const cmd = o === 0 ? undefined : global?.commandants?.find(c2 => c2.numero === o);
                     span.textContent = (i === 0 ? '  ' : '') + (o === 0 ? 'Neutre (0)' : cmd ? `${cmd.nom} (${o})` : `#${o}`);
-                    span.style.color = o === 0 ? '#999' : (ownerRaceColor(o) || '#ddd');
+                    span.style.color = o === 0 ? '#94a3b8' : (ownerRaceColor(o) || '#cbd5e1');
                     el.appendChild(span);
                 });
             }
@@ -336,7 +377,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         if (nf > 0) {
             const flEl = document.createElement('span');
             flEl.textContent = `  ${nf} flotte${nf > 1 ? 's' : ''}`;
-            flEl.style.color = '#9fc6ff';
+            flEl.style.color = '#38bdf8';
             el.appendChild(flEl);
         }
     }, [systems, fleets, global, ownerRaceColor]);
@@ -521,7 +562,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 // Couche Influence - dessinée après le damier pour plus de clarté
                 if (showInfluence && influenceGrid[r] && influenceGrid[r][c] !== -1) {
                     const closestOwner = influenceGrid[r][c];
-                    const baseColor = colorMode === 'player' ? (ownerRaceColor(closestOwner) || getColorForPlayer(closestOwner)) : getColorForPlayer(closestOwner);
+                    const baseColor = colorMode === 'race' ? (ownerRaceColor(closestOwner) || getColorForPlayer(closestOwner)) : colorMode === 'player' ? getColorForPlayer(closestOwner) : getColorForPlayer(closestOwner);
                     // Rend la couleur semi-transparente (couleurs HSL des joueurs ou hexa des races)
                     ctx.fillStyle = withOpacity(baseColor, influenceOpacity);
                     ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
@@ -575,48 +616,88 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
         }
 
-        // grille + en-têtes
+        // grille + en-têtes — densité adaptative : en dézoomant on ne garde que les repères
+        // (×5, ×20) ; la grille fine complète ne sert que lorsque les cases sont lisibles.
+        const showMinorGrid = cellSize >= 26;
+        // En dessous de ~14px par case, un chiffre ne rentre plus dans l'en-tête : coches seules
+        const headerLabelEvery = cellSize >= 30 ? 1 : 5;
+        const showHeaderLabels = cellSize >= 14;
         for (let r = 0; r <= rows; r++) {
             const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
             const yPos = r * cellSize;
-            if ((xCoord - 1) % 20 === 0) ctx.strokeStyle = '#123b66'; else if ((xCoord - 1) % 5 === 0) ctx.strokeStyle = '#661212'; else ctx.strokeStyle = '#444';
-            ctx.beginPath();
-            ctx.moveTo(0, yPos);
-            ctx.lineTo(cols * cellSize, yPos);
-            ctx.stroke();
+            const isMajor20 = (xCoord - 1) % 20 === 0;
+            const isMajor5 = (xCoord - 1) % 5 === 0;
+            if (showMinorGrid || isMajor5 || isMajor20) {
+                ctx.lineWidth = isMajor20 ? 1.2 : 1;
+                if (isMajor20) ctx.strokeStyle = '#274058';
+                else if (isMajor5) ctx.strokeStyle = '#1e2a38';
+                else ctx.strokeStyle = 'rgba(30, 41, 59, 0.55)';
+                ctx.beginPath();
+                ctx.moveTo(0, yPos);
+                ctx.lineTo(cols * cellSize, yPos);
+                ctx.stroke();
+                ctx.lineWidth = 1;
+            }
 
             // Fond opaque pour l'en-tête de ligne (surligné si c'est la ligne de la case sélectionnée)
             const rowSelected = r > 0 && selected?.x === xCoord;
-            ctx.fillStyle = rowSelected ? '#ffe600' : '#1a1a1a';
+            ctx.fillStyle = rowSelected ? '#38bdf8' : '#141c28';
             ctx.fillRect(0, yPos, cellSize, cellSize);
 
-            ctx.fillStyle = rowSelected ? '#000' : '#ccc';
-            ctx.font = 'bold 12px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(String(xCoord), cellSize / 2, yPos + cellSize / 2);
+            // Chiffres tous les 5 (sinon coches discrètes) : le chrome ne doit pas
+            // crier plus fort que le contenu (compteurs de flottes, marqueurs).
+            if (showHeaderLabels && (rowSelected || xCoord % headerLabelEvery === 0)) {
+                ctx.fillStyle = rowSelected ? '#0b0f17' : '#7d8ba0';
+                ctx.font = '600 10px system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(String(xCoord), cellSize / 2, yPos + cellSize / 2);
+            } else {
+                ctx.fillStyle = '#3b475a';
+                ctx.fillRect(cellSize / 2 - 1, yPos + cellSize / 2 - 1, 2, 2);
+            }
         }
 
         for (let c = 0; c <= cols; c++) {
             const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
             const xPos = c * cellSize;
-            if ((yCoord - 1) % 20 === 0) ctx.strokeStyle = '#123b66'; else if ((yCoord - 1) % 5 === 0) ctx.strokeStyle = '#661212'; else ctx.strokeStyle = '#444';
-            ctx.beginPath();
-            ctx.moveTo(xPos, 0);
-            ctx.lineTo(xPos, rows * cellSize);
-            ctx.stroke();
+            const isMajor20 = (yCoord - 1) % 20 === 0;
+            const isMajor5 = (yCoord - 1) % 5 === 0;
+            if (showMinorGrid || isMajor5 || isMajor20) {
+                ctx.lineWidth = isMajor20 ? 1.2 : 1;
+                if (isMajor20) ctx.strokeStyle = '#274058';
+                else if (isMajor5) ctx.strokeStyle = '#1e2a38';
+                else ctx.strokeStyle = 'rgba(30, 41, 59, 0.55)';
+                ctx.beginPath();
+                ctx.moveTo(xPos, 0);
+                ctx.lineTo(xPos, rows * cellSize);
+                ctx.stroke();
+                ctx.lineWidth = 1;
+            }
 
             // Fond opaque pour l'en-tête de colonne (surligné si c'est la colonne de la case sélectionnée)
             const colSelected = c > 0 && selected?.y === yCoord;
-            ctx.fillStyle = colSelected ? '#ffe600' : '#1a1a1a';
+            ctx.fillStyle = colSelected ? '#38bdf8' : '#141c28';
             ctx.fillRect(xPos, 0, cellSize, cellSize);
 
-            ctx.fillStyle = colSelected ? '#000' : '#ccc';
-            ctx.font = 'bold 12px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(String(yCoord), xPos + cellSize / 2, cellSize / 2);
+            if (showHeaderLabels && (colSelected || yCoord % headerLabelEvery === 0)) {
+                ctx.fillStyle = colSelected ? '#0b0f17' : '#7d8ba0';
+                ctx.font = '600 10px system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(String(yCoord), xPos + cellSize / 2, cellSize / 2);
+            } else {
+                ctx.fillStyle = '#3b475a';
+                ctx.fillRect(xPos + cellSize / 2 - 1, cellSize / 2 - 1, 2, 2);
+            }
         }
+
+        // Repère d'axes dans la case d'angle (x = lignes ↓, y = colonnes →)
+        ctx.fillStyle = '#5b6b80';
+        ctx.font = '600 9px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('x↓', cellSize / 2, cellSize / 2);
 
         // ZONES MANUELLES – rectangles saisis à la main (coin haut-gauche = case cliquée)
 
@@ -739,19 +820,32 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
         });
 
-        // Dessin unique des cases détectées, en bleu transparent uniforme
+        // Dessin unique des cases détectées : aplat très léger + liseré périphérique.
+        // L'œil lit la frontière de la zone sans que le bleu n'écrase le contenu.
         const cScan = ctx as CanvasRenderingContext2D;
         cScan.save();
         cScan.globalAlpha = 1.0;
-        cScan.fillStyle = 'rgba(0, 128, 255, 0.22)'; // bleu transparent
+        cScan.fillStyle = 'rgba(56, 150, 255, 0.07)';
         detected.forEach(key => {
             const [ixStr, iyStr] = key.split(',');
             const ix = Number(ixStr);
             const iy = Number(iyStr);
+            cScan.fillRect(ix * cellSize, iy * cellSize, cellSize, cellSize);
+        });
+        // Liseré : trait sur chaque arête dont le voisin n'est pas détecté
+        cScan.strokeStyle = 'rgba(56, 150, 255, 0.35)';
+        cScan.lineWidth = 1;
+        cScan.beginPath();
+        detected.forEach(key => {
+            const [ix, iy] = key.split(',').map(Number);
             const px = ix * cellSize;
             const py = iy * cellSize;
-            cScan.fillRect(px, py, cellSize, cellSize);
+            if (!detected.has(`${ix},${iy - 1}`)) { cScan.moveTo(px, py); cScan.lineTo(px + cellSize, py); }
+            if (!detected.has(`${ix},${iy + 1}`)) { cScan.moveTo(px, py + cellSize); cScan.lineTo(px + cellSize, py + cellSize); }
+            if (!detected.has(`${ix - 1},${iy}`)) { cScan.moveTo(px, py); cScan.lineTo(px, py + cellSize); }
+            if (!detected.has(`${ix + 1},${iy}`)) { cScan.moveTo(px + cellSize, py); cScan.lineTo(px + cellSize, py + cellSize); }
         });
+        cScan.stroke();
 
         // INDICATEURS DE NOTES
         Object.keys(notes).forEach(noteKey => {
@@ -990,6 +1084,42 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 cRing.restore();
             }
 
+            // Capacité de réparation > 0 : petit insigne « + » en haut-gauche de la case.
+            // (Avant : anneau blanc épais autour du disque — visuellement dominant, il
+            // rivalisait avec la sélection et lavait le contraste des systèmes voisins.)
+            const reparation = reparationByPos.get(`${s.pos.x}_${s.pos.y}`) ?? 0;
+            if (reparation > 0 && isSystemSelected(owners)) {
+                const chip = Math.max(10, Math.round(cellSize * 0.42));
+                const pad = Math.max(2, Math.round(cellSize * 0.06));
+                const bx = px + pad;
+                const by = py + pad;
+                const cr = Math.max(2, chip * 0.25);
+                const cRep = ctx as CanvasRenderingContext2D;
+                cRep.save();
+                cRep.beginPath();
+                cRep.moveTo(bx + cr, by);
+                cRep.arcTo(bx + chip, by, bx + chip, by + chip, cr);
+                cRep.arcTo(bx + chip, by + chip, bx, by + chip, cr);
+                cRep.arcTo(bx, by + chip, bx, by, cr);
+                cRep.arcTo(bx, by, bx + chip, by, cr);
+                cRep.closePath();
+                cRep.fillStyle = 'rgba(10, 15, 25, 0.9)';
+                cRep.fill();
+                cRep.strokeStyle = 'rgba(226, 232, 240, 0.7)';
+                cRep.lineWidth = 1;
+                cRep.stroke();
+                const m = Math.max(2.5, chip * 0.28);
+                cRep.strokeStyle = '#f8fafc';
+                cRep.lineWidth = Math.max(1.4, chip * 0.12);
+                cRep.beginPath();
+                cRep.moveTo(bx + chip / 2, by + m);
+                cRep.lineTo(bx + chip / 2, by + chip - m);
+                cRep.moveTo(bx + m, by + chip / 2);
+                cRep.lineTo(bx + chip - m, by + chip / 2);
+                cRep.stroke();
+                cRep.restore();
+            }
+
             // Badges propriétaires en bas à droite de la case
             if (showOwnerBadges && owners && owners.length > 0) {
                 const badgePadding = Math.max(2, Math.floor(cellSize * 0.08));
@@ -1038,6 +1168,32 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 }
             }
         }
+
+        // Flèche (direction / ordre de déplacement) : trait + pointe pleine, clipée à la grille.
+        // Déclarée AVANT le passage des flottes qui l'appelle via renderFleetCell (la fonction est
+        // hoistée, le const lui ne l'est pas — ordre d'exécution respecté ici)
+        const drawArrow = (c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, color = '#f59e0b') => {
+            const headLen = Math.max(6, Math.floor(cellSize * 0.25));
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            c.save();
+            c.beginPath();
+            c.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
+            c.clip();
+            c.strokeStyle = color;
+            c.fillStyle = color;
+            c.lineWidth = 2;
+            c.beginPath();
+            c.moveTo(x1, y1);
+            c.lineTo(x2, y2);
+            c.stroke();
+            c.beginPath();
+            c.moveTo(x2, y2);
+            c.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+            c.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+            c.closePath();
+            c.fill();
+            c.restore();
+        };
 
         // flottes : un seul marqueur par case, étiqueté au nombre total de flottes sur la case
         if (showFleetBadges) {
@@ -1103,37 +1259,29 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             c2d.textBaseline = 'middle';
             c2d.fillText(label, cx, cy + 0.5);
 
-            // Flèches de direction (une par flotte du groupe qui en a une, flottes du joueur uniquement)
+            // Ordre de déplacement : anneau ambre autour du disque blanc (flotte « modifiée vs rapport »)
+            if (fGroup.some(f => f.type === 'joueur' && deplacements && deplacements[f.num])) {
+                c2d.strokeStyle = '#f59e0b';
+                c2d.lineWidth = 2;
+                c2d.beginPath();
+                c2d.arc(cx, cy, diameter / 2 + 3, 0, Math.PI * 2);
+                c2d.stroke();
+            }
+
+            // Flèches de direction (une par flotte du groupe qui en a une, flottes du joueur uniquement).
+            // Les ordres de déplacement sont dessinés dans le passage dédié plus bas (par-dessus
+            // tout le reste) : on les saute ici
             fGroup.forEach(f => {
+                if (f.type === 'joueur' && deplacements && deplacements[f.num]) return;
                 const t = f.direction;
-                if (t) {
+                // Cible identique à la position (entrée périmée après changement de tour) :
+                // pas de flèche de longueur nulle
+                if (t && !(t.x === f.pos.x && t.y === f.pos.y)) {
                     const tdx = ((t.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
                     const tdy = ((t.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
                     const tx = tdx * cellSize + cellSize / 2;
                     const ty = tdy * cellSize + cellSize / 2;
                     if (tx >= 0 && ty >= 0 && tx <= cols * cellSize && ty <= rows * cellSize) {
-                        const drawArrow = (c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) => {
-                            const headLen = Math.max(6, Math.floor(cellSize * 0.25));
-                            const angle = Math.atan2(y2 - y1, x2 - x1);
-                            c.save();
-                            c.beginPath();
-                            c.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
-                            c.clip();
-                            c.strokeStyle = '#ff9800';
-                            c.fillStyle = '#ff9800';
-                            c.lineWidth = 2;
-                            c.beginPath();
-                            c.moveTo(x1, y1);
-                            c.lineTo(x2, y2);
-                            c.stroke();
-                            c.beginPath();
-                            c.moveTo(x2, y2);
-                            c.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
-                            c.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
-                            c.closePath();
-                            c.fill();
-                            c.restore();
-                        };
                         drawArrow(c2d, cx, cy, tx, ty);
                     }
                 }
@@ -1192,9 +1340,9 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     const dist = getTorusDistance(f.pos, showFleetsFor);
                     const reachable = dist <= f.vitesse;
 
-                    // Couleur : vert/jaune clair si atteignable, orange clair sinon
-                    ctx.strokeStyle = reachable ? '#ccff00' : '#ffa500';
-                    ctx.fillStyle = reachable ? '#ccff0000' : '#ffa500';
+                    // Couleur : émeraude clair si atteignable, ambre sinon
+                    ctx.strokeStyle = reachable ? '#10b981' : '#f59e0b';
+                    ctx.fillStyle = reachable ? 'rgba(16, 185, 129, 0)' : '#f59e0b';
                     ctx.setLineDash([5, 5]);
 
                     // On calcule le delta le plus court sur le tore
@@ -1245,6 +1393,25 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
         }
 
+        // Équerres blanches débordant de la case — style commun à la case sélectionnée et à la
+// surbrillance de case (survol d'une flotte dans le panneau info)
+        const drawCellCorners = (c2d: CanvasRenderingContext2D, px: number, py: number) => {
+            const m = Math.max(3, Math.round(cellSize * 0.15));
+            const l = Math.max(5, Math.round(cellSize * 0.35));
+            c2d.lineWidth = 2;
+            c2d.strokeStyle = '#ffffff';
+            c2d.beginPath();
+            // haut-gauche
+            c2d.moveTo(px - m, py - m + l); c2d.lineTo(px - m, py - m); c2d.lineTo(px - m + l, py - m);
+            // haut-droite
+            c2d.moveTo(px + cellSize + m - l, py - m); c2d.lineTo(px + cellSize + m, py - m); c2d.lineTo(px + cellSize + m, py - m + l);
+            // bas-droite
+            c2d.moveTo(px + cellSize + m, py + cellSize + m - l); c2d.lineTo(px + cellSize + m, py + cellSize + m); c2d.lineTo(px + cellSize + m - l, py + cellSize + m);
+            // bas-gauche
+            c2d.moveTo(px - m + l, py + cellSize + m); c2d.lineTo(px - m, py + cellSize + m); c2d.lineTo(px - m, py + cellSize + m - l);
+            c2d.stroke();
+        };
+
         // CASE SÉLECTIONNÉE (dessinée en dernier pour rester visible au-dessus de tout)
         if (selected) {
             const cSel = ctx as CanvasRenderingContext2D;
@@ -1270,12 +1437,12 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     const py = dy * cellSize;
 
                     // Bandes discrètes sur la ligne et la colonne pour repérer la case
-                    cSel.fillStyle = 'rgba(255, 230, 0, 0.08)';
+                    cSel.fillStyle = 'rgba(56, 189, 248, 0.05)';
                     cSel.fillRect(px, cellSize, cellSize, rows * cellSize);
                     cSel.fillRect(cellSize, py, cols * cellSize, cellSize);
 
                     // Remplissage léger de la case
-                    cSel.fillStyle = 'rgba(255, 230, 0, 0.18)';
+                    cSel.fillStyle = 'rgba(56, 189, 248, 0.16)';
                     cSel.fillRect(px, py, cellSize, cellSize);
 
                     // Contour : trait sombre puis trait clair pour être lisible sur tout fond
@@ -1283,24 +1450,11 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     cSel.strokeStyle = 'rgba(0, 0, 0, 0.8)';
                     cSel.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
                     cSel.lineWidth = 2;
-                    cSel.strokeStyle = '#ffe600';
+                    cSel.strokeStyle = '#38bdf8';
                     cSel.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
 
                     // Coins en équerre débordant de la case
-                    const m = Math.max(3, Math.round(cellSize * 0.15));
-                    const l = Math.max(5, Math.round(cellSize * 0.35));
-                    cSel.lineWidth = 2;
-                    cSel.strokeStyle = '#ffffff';
-                    cSel.beginPath();
-                    // haut-gauche
-                    cSel.moveTo(px - m, py - m + l); cSel.lineTo(px - m, py - m); cSel.lineTo(px - m + l, py - m);
-                    // haut-droite
-                    cSel.moveTo(px + cellSize + m - l, py - m); cSel.lineTo(px + cellSize + m, py - m); cSel.lineTo(px + cellSize + m, py - m + l);
-                    // bas-droite
-                    cSel.moveTo(px + cellSize + m, py + cellSize + m - l); cSel.lineTo(px + cellSize + m, py + cellSize + m); cSel.lineTo(px + cellSize + m - l, py + cellSize + m);
-                    // bas-gauche
-                    cSel.moveTo(px - m + l, py + cellSize + m); cSel.lineTo(px - m, py + cellSize + m); cSel.lineTo(px - m, py + cellSize + m - l);
-                    cSel.stroke();
+                    drawCellCorners(cSel, px, py);
 
                     dy += BOUNDS.maxX;
                 }
@@ -1309,9 +1463,166 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             cSel.restore();
         }
 
+        // FLÈCHES DES ORDRES DE DÉPLACEMENT : passage dédié par-dessus tout le reste (disques de flottes,
+        // marqueurs de combat, cadre de sélection) pour que la cible commandée ne soit jamais
+        // masquée. (L'anneau ambre de la case reste dessiné avec le marqueur.)
+        if (deplacements) {
+            for (const f of fleets) {
+                if (f.type !== 'joueur') continue;
+                const t = deplacements[f.num];
+                if (!t || (t.x === f.pos.x && t.y === f.pos.y)) continue;
+                // Delta le plus court sur le tore (même méthode que les flèches de portée)
+                let ddx = t.x - f.pos.x;
+                if (ddx > BOUNDS.maxX / 2) ddx -= BOUNDS.maxX;
+                if (ddx < -BOUNDS.maxX / 2) ddx += BOUNDS.maxX;
+                let ddy = t.y - f.pos.y;
+                if (ddy > BOUNDS.maxY / 2) ddy -= BOUNDS.maxY;
+                if (ddy < -BOUNDS.maxY / 2) ddy += BOUNDS.maxY;
+                // Hors de la portée de la flotte : flèche rouge (à portée : émeraude).
+                const cDeplacement = getTorusDistance(f.pos, t) > f.vitesse ? '#ef4444' : '#10b981';
+                // La flèche part de chaque copie de la case de la flotte visible dans le viewport
+                // (viewport plus grand que le tore : mêmes copies que le passage des disques)
+                let dx = ((f.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+                let dy = ((f.pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+                while (dx < cols) {
+                    if (dx === 0) {
+                        dx += BOUNDS.maxY;
+                        continue;
+                    }
+                    let currentDy = dy;
+                    while (currentDy < rows) {
+                        if (currentDy === 0) {
+                            currentDy += BOUNDS.maxX;
+                            continue;
+                        }
+                        const fx = dx * cellSize + cellSize / 2;
+                        const fy = currentDy * cellSize + cellSize / 2;
+                        // X = ligne (vertical), Y = colonne (horizontal)
+                        drawArrow(ctx as CanvasRenderingContext2D, fx, fy, fx + ddy * cellSize, fy + ddx * cellSize, cDeplacement);
+                        currentDy += BOUNDS.maxX;
+                    }
+                    dx += BOUNDS.maxY;
+                }
+            }
+        }
+
+        // SURBRILLANCE DE CASE (survol d'une flotte dans le panneau info) : même style que la case
+        // sélectionnée (équerres blanches), par-dessus les flèches, sous le drag en cours
+        if (highlightPos) {
+            const hCtx = ctx as CanvasRenderingContext2D;
+            hCtx.save();
+            hCtx.beginPath();
+            hCtx.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
+            hCtx.clip();
+            let dx = ((highlightPos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+            let dy = ((highlightPos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+            while (dx < cols) {
+                if (dx === 0) {
+                    dx += BOUNDS.maxY;
+                    continue;
+                }
+                let currentDy = dy;
+                while (currentDy < rows) {
+                    if (currentDy === 0) {
+                        currentDy += BOUNDS.maxX;
+                        continue;
+                    }
+                    drawCellCorners(hCtx, dx * cellSize, currentDy * cellSize);
+                    currentDy += BOUNDS.maxX;
+                }
+                dx += BOUNDS.maxY;
+            }
+            hCtx.restore();
+        }
+
+        // DRAG DE FLOTTE EN COURS : anneau de vitesse (carré de Tchebyshev autour de l'origine),
+        // ligne origine→case du curseur et distance en cases. Dessiné en tout dernier, par-dessus tout.
+        if (dragFleet) {
+            const dDist = getTorusDistance(dragFleet.from, dragFleet.cursor);
+            const dColor = dDist <= dragFleet.vitesse ? '#10b981' : '#ef4444';
+            const dCtx = ctx as CanvasRenderingContext2D;
+            dCtx.save();
+            // Clip sur la zone de grille (jamais sur les en-têtes)
+            dCtx.beginPath();
+            dCtx.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
+            dCtx.clip();
+
+            // Position écran d'une case : delta signé par rapport au centre (même méthode que les flèches de portée)
+            const dScreen = (pos: XY) => {
+                let offX = pos.x - currentCenter.x;
+                if (offX > BOUNDS.maxX / 2) offX -= BOUNDS.maxX;
+                if (offX < -BOUNDS.maxX / 2) offX += BOUNDS.maxX;
+                let offY = pos.y - currentCenter.y;
+                if (offY > BOUNDS.maxY / 2) offY -= BOUNDS.maxY;
+                if (offY < -BOUNDS.maxY / 2) offY += BOUNDS.maxY;
+                return {
+                    x: (halfCols + offY) * cellSize + cellSize / 2,
+                    y: (halfRows + offX) * cellSize + cellSize / 2,
+                };
+            };
+
+            // (i) Anneau de vitesse : carré de Tchebyshev de rayon `vitesse` autour de l'origine.
+            // Enroulé sur le tore comme les zones : on dessine les 9 copies décalées d'un tour
+            // et on ne garde que celles qui touchent le viewport. (vitesse > demi-tore : toute
+            // la galaxie est déjà à portée, il n'y a pas d'anneau limite à montrer.)
+            const dR = dragFleet.vitesse;
+            if (dR > 0 && dR <= BOUNDS.maxX / 2 && dR <= BOUNDS.maxY / 2) {
+                let dOffX = (dragFleet.from.x - dR) - currentCenter.x;
+                if (dOffX > BOUNDS.maxX / 2) dOffX -= BOUNDS.maxX;
+                if (dOffX < -BOUNDS.maxX / 2) dOffX += BOUNDS.maxX;
+                let dOffY = (dragFleet.from.y - dR) - currentCenter.y;
+                if (dOffY > BOUNDS.maxY / 2) dOffY -= BOUNDS.maxY;
+                if (dOffY < -BOUNDS.maxY / 2) dOffY += BOUNDS.maxY;
+                const dSize = (2 * dR + 1) * cellSize;
+                dCtx.lineWidth = 2;
+                dCtx.strokeStyle = dColor;
+                for (const wx of [-BOUNDS.maxX, 0, BOUNDS.maxX]) {
+                    for (const wy of [-BOUNDS.maxY, 0, BOUNDS.maxY]) {
+                        const px = (halfCols + dOffY + wy) * cellSize;
+                        const py = (halfRows + dOffX + wx) * cellSize;
+                        if (px + dSize < 0 || py + dSize < 0 || px > cols * cellSize || py > rows * cellSize) continue;
+                        dCtx.strokeRect(px, py, dSize, dSize);
+                    }
+                }
+            }
+
+            // (ii) Ligne de la case d'origine vers la case sous le curseur, avec pointe de flèche à l'extrémité
+            const dStart = dScreen(dragFleet.from);
+            const dEnd = dScreen(dragFleet.cursor);
+            const dAngle = Math.atan2(dEnd.y - dStart.y, dEnd.x - dStart.x);
+            dCtx.lineWidth = 2;
+            dCtx.strokeStyle = dColor;
+            dCtx.beginPath();
+            dCtx.moveTo(dStart.x, dStart.y);
+            dCtx.lineTo(dEnd.x, dEnd.y);
+            dCtx.stroke();
+            const dHead = Math.max(8, Math.floor(cellSize * 0.3));
+            dCtx.fillStyle = dColor;
+            dCtx.beginPath();
+            dCtx.moveTo(dEnd.x, dEnd.y);
+            dCtx.lineTo(dEnd.x - dHead * Math.cos(dAngle - Math.PI / 6), dEnd.y - dHead * Math.sin(dAngle - Math.PI / 6));
+            dCtx.lineTo(dEnd.x - dHead * Math.cos(dAngle + Math.PI / 6), dEnd.y - dHead * Math.sin(dAngle + Math.PI / 6));
+            dCtx.closePath();
+            dCtx.fill();
+
+            // (iii) Distance en cases, au MILIEU du trait et décalée perpendiculairement :
+            // ne passe jamais sous le curseur (le marquage à l'extrémité sud s'y cachait)
+            const dLabel = String(dDist);
+            dCtx.font = 'bold 12px sans-serif';
+            dCtx.textAlign = 'center';
+            dCtx.textBaseline = 'middle';
+            dCtx.fillStyle = dColor;
+            const dPerpX = -Math.sin(dAngle) * 14;
+            const dPerpY = Math.cos(dAngle) * 14;
+            const dMidX = (dStart.x + dEnd.x) / 2 + dPerpX;
+            const dMidY = (dStart.y + dEnd.y) / 2 + dPerpY;
+            dCtx.fillText(dLabel, dMidX, dMidY);
+            dCtx.restore();
+        }
+
         // Le survol dépend de la géométrie (centre, taille de case) : on resynchronise l'overlay après chaque dessin
         redrawHoverOverlay();
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
@@ -1396,6 +1707,16 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
     const handleMouseDown = useCallback((evt: React.MouseEvent<HTMLCanvasElement>) => {
         if (evt.button !== 0) return; // seulement clic gauche
 
+        // Ordres de déplacement : notification pour tout clic gauche (avant la logique de pan),
+        // et détection d'une case contenant au moins une flotte du joueur (=> FleetPicker)
+        onAnyCanvasMouseDown?.();
+        const mdCell = cellAt(evt.clientX, evt.clientY);
+        const isFleetCell = !!mdCell && fleets.some(f => f.type === 'joueur' && f.pos.x === mdCell.x && f.pos.y === mdCell.y);
+        // Alt est réservé au tracé de zone : le sélecteur de flotte ne s'ouvre pas en Alt+clic
+        if (isFleetCell && mdCell && !evt.altKey) {
+            onFleetCellMouseDown?.(mdCell, evt.clientX, evt.clientY);
+        }
+
         // Alt + glisser : tracé d'une zone du coin de départ au coin de fin
         if (evt.altKey && onCreateZone) {
             const start = cellAt(evt.clientX, evt.clientY);
@@ -1438,10 +1759,25 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         dragRef.current.accX = 0;
         dragRef.current.accY = 0;
         dragRef.current.moved = false;
+        // Repère de départ du geste : sert au seuil d'annulation du FleetPicker
+        dragRef.current.startX = evt.clientX;
+        dragRef.current.startY = evt.clientY;
+        dragRef.current.fleetAbortFired = false;
         evt.preventDefault();
 
         const onMove = (e: MouseEvent) => {
             if (!dragRef.current.dragging) return;
+            // Seuil de 4 px sur le déplacement TOTAL depuis le mousedown : si le geste sur une
+            // case de flotte devient un pan, on annule le FleetPicker (une seule fois).
+            // Évalué en tête du onMove, donc AVANT tout pas de case : un pas de case exige
+            // ≥ cellSize (≥ 8 px) de déplacement accumulé, ce seuil déclenche donc toujours
+            // en premier. (Le tracé de zone Alt+glisser ne fait pas panser la carte : pas d'abort.)
+            if (isFleetCell && !dragRef.current.fleetAbortFired) {
+                if (Math.abs(e.clientX - dragRef.current.startX) >= 4 || Math.abs(e.clientY - dragRef.current.startY) >= 4) {
+                    dragRef.current.fleetAbortFired = true;
+                    onFleetCellGestureAbort?.();
+                }
+            }
             const dx = e.clientX - dragRef.current.lastX;
             const dy = e.clientY - dragRef.current.lastY;
             dragRef.current.lastX = e.clientX;
@@ -1493,7 +1829,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
-    }, [cellSize, setCenter, cellAt, onCreateZone, onSelect, hideTooltip]);
+    }, [cellSize, setCenter, cellAt, onCreateZone, onSelect, hideTooltip, fleets, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort]);
 
     const handleWheel = useCallback((evt: React.WheelEvent<HTMLCanvasElement>) => {
         const zoomSpeed = 0.1;
@@ -1504,7 +1840,36 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         }
     }, [cellSize, setCellSize]);
 
-    return (<div className="canvas-host">
+    // Drag & drop HTML5 de flottes (payload 'application/x-fleet-num' posé par le FleetPicker)
+    const handleFleetDragOver = useCallback((e: React.DragEvent<HTMLCanvasElement>) => {
+        // On ne réagit qu'à NOS drags de flottes (le types n'est lisible qu'en dragover)
+        if (!e.dataTransfer.types.includes('application/x-fleet-num')) return;
+        e.preventDefault(); // autorise le drop
+        e.dataTransfer.dropEffect = 'move';
+        const cell = cellAt(e.clientX, e.clientY);
+        if (cell) onFleetDragOver?.(cell);
+    }, [cellAt, onFleetDragOver]);
+
+    const handleFleetDrop = useCallback((e: React.DragEvent<HTMLCanvasElement>) => {
+        const raw = e.dataTransfer.getData('application/x-fleet-num');
+        if (raw === '') return;
+        e.preventDefault();
+        const fleetNum = parseInt(raw, 10);
+        if (Number.isNaN(fleetNum)) return;
+        const cell = cellAt(e.clientX, e.clientY);
+        if (cell) onFleetDrop?.(fleetNum, cell);
+    }, [cellAt, onFleetDrop]);
+
+    const handleFleetDragLeave = useCallback((e: React.DragEvent<HTMLCanvasElement>) => {
+        // dragleave déclenche aussi en traversant les enfants du conteneur ; on ne remonte
+        // l'événement que si le pointeur sort VRAIMENT de la carte (relatedTarget à l'extérieur)
+        const host = hostRef.current;
+        const rt = e.relatedTarget as Node | null;
+        if (host && rt && host.contains(rt)) return;
+        onFleetDragLeave?.();
+    }, [onFleetDragLeave]);
+
+    return (<div className="canvas-host" ref={hostRef}>
             <canvas
                 ref={canvasRef}
                 style={{width: '100%', height: '100vh'}}
@@ -1513,6 +1878,9 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 onWheel={handleWheel}
                 onMouseMove={handleMouseMove}
                 onMouseLeave={handleMouseLeave}
+                onDragOver={handleFleetDragOver}
+                onDragLeave={handleFleetDragLeave}
+                onDrop={handleFleetDrop}
             />
             {/* Surcouche transparente : contour de la case survolée */}
             <canvas
@@ -1524,9 +1892,9 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 ref={tooltipRef}
                 style={{
                     position: 'absolute', display: 'none', pointerEvents: 'none', zIndex: 200,
-                    background: 'rgba(15, 15, 20, 0.95)', border: '1px solid #555', borderRadius: 4,
-                    padding: '4px 8px', fontSize: '0.8em', color: '#ddd', whiteSpace: 'nowrap',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                    background: 'rgba(15, 23, 42, 0.95)', border: '1px solid #334155', borderRadius: 6,
+                    padding: '5px 10px', fontSize: '0.8rem', color: '#f1f5f9', whiteSpace: 'nowrap',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
                 }}
             />
         </div>);
