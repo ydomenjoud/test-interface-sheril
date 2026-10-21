@@ -760,7 +760,7 @@ export default function Carte() {
           {/* Le ré-ouverture du panneau info se fait depuis la barre d'outils (« Détails » / Alt + I) :
               pas de bouton en double sur la carte */}
           {showMiniMap && <MiniMap onCenter={(x, y) => setCenter({ x, y })} colorMode={colorMode} />}
-          {/* Légende des couleurs (mode Par diplo) : la carte se suffit à elle-même au coup d'œil */}
+          {/* Légende des couleurs — la carte se suffit à elle-même au coup d'œil */}
           {colorMode === 'status' && (
             <div className="map-legend" title="Couleurs de possession des systèmes et des flottes">
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#10b981' }} /> moi</span>
@@ -768,8 +768,17 @@ export default function Carte() {
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#fde047' }} /> PNA</span>
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#ef4444' }} /> ennemi</span>
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#94a3b8' }} /> neutre</span>
-              <span className="map-legend-item"><span className="map-legend-dot map-legend-fleet" /> flotte</span>
-              <span className="map-legend-item" title="Système avec une capacité de réparation (bordure blanche épaisse sur le disque)"><span className="map-legend-dot" style={{ background: 'transparent', border: '3px solid #fff' }} /> réparation</span>
+              <span className="map-legend-item" title="Système avec une capacité de réparation (insigne « + » en haut-gauche de la case)"><span className="map-legend-dot" style={{ background: '#0f172a', border: '1.5px solid #cbd5e1', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>+</span> réparation</span>
+            </div>
+          )}
+          {colorMode === 'race' && (
+            <div className="map-legend" title="Les couleurs représentent les races. L'insigne « + » indique un centre de réparation.">
+              <span className="map-legend-item" title="Centre de réparation (insigne « + » en haut-gauche de la case)"><span className="map-legend-dot" style={{ background: '#0f172a', border: '1.5px solid #cbd5e1', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>+</span> réparation</span>
+            </div>
+          )}
+          {colorMode === 'player' && (
+            <div className="map-legend" title="Les couleurs représentent les joueurs. L'insigne « + » indique un centre de réparation.">
+              <span className="map-legend-item" title="Centre de réparation (insigne « + » en haut-gauche de la case)"><span className="map-legend-dot" style={{ background: '#0f172a', border: '1.5px solid #cbd5e1', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>+</span> réparation</span>
             </div>
           )}
           {/* Filtres avancés : monté uniquement quand il est ouvert (⚙ de la barre d'outils) — pas
