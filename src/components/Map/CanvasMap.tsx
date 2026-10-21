@@ -1071,15 +1071,38 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 cRing.restore();
             }
 
-            // Système avec une capacité de réparation > 0 : bordure blanche épaisse (légende « réparation »)
+            // Capacité de réparation > 0 : petit insigne « + » en haut-gauche de la case.
+            // (Avant : anneau blanc épais autour du disque — visuellement dominant, il
+            // rivalisait avec la sélection et lavait le contraste des systèmes voisins.)
             const reparation = reparationByPos.get(`${s.pos.x}_${s.pos.y}`) ?? 0;
             if (reparation > 0 && isSystemSelected(owners)) {
+                const chip = Math.max(10, Math.round(cellSize * 0.42));
+                const pad = Math.max(2, Math.round(cellSize * 0.06));
+                const bx = px + pad;
+                const by = py + pad;
+                const cr = Math.max(2, chip * 0.25);
                 const cRep = ctx as CanvasRenderingContext2D;
                 cRep.save();
-                cRep.strokeStyle = '#ffffff';
-                cRep.lineWidth = Math.max(2, Math.round(cellSize * 0.09));
                 cRep.beginPath();
-                cRep.arc(cx, cy, radius + 2, 0, Math.PI * 2);
+                cRep.moveTo(bx + cr, by);
+                cRep.arcTo(bx + chip, by, bx + chip, by + chip, cr);
+                cRep.arcTo(bx + chip, by + chip, bx, by + chip, cr);
+                cRep.arcTo(bx, by + chip, bx, by, cr);
+                cRep.arcTo(bx, by, bx + chip, by, cr);
+                cRep.closePath();
+                cRep.fillStyle = 'rgba(10, 15, 25, 0.9)';
+                cRep.fill();
+                cRep.strokeStyle = 'rgba(226, 232, 240, 0.7)';
+                cRep.lineWidth = 1;
+                cRep.stroke();
+                const m = Math.max(2.5, chip * 0.28);
+                cRep.strokeStyle = '#f8fafc';
+                cRep.lineWidth = Math.max(1.4, chip * 0.12);
+                cRep.beginPath();
+                cRep.moveTo(bx + chip / 2, by + m);
+                cRep.lineTo(bx + chip / 2, by + chip - m);
+                cRep.moveTo(bx + m, by + chip / 2);
+                cRep.lineTo(bx + chip - m, by + chip / 2);
                 cRep.stroke();
                 cRep.restore();
             }
