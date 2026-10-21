@@ -820,19 +820,32 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
         });
 
-        // Dessin unique des cases détectées, en bleu transparent uniforme
+        // Dessin unique des cases détectées : aplat très léger + liseré périphérique.
+        // L'œil lit la frontière de la zone sans que le bleu n'écrase le contenu.
         const cScan = ctx as CanvasRenderingContext2D;
         cScan.save();
         cScan.globalAlpha = 1.0;
-        cScan.fillStyle = 'rgba(0, 128, 255, 0.22)'; // bleu transparent
+        cScan.fillStyle = 'rgba(56, 150, 255, 0.07)';
         detected.forEach(key => {
             const [ixStr, iyStr] = key.split(',');
             const ix = Number(ixStr);
             const iy = Number(iyStr);
+            cScan.fillRect(ix * cellSize, iy * cellSize, cellSize, cellSize);
+        });
+        // Liseré : trait sur chaque arête dont le voisin n'est pas détecté
+        cScan.strokeStyle = 'rgba(56, 150, 255, 0.35)';
+        cScan.lineWidth = 1;
+        cScan.beginPath();
+        detected.forEach(key => {
+            const [ix, iy] = key.split(',').map(Number);
             const px = ix * cellSize;
             const py = iy * cellSize;
-            cScan.fillRect(px, py, cellSize, cellSize);
+            if (!detected.has(`${ix},${iy - 1}`)) { cScan.moveTo(px, py); cScan.lineTo(px + cellSize, py); }
+            if (!detected.has(`${ix},${iy + 1}`)) { cScan.moveTo(px, py + cellSize); cScan.lineTo(px + cellSize, py + cellSize); }
+            if (!detected.has(`${ix - 1},${iy}`)) { cScan.moveTo(px, py); cScan.lineTo(px, py + cellSize); }
+            if (!detected.has(`${ix + 1},${iy}`)) { cScan.moveTo(px + cellSize, py); cScan.lineTo(px + cellSize, py + cellSize); }
         });
+        cScan.stroke();
 
         // INDICATEURS DE NOTES
         Object.keys(notes).forEach(noteKey => {
