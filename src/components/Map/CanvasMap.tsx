@@ -616,48 +616,88 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
         }
 
-        // grille + en-têtes
+        // grille + en-têtes — densité adaptative : en dézoomant on ne garde que les repères
+        // (×5, ×20) ; la grille fine complète ne sert que lorsque les cases sont lisibles.
+        const showMinorGrid = cellSize >= 26;
+        // En dessous de ~14px par case, un chiffre ne rentre plus dans l'en-tête : coches seules
+        const headerLabelEvery = cellSize >= 30 ? 1 : 5;
+        const showHeaderLabels = cellSize >= 14;
         for (let r = 0; r <= rows; r++) {
             const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
             const yPos = r * cellSize;
-            if ((xCoord - 1) % 20 === 0) ctx.strokeStyle = '#1e3a5f'; else if ((xCoord - 1) % 5 === 0) ctx.strokeStyle = '#2d3748'; else ctx.strokeStyle = '#1e293b';
-            ctx.beginPath();
-            ctx.moveTo(0, yPos);
-            ctx.lineTo(cols * cellSize, yPos);
-            ctx.stroke();
+            const isMajor20 = (xCoord - 1) % 20 === 0;
+            const isMajor5 = (xCoord - 1) % 5 === 0;
+            if (showMinorGrid || isMajor5 || isMajor20) {
+                ctx.lineWidth = isMajor20 ? 1.2 : 1;
+                if (isMajor20) ctx.strokeStyle = '#274058';
+                else if (isMajor5) ctx.strokeStyle = '#1e2a38';
+                else ctx.strokeStyle = 'rgba(30, 41, 59, 0.55)';
+                ctx.beginPath();
+                ctx.moveTo(0, yPos);
+                ctx.lineTo(cols * cellSize, yPos);
+                ctx.stroke();
+                ctx.lineWidth = 1;
+            }
 
             // Fond opaque pour l'en-tête de ligne (surligné si c'est la ligne de la case sélectionnée)
             const rowSelected = r > 0 && selected?.x === xCoord;
             ctx.fillStyle = rowSelected ? '#38bdf8' : '#141c28';
             ctx.fillRect(0, yPos, cellSize, cellSize);
 
-            ctx.fillStyle = rowSelected ? '#0b0f17' : '#94a3b8';
-            ctx.font = 'bold 12px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(String(xCoord), cellSize / 2, yPos + cellSize / 2);
+            // Chiffres tous les 5 (sinon coches discrètes) : le chrome ne doit pas
+            // crier plus fort que le contenu (compteurs de flottes, marqueurs).
+            if (showHeaderLabels && (rowSelected || xCoord % headerLabelEvery === 0)) {
+                ctx.fillStyle = rowSelected ? '#0b0f17' : '#7d8ba0';
+                ctx.font = '600 10px system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(String(xCoord), cellSize / 2, yPos + cellSize / 2);
+            } else {
+                ctx.fillStyle = '#3b475a';
+                ctx.fillRect(cellSize / 2 - 1, yPos + cellSize / 2 - 1, 2, 2);
+            }
         }
 
         for (let c = 0; c <= cols; c++) {
             const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
             const xPos = c * cellSize;
-            if ((yCoord - 1) % 20 === 0) ctx.strokeStyle = '#1e3a5f'; else if ((yCoord - 1) % 5 === 0) ctx.strokeStyle = '#2d3748'; else ctx.strokeStyle = '#1e293b';
-            ctx.beginPath();
-            ctx.moveTo(xPos, 0);
-            ctx.lineTo(xPos, rows * cellSize);
-            ctx.stroke();
+            const isMajor20 = (yCoord - 1) % 20 === 0;
+            const isMajor5 = (yCoord - 1) % 5 === 0;
+            if (showMinorGrid || isMajor5 || isMajor20) {
+                ctx.lineWidth = isMajor20 ? 1.2 : 1;
+                if (isMajor20) ctx.strokeStyle = '#274058';
+                else if (isMajor5) ctx.strokeStyle = '#1e2a38';
+                else ctx.strokeStyle = 'rgba(30, 41, 59, 0.55)';
+                ctx.beginPath();
+                ctx.moveTo(xPos, 0);
+                ctx.lineTo(xPos, rows * cellSize);
+                ctx.stroke();
+                ctx.lineWidth = 1;
+            }
 
             // Fond opaque pour l'en-tête de colonne (surligné si c'est la colonne de la case sélectionnée)
             const colSelected = c > 0 && selected?.y === yCoord;
             ctx.fillStyle = colSelected ? '#38bdf8' : '#141c28';
             ctx.fillRect(xPos, 0, cellSize, cellSize);
 
-            ctx.fillStyle = colSelected ? '#0b0f17' : '#94a3b8';
-            ctx.font = 'bold 12px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(String(yCoord), xPos + cellSize / 2, cellSize / 2);
+            if (showHeaderLabels && (colSelected || yCoord % headerLabelEvery === 0)) {
+                ctx.fillStyle = colSelected ? '#0b0f17' : '#7d8ba0';
+                ctx.font = '600 10px system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(String(yCoord), xPos + cellSize / 2, cellSize / 2);
+            } else {
+                ctx.fillStyle = '#3b475a';
+                ctx.fillRect(xPos + cellSize / 2 - 1, cellSize / 2 - 1, 2, 2);
+            }
         }
+
+        // Repère d'axes dans la case d'angle (x = lignes ↓, y = colonnes →)
+        ctx.fillStyle = '#5b6b80';
+        ctx.font = '600 9px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('x↓', cellSize / 2, cellSize / 2);
 
         // ZONES MANUELLES – rectangles saisis à la main (coin haut-gauche = case cliquée)
 
