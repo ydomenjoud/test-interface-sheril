@@ -8,7 +8,10 @@ import {drawCombatMarkers} from '../../utils/combatMarkers';
 import {Alliance, GlobalData, XY, Zone} from '../../types';
 import {lightenHexColor, getColorForPlayer} from "../../utils/global";
 import {isTypingTarget} from '../../utils/keyboard';
-import {FleetCellSummary, FleetFormation, MapFleet, formationShortLabel, verboseCompositionLabel} from '../../utils/fleetModel';
+import {FleetCellSummary, MapFleet, verboseCompositionLabel} from '../../utils/fleetModel';
+import {drawFleetScene} from '../../utils/fleetLayout';
+import {projectFleetRoute, visibleFleetCopies} from '../../utils/fleetProjection';
+import {drawFleetCell} from './fleets/drawFleetLayer';
 
 const OWNER_BADGE_COLORS: Record<number, string> = {
     1: '#0066CC',
@@ -505,6 +508,8 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         const topX = wrapX(currentCenter.x - halfRows);
         const leftY = wrapY(currentCenter.y - halfCols);
+
+        const fleetView = {topX, leftY, rows, cols, cellSize, maxX: BOUNDS.maxX, maxY: BOUNDS.maxY};
 
         // Préparation des influenceurs pour la couche d'influence
         const influencers: { owner: number, pos: XY }[] = [];
@@ -1201,14 +1206,13 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         }
 
         // Flèche (direction / ordre de déplacement) : trait + pointe pleine, clipée à la grille.
-        // Déclarée AVANT le passage des flottes qui l'appelle via renderFleetCell (la fonction est
-        // hoistée, le const lui ne l'est pas — ordre d'exécution respecté ici)
+        // Les directions du rapport et les ordres partagent la projection torique et le clip.
         const drawArrow = (c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, color = '#f59e0b') => {
             const headLen = Math.max(6, Math.floor(cellSize * 0.25));
             const angle = Math.atan2(y2 - y1, x2 - x1);
             c.save();
             c.beginPath();
-            c.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
+            c.rect(cellSize, cellSize, Math.max(0, cols - 1) * cellSize, Math.max(0, rows - 1) * cellSize);
             c.clip();
             c.strokeStyle = color;
             c.fillStyle = color;
@@ -1226,348 +1230,102 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             c.restore();
         };
 
-        // FLOTTES : une formation est un groupe « même commandant + même taille rapportée ».
-        // On ne somme et n'estime jamais les puissances : P/M/G/TG sont les libellés source.
-        if (showFleetBadges) {
-            fleetCells.forEach(summary => {
-                const pos = summary.pos;
-                let dx = ((pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
-                let dy = ((pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
-                while (dx < cols) {
-                    if (dx === 0) {
-                        dx += BOUNDS.maxY;
-                        continue;
-                    }
-                    let currentDy = dy;
-                    while (currentDy < rows) {
-                        if (currentDy === 0) {
-                            currentDy += BOUNDS.maxX;
-                            continue;
-                        }
-                        renderFleetCell(summary, dx * cellSize, currentDy * cellSize);
-                        currentDy += BOUNDS.maxX;
-                    }
-                    dx += BOUNDS.maxY;
-                }
-            });
-        }
-
-        function renderFleetCell(summary: FleetCellSummary, px: number, py: number) {
-            const c2d = ctx as CanvasRenderingContext2D;
-            const formations = summary.formations;
-            if (formations.length === 0) return; // filtre de puissance : on cache réellement les formations
-
-            const maxVisible = fleetFocus ? 4 : (cellSize < 20 ? 2 : 3);
-            const visibleFormations = formations.slice(0, maxVisible);
-            const cx = px + cellSize / 2;
-            const cy = py + cellSize / 2;
-            const offsets = visibleFormations.length === 1
-                ? [{x: 0, y: 0}]
-                : visibleFormations.length === 2
-                    ? [{x: -0.20, y: 0}, {x: 0.20, y: 0}]
-                    : visibleFormations.length === 3
-                        ? [{x: -0.19, y: -0.17}, {x: 0.19, y: -0.17}, {x: 0, y: 0.22}]
-                        : [{x: -0.18, y: -0.18}, {x: 0.18, y: -0.18}, {x: -0.18, y: 0.18}, {x: 0.18, y: 0.18}];
-            // La forme reste volontairement très grande en focus : c'est une vue tactique,
-            // pas un badge ajouté à une carte de systèmes.
-            const compactFactor = visibleFormations.length > 1 ? (fleetFocus ? 0.84 : 0.76) : 1;
-            const normalSizeByRank = [0.52, 0.64, 0.76, 0.90, 1.02];
-            const focusSizeByRank = [0.66, 0.78, 0.90, 1.04, 1.16];
-            const sizeByRank = fleetFocus ? focusSizeByRank : normalSizeByRank;
-            const positioned = visibleFormations.map((formation, index) => {
-                const offset = offsets[index];
-                const rank = Math.max(0, formation.primary.rank);
-                const baseSize = formation.primary.band === 'unknown' ? (fleetFocus ? 0.62 : 0.48) : sizeByRank[rank];
-                return {
-                    formation,
-                    x: cx + offset.x * cellSize,
-                    y: cy + offset.y * cellSize,
-                    size: Math.max(fleetFocus ? 8 : 6, cellSize * baseSize * compactFactor),
-                    selected: isFleetSelected(formation.owner),
-                };
-            });
-
-            // Triangle de puissance : la catégorie principale (F, P, M, G, AG…) avec le '+'
-            // rattaché directement. L'opacité indique la visibilité, pas le type de données.
-            const fleetFramePath = (x: number, y: number, size: number) => {
-                const halfW = size * 0.45;
-                const halfH = size * 0.45;
-                c2d.beginPath();
-                c2d.moveTo(x, y - halfH);
-                c2d.lineTo(x + halfW, y + halfH);
-                c2d.lineTo(x - halfW, y + halfH);
-                c2d.closePath();
-            };
-
-            const drawFleetMarker = (
-                x: number,
-                y: number,
-                size: number,
-                ownerColor: string,
-                formation: FleetFormation,
-                markerSelected: boolean,
-            ) => {
-                const selectedByOwnerFilter = markerSelected && !!selectedOwners?.length;
-                c2d.save();
-                if (!markerSelected) c2d.filter = 'grayscale(1)';
-
-                const halfW = size * 0.45;
-                const halfH = size * 0.45;
-
-                // Triangle principal
-                c2d.beginPath();
-                c2d.moveTo(x, y - halfH);
-                c2d.lineTo(x + halfW, y + halfH);
-                c2d.lineTo(x - halfW, y + halfH);
-                c2d.closePath();
-
-                if (fleetFocus) {
-                    c2d.fillStyle = 'rgba(2, 6, 23, 0.76)';
-                    c2d.fill();
-                }
-                c2d.strokeStyle = ownerColor;
-                c2d.globalAlpha = selectedByOwnerFilter ? 0.92 : 1;
-                c2d.lineWidth = Math.max(1, Math.min(2.5, cellSize * 0.052));
-                c2d.stroke();
-                c2d.globalAlpha = 1;
-
-                // Indice de puissance (0–10) : le plus grand possible dans le triangle.
-                if (cellSize >= 20 && size >= 11) {
-                    const text = formationShortLabel(formation);
-                    const fontSize = Math.max(10, Math.min(18, Math.floor(size * 0.55)));
-                    c2d.font = `800 ${fontSize}px system-ui, sans-serif`;
-                    c2d.fillStyle = ownerColor;
-                    c2d.textAlign = 'center';
-                    c2d.textBaseline = 'bottom';
-                    c2d.fillText(text, x, y + halfH - 2);
-
-                    // Deux petits triangles en haut pour les catégories complémentaires
-                    if (formation.composition.length > 1) {
-                        const smallR = size * 0.18;
-                        const baseY = y - halfH * 0.3;
-                        for (let i = 0; i < 2; i++) {
-                            const offsetX = (i - 0.5) * size * 0.36;
-                            c2d.beginPath();
-                            c2d.moveTo(x + offsetX - smallR * 1.4, baseY);
-                            c2d.lineTo(x + offsetX + smallR * 1.4, baseY);
-                            c2d.lineTo(x + offsetX, baseY - smallR * 2.5);
-                            c2d.closePath();
-                            c2d.fillStyle = withOpacity(ownerColor, 0.55);
-                            c2d.fill();
-                            c2d.strokeStyle = ownerColor;
-                            c2d.lineWidth = Math.max(1, size * 0.035);
-                            c2d.stroke();
-                        }
-                    }
-                }
-
-                if (formation.count > 1 && cellSize >= 24) {
-                    const label = `×${formation.count}`;
-                    c2d.font = '700 8px system-ui, sans-serif';
-                    c2d.textAlign = 'left';
-                    c2d.textBaseline = 'middle';
-                    const width = c2d.measureText(label).width + 4;
-                    c2d.fillStyle = '#0b1420';
-                    c2d.fillRect(x + size * 0.15, y - size * 0.12, width, 10);
-                    c2d.fillStyle = ownerColor;
-                    c2d.fillText(label, x + size * 0.15 + 2, y - size * 0.12 + 5);
-                }
-
-                if (selectedByOwnerFilter) {
-                    c2d.beginPath();
-                    c2d.arc(x, y, size * 0.49, 0, Math.PI * 2);
-                    c2d.strokeStyle = ownerColor;
-                    c2d.lineWidth = 2;
-                    c2d.stroke();
-                }
-                c2d.restore();
-            };
-
-            // Les directions du rapport se regroupent par cible à l'intérieur d'une même formation.
-            // Les ordres saisis restent rendus dans le passage dédié plus bas, au-dessus de la carte.
-            positioned.forEach(marker => {
-                const directionGroups = new Map<string, { target: XY; count: number }>();
-                marker.formation.fleets.forEach(fleet => {
-                    if (fleet.type === 'joueur' && deplacements && deplacements[fleet.num]) return;
-                    const target = fleet.type === 'joueur' ? fleet.direction : undefined;
+        // Passage GLOBAL : aucune direction d'une case ne repeint les marqueurs d'une autre.
+        const drawReportDirections = () => {
+            if (!showFleetBadges) return;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(cellSize, cellSize, Math.max(0, cols - 1) * cellSize, Math.max(0, rows - 1) * cellSize);
+            ctx.clip();
+            fleetCells.forEach(summary => summary.formations.forEach(formation => {
+                const directions = new Map<string, {target: XY; count: number}>();
+                formation.fleets.forEach(fleet => {
+                    if (fleet.type !== 'joueur' || deplacements?.[fleet.num]) return;
+                    const target = fleet.direction;
                     if (!target || (target.x === fleet.pos.x && target.y === fleet.pos.y)) return;
                     const key = `${target.x}_${target.y}`;
-                    const group = directionGroups.get(key);
-                    if (group) group.count += 1; else directionGroups.set(key, {target, count: 1});
+                    const group = directions.get(key);
+                    if (group) group.count += 1;
+                    else directions.set(key, {target, count: 1});
                 });
-                directionGroups.forEach(({target, count}) => {
-                    const tdx = ((target.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
-                    const tdy = ((target.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
-                    const tx = tdx * cellSize + cellSize / 2;
-                    const ty = tdy * cellSize + cellSize / 2;
-                    if (tx < 0 || ty < 0 || tx > cols * cellSize || ty > rows * cellSize) return;
-                    drawArrow(c2d, marker.x, marker.y, tx, ty, marker.selected ? '#f59e0b' : 'rgba(148, 163, 184, 0.55)');
-                    if (count > 1 && cellSize >= 34) {
-                        c2d.save();
-                        c2d.fillStyle = marker.selected ? '#fbbf24' : '#94a3b8';
-                        c2d.font = '600 9px system-ui, sans-serif';
-                        c2d.textAlign = 'center';
-                        c2d.textBaseline = 'middle';
-                        c2d.fillText(`×${count}`, (marker.x + tx) / 2, (marker.y + ty) / 2 - 7);
-                        c2d.restore();
-                    }
+                const selected = isFleetSelected(formation.owner);
+                directions.forEach(({target, count}) => {
+                    projectFleetRoute(summary.pos, target, fleetView).forEach(({from, to}) => {
+                        drawArrow(ctx, from.x, from.y, to.x, to.y, selected ? '#f59e0b' : '#64748b');
+                        if (count > 1 && cellSize >= 34) {
+                            ctx.fillStyle = selected ? '#fbbf24' : '#94a3b8';
+                            ctx.font = '600 9px system-ui, sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText(`×${count}`, (from.x + to.x) / 2, (from.y + to.y) / 2 - 7);
+                        }
+                    });
+                });
+            }));
+            ctx.restore();
+        };
+
+        const drawFleetMarkers = () => {
+            if (!showFleetBadges) return;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(cellSize, cellSize, Math.max(0, cols - 1) * cellSize, Math.max(0, rows - 1) * cellSize);
+            ctx.clip();
+            fleetCells.forEach(summary => {
+                if (!summary.visibleCount) return;
+                visibleFleetCopies(summary.pos, fleetView).forEach(({x, y}) => {
+                    drawFleetCell(ctx, summary, x, y, cellSize, {
+                        focus: fleetFocus,
+                        getOwnerColor: owner => colorForOwnership(currentPlayerId, [owner], rapport?.joueur.alliances,
+                            rapport?.joueur.pna, colorMode, global) || '#94a3b8',
+                        isOwnerSelected: isFleetSelected,
+                        hasOwnerFilter: !!selectedOwners?.length,
+                        deplacements,
+                    });
                 });
             });
+            ctx.restore();
+        };
 
-            positioned.forEach(marker => {
-                const {formation, x, y, size, selected: formationSelected} = marker;
-                const ownerColor = colorForOwnership(
-                    currentPlayerId,
-                    [formation.owner],
-                    rapport?.joueur.alliances,
-                    rapport?.joueur.pna,
-                    colorMode,
-                    global,
-                ) || '#94a3b8';
-                const hasPendingOrder = formation.fleets.some(fleet => fleet.type === 'joueur' && deplacements && deplacements[fleet.num]);
-                const hasOutOfRangeOrder = formation.fleets.some(fleet => {
-                    if (fleet.type !== 'joueur') return false;
-                    const target = deplacements?.[fleet.num];
-                    return !!target && getTorusDistance(fleet.pos, target) > fleet.vitesse;
+        const drawCombats = () => {
+            // Marqueurs de combat au-dessus des systèmes (S = spatial, P = planétaire)
+            if (showCombatBadges && combats.length > 0) {
+                const cCombat = ctx as CanvasRenderingContext2D;
+                cCombat.save();
+                for (let r = 0; r < rows; r++) {
+                    if (r === 0) continue;
+                    const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
+                    for (let c = 0; c < cols; c++) {
+                        if (c === 0) continue;
+                        const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
+                        const counts = countCombatsByKind(combats, {x: xCoord, y: yCoord});
+                        if (counts.spatial <= 0 && counts.planetary <= 0) continue;
+                        drawCombatMarkers(cCombat, c * cellSize, r * cellSize, cellSize, counts.spatial, counts.planetary);
+                    }
+                }
+                cCombat.restore();
+            }
+
+        };
+
+        const drawReachability = () => {
+            if (!showFleetsFor) return;
+            ctx.save();
+            ctx.globalAlpha = 0.65;
+            ctx.setLineDash([5, 5]);
+            rapport?.flottesJoueur.forEach(fleet => {
+                const color = getTorusDistance(fleet.pos, showFleetsFor) <= fleet.vitesse ? '#10b981' : '#f59e0b';
+                projectFleetRoute(fleet.pos, showFleetsFor, fleetView).forEach(({from, to}) => {
+                    drawArrow(ctx, from.x, from.y, to.x, to.y, color);
                 });
-
-                drawFleetMarker(x, y, size, ownerColor, formation, formationSelected);
-
-                // Déplacement saisi : bord vert si atteignable, rouge si hors portée.
-                if (hasPendingOrder) {
-                    c2d.save();
-                    c2d.strokeStyle = hasOutOfRangeOrder ? '#ef4444' : '#10b981';
-                    c2d.lineWidth = fleetFocus ? 2.5 : 2;
-                    fleetFramePath(x, y, size + Math.max(4, cellSize * 0.13));
-                    c2d.stroke();
-                    c2d.restore();
-                }
-                if (formationSelected && selectedOwners && selectedOwners.length > 0) {
-                    c2d.save();
-                    c2d.strokeStyle = '#f8fafc';
-                    c2d.lineWidth = 1;
-                    fleetFramePath(x, y, size + 2);
-                    c2d.stroke();
-                    c2d.restore();
-                }
             });
+            ctx.restore();
+        };
 
-            // Un groupe de plus que ce que la cellule peut lisiblement afficher reste signalé.
-            const hiddenCount = formations.length - visibleFormations.length;
-            if (hiddenCount > 0 && cellSize >= 20) {
-                const label = `+${hiddenCount}`;
-                const w = Math.max(14, 5 + label.length * 7);
-                const h = 13;
-                c2d.save();
-                c2d.fillStyle = 'rgba(2, 6, 23, 0.94)';
-                c2d.strokeStyle = '#64748b';
-                c2d.lineWidth = 1;
-                c2d.fillRect(cx - w / 2, py + cellSize - h - 2, w, h);
-                c2d.strokeRect(cx - w / 2, py + cellSize - h - 2, w, h);
-                c2d.fillStyle = '#e2e8f0';
-                c2d.font = '700 9px system-ui, sans-serif';
-                c2d.textAlign = 'center';
-                c2d.textBaseline = 'middle';
-                c2d.fillText(label, cx, py + cellSize - h / 2 - 2);
-                c2d.restore();
-            }
-        }
-
-        // Marqueurs de combat au-dessus des systèmes (S = spatial, P = planétaire)
-        if (showCombatBadges && combats.length > 0) {
-            const cCombat = ctx as CanvasRenderingContext2D;
-            cCombat.save();
-            for (let r = 0; r < rows; r++) {
-                if (r === 0) continue;
-                const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
-                for (let c = 0; c < cols; c++) {
-                    if (c === 0) continue;
-                    const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
-                    const counts = countCombatsByKind(combats, {x: xCoord, y: yCoord});
-                    if (counts.spatial <= 0 && counts.planetary <= 0) continue;
-                    drawCombatMarkers(cCombat, c * cellSize, r * cellSize, cellSize, counts.spatial, counts.planetary);
-                }
-            }
-            cCombat.restore();
-        }
-
-        // FLÈCHES DE DÉPLACEMENT (mes flottes vers showFleetsFor), indépendantes des badges de combat
-        if (showFleetsFor) {
-            const playerFleets = rapport?.flottesJoueur.filter(f => {
-                return !(f.pos.x === showFleetsFor.x && f.pos.y === showFleetsFor.y);
-            }) || [];
-
-            if (playerFleets.length > 0) {
-                ctx.save();
-
-                // Clip pour éviter de dessiner sur les en-têtes (colonne 0 et ligne 0)
-                ctx.beginPath();
-                ctx.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
-                ctx.clip();
-
-                ctx.lineWidth = 1;
-
-                playerFleets.forEach(f => {
-                    const dist = getTorusDistance(f.pos, showFleetsFor);
-                    const reachable = dist <= f.vitesse;
-
-                    // Couleur : émeraude clair si atteignable, ambre sinon
-                    ctx.strokeStyle = reachable ? '#10b981' : '#f59e0b';
-                    ctx.fillStyle = reachable ? 'rgba(16, 185, 129, 0)' : '#f59e0b';
-                    ctx.setLineDash([5, 5]);
-
-                    // On calcule le delta le plus court sur le tore
-                    let dx = showFleetsFor.x - f.pos.x;
-                    if (Math.abs(dx) > BOUNDS.maxX / 2) {
-                        dx = dx > 0 ? dx - BOUNDS.maxX : dx + BOUNDS.maxX;
-                    }
-                    let dy = showFleetsFor.y - f.pos.y;
-                    if (Math.abs(dy) > BOUNDS.maxY / 2) {
-                        dy = dy > 0 ? dy - BOUNDS.maxY : dy + BOUNDS.maxY;
-                    }
-
-                    const getScreenPos = (pos: XY) => {
-                        // Distance signée par rapport au centre, tenant compte du tore
-                        let offX = pos.x - currentCenter.x;
-                        if (offX > BOUNDS.maxX / 2) offX -= BOUNDS.maxX;
-                        if (offX < -BOUNDS.maxX / 2) offX += BOUNDS.maxX;
-
-                        let offY = pos.y - currentCenter.y;
-                        if (offY > BOUNDS.maxY / 2) offY -= BOUNDS.maxY;
-                        if (offY < -BOUNDS.maxY / 2) offY += BOUNDS.maxY;
-
-                        return {
-                            x: (halfCols + offY) * cellSize + cellSize / 2,
-                            y: (halfRows + offX) * cellSize + cellSize / 2
-                        };
-                    };
-
-                    const start = getScreenPos(f.pos);
-                    const end = getScreenPos(showFleetsFor);
-
-                    ctx.beginPath();
-                    ctx.moveTo(start.x, start.y);
-                    ctx.lineTo(end.x, end.y);
-                    ctx.stroke();
-
-                    // Petite flèche au bout
-                    const angle = Math.atan2(end.y - start.y, end.x - start.x);
-                    ctx.setLineDash([]);
-                    ctx.beginPath();
-                    ctx.moveTo(end.x, end.y);
-                    ctx.lineTo(end.x - 10 * Math.cos(angle - Math.PI / 6), end.y - 10 * Math.sin(angle - Math.PI / 6));
-                    ctx.lineTo(end.x - 10 * Math.cos(angle + Math.PI / 6), end.y - 10 * Math.sin(angle + Math.PI / 6));
-                    ctx.closePath();
-                    ctx.fill();
-                });
-                ctx.restore();
-            }
-        }
-
-        // Équerres blanches débordant de la case — style commun à la case sélectionnée et à la
-// surbrillance de case (survol d'une flotte dans le panneau info)
+        // Cadre commun à la sélection et au survol. En focus, les coins restent au bord
+        // intérieur de la case pour ne pas barrer les flottes des cases voisines.
         const drawCellCorners = (c2d: CanvasRenderingContext2D, px: number, py: number) => {
-            const m = Math.max(3, Math.round(cellSize * 0.15));
+            const m = fleetFocus ? -0.5 : Math.max(3, Math.round(cellSize * 0.15));
             const l = Math.max(5, Math.round(cellSize * 0.35));
             c2d.lineWidth = 2;
             c2d.strokeStyle = '#ffffff';
@@ -1583,99 +1341,81 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             c2d.stroke();
         };
 
-        // CASE SÉLECTIONNÉE (dessinée en dernier pour rester visible au-dessus de tout)
-        if (selected) {
-            const cSel = ctx as CanvasRenderingContext2D;
-            cSel.save();
-            cSel.beginPath();
-            cSel.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
-            cSel.clip();
+        const drawSelection = () => {
+            // Remplissage et cadre de sélection : sous les emblèmes en focus.
+            if (selected) {
+                const cSel = ctx as CanvasRenderingContext2D;
+                cSel.save();
+                cSel.beginPath();
+                cSel.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
+                cSel.clip();
 
-            let dx = ((selected.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
-            const dyBase = ((selected.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
-            while (dx < cols) {
-                if (dx === 0) {
-                    dx += BOUNDS.maxY;
-                    continue;
-                }
-                let dy = dyBase;
-                while (dy < rows) {
-                    if (dy === 0) {
-                        dy += BOUNDS.maxX;
-                        continue;
-                    }
-                    const px = dx * cellSize;
-                    const py = dy * cellSize;
-
-                    // Bandes discrètes sur la ligne et la colonne pour repérer la case
-                    cSel.fillStyle = 'rgba(56, 189, 248, 0.05)';
-                    cSel.fillRect(px, cellSize, cellSize, rows * cellSize);
-                    cSel.fillRect(cellSize, py, cols * cellSize, cellSize);
-
-                    // Remplissage léger de la case
-                    cSel.fillStyle = 'rgba(56, 189, 248, 0.16)';
-                    cSel.fillRect(px, py, cellSize, cellSize);
-
-                    // Contour : trait sombre puis trait clair pour être lisible sur tout fond
-                    cSel.lineWidth = 4;
-                    cSel.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-                    cSel.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
-                    cSel.lineWidth = 2;
-                    cSel.strokeStyle = '#38bdf8';
-                    cSel.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
-
-                    // Coins en équerre débordant de la case
-                    drawCellCorners(cSel, px, py);
-
-                    dy += BOUNDS.maxX;
-                }
-                dx += BOUNDS.maxY;
-            }
-            cSel.restore();
-        }
-
-        // FLÈCHES DES ORDRES DE DÉPLACEMENT : passage dédié par-dessus tout le reste (disques de flottes,
-        // marqueurs de combat, cadre de sélection) pour que la cible commandée ne soit jamais
-        // masquée. (L'anneau ambre de la case reste dessiné avec le marqueur.)
-        if (deplacements) {
-            for (const f of fleets) {
-                if (f.type !== 'joueur') continue;
-                const t = deplacements[f.num];
-                if (!t || (t.x === f.pos.x && t.y === f.pos.y)) continue;
-                // Delta le plus court sur le tore (même méthode que les flèches de portée)
-                let ddx = t.x - f.pos.x;
-                if (ddx > BOUNDS.maxX / 2) ddx -= BOUNDS.maxX;
-                if (ddx < -BOUNDS.maxX / 2) ddx += BOUNDS.maxX;
-                let ddy = t.y - f.pos.y;
-                if (ddy > BOUNDS.maxY / 2) ddy -= BOUNDS.maxY;
-                if (ddy < -BOUNDS.maxY / 2) ddy += BOUNDS.maxY;
-                // Hors de la portée de la flotte : flèche rouge (à portée : émeraude).
-                const cDeplacement = getTorusDistance(f.pos, t) > f.vitesse ? '#ef4444' : '#10b981';
-                // La flèche part de chaque copie de la case de la flotte visible dans le viewport
-                // (viewport plus grand que le tore : mêmes copies que le passage des disques)
-                let dx = ((f.pos.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
-                let dy = ((f.pos.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
+                let dx = ((selected.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
+                const dyBase = ((selected.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
                 while (dx < cols) {
                     if (dx === 0) {
                         dx += BOUNDS.maxY;
                         continue;
                     }
-                    let currentDy = dy;
-                    while (currentDy < rows) {
-                        if (currentDy === 0) {
-                            currentDy += BOUNDS.maxX;
+                    let dy = dyBase;
+                    while (dy < rows) {
+                        if (dy === 0) {
+                            dy += BOUNDS.maxX;
                             continue;
                         }
-                        const fx = dx * cellSize + cellSize / 2;
-                        const fy = currentDy * cellSize + cellSize / 2;
-                        // X = ligne (vertical), Y = colonne (horizontal)
-                        drawArrow(ctx as CanvasRenderingContext2D, fx, fy, fx + ddy * cellSize, fy + ddx * cellSize, cDeplacement);
-                        currentDy += BOUNDS.maxX;
+                        const px = dx * cellSize;
+                        const py = dy * cellSize;
+
+                        // Bandes discrètes sur la ligne et la colonne pour repérer la case
+                        cSel.fillStyle = 'rgba(56, 189, 248, 0.05)';
+                        cSel.fillRect(px, cellSize, cellSize, rows * cellSize);
+                        cSel.fillRect(cellSize, py, cols * cellSize, cellSize);
+
+                        // Remplissage léger de la case
+                        cSel.fillStyle = 'rgba(56, 189, 248, 0.16)';
+                        cSel.fillRect(px, py, cellSize, cellSize);
+
+                        // Contour : trait sombre puis trait clair pour être lisible sur tout fond
+                        cSel.lineWidth = 4;
+                        cSel.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+                        cSel.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
+                        cSel.lineWidth = 2;
+                        cSel.strokeStyle = '#38bdf8';
+                        cSel.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
+
+                        // Coins en équerre débordant de la case
+                        drawCellCorners(cSel, px, py);
+
+                        dy += BOUNDS.maxX;
                     }
                     dx += BOUNDS.maxY;
                 }
+                cSel.restore();
             }
-        }
+
+        };
+
+        const drawOrders = () => {
+            if (!deplacements) return;
+            fleetCells.forEach(summary => summary.formations.forEach(formation => {
+                formation.fleets.forEach(fleet => {
+                    if (fleet.type !== 'joueur') return;
+                    const target = deplacements[fleet.num];
+                    if (!target) return;
+                    const color = getTorusDistance(fleet.pos, target) > fleet.vitesse ? '#ef4444' : '#10b981';
+                    projectFleetRoute(fleet.pos, target, fleetView).forEach(({from, to}) => {
+                        drawArrow(ctx, from.x, from.y, to.x, to.y, color);
+                    });
+                });
+            }));
+        };
+
+        // En focus, TOUTES les routes persistantes et tous les remplissages passent sous les flottes.
+        // En vue normale, on conserve la priorité des ordres par-dessus les marqueurs.
+        drawFleetScene(fleetFocus, {
+            reportRoutes: drawReportDirections, fleets: drawFleetMarkers, combats: drawCombats,
+            reachability: drawReachability, selection: drawSelection, orders: drawOrders,
+        });
 
         // SURBRILLANCE DE CASE (survol d'une flotte dans le panneau info) : même style que la case
         // sélectionnée (équerres blanches), par-dessus les flèches, sous le drag en cours

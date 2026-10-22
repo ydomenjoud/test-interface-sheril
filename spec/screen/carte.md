@@ -252,9 +252,12 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 - La flotte apparaît « modifiée par rapport au rapport » : anneau ambre (#ff9800) et flèche vers sa nouvelle
   destination (qui remplace la direction du rapport, rappelée ⚠ « déjà en route vers x_y » dans le panneau quand
   le rapport en avait une).
-- La flèche d'ordre de déplacement est dessinée dans un passage dédié PAR-DESSUS TOUT le reste de la carte
-  (disques de flottes, marqueurs de combat, cadre de sélection) : la cible commandée n'est jamais masquée
-  (seuls le tracé du glisser en cours et la surbrillance de survol d'une flotte se dessinent au-dessus).
+- En vue normale, la flèche d'ordre de déplacement reste au-dessus des marqueurs de flottes, des combats
+  et du cadre de sélection. En **focus flottes**, exception explicite : systèmes, combats, remplissages de
+  sélection et TOUTES les routes persistantes (rapport, portée, ordres) sont dessinés avant le passage
+  global des emblèmes de flottes, sur fond opaque. Le survol et le glisser actif restent au-dessus.
+- Les directions du rapport et les ordres utilisent le même delta court torique, pour toutes les copies
+  visibles du tore. Aucun tracé de direction d'une case ne repeint les marqueurs d'une autre case.
 - Couleur de la flèche : verte (#4caf50) si la destination est à portée de la flotte ce tour, rouge (#f44336) sinon.
   L'orange (#ff9800) est réservé aux flèches de « direction » préexistantes du rapport.
 
