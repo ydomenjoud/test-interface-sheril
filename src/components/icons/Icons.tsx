@@ -109,6 +109,19 @@ export function IconFleetMove({ size = 16, className, style, color, strokeWidth 
   );
 }
 
+/** Focus frame / viewfinder : la flotte au centre, le reste s'écarte */
+export function IconFleetFocus({ size = 16, className, style, color, strokeWidth = 2 }: IconProps) {
+  return (
+    <svg {...baseProps(size, color, strokeWidth)} className={className} style={style}>
+      <path d="M4 9V6a2 2 0 0 1 2-2h3" />
+      <path d="M15 4h3a2 2 0 0 1 2 2v3" />
+      <path d="M20 15v3a2 2 0 0 1-2 2h-3" />
+      <path d="M9 20H6a2 2 0 0 1-2-2v-3" />
+      <circle cx="12" cy="12" r="3" fill="currentColor" fillOpacity="0.25" />
+    </svg>
+  );
+}
+
 /** Media Play icon */
 export function IconPlay({ size = 14, className, style, color }: IconProps) {
   return (
