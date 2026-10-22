@@ -4,7 +4,6 @@ import CanvasMap, {ZoneRect} from '../components/Map/CanvasMap';
 import {FleetSizeBand, buildFleetCells, mapFleetsForReport, restoreFleetSizeBands} from '../utils/fleetModel';
 import MiniMap from '../components/Map/MiniMap';
 import InfoPanel from '../components/Map/InfoPanel';
-import {FleetInspection} from '../components/Map/fleets/FleetRoster';
 import FleetFilters from '../components/Map/fleets/FleetFilters';
 import {useStoredFleetOrders} from '../components/Map/fleets/useStoredFleetOrders';
 import ZoneDialog from '../components/Map/ZoneDialog';
@@ -75,7 +74,6 @@ export default function Carte() {
     setZonePreview(undefined); // validée ou annulée, l'aperçu disparaît
   }, []);
   const [selected, setSelected] = useState<XY | undefined>(undefined);
-  const [fleetInspection, setFleetInspection] = useState<FleetInspection | undefined>();
   // Case mise en surbrillance sur la carte quand on survole une ligne de flotte du panneau info
   const [hoverFleetPos, setHoverFleetPos] = useState<XY | undefined>(undefined);
   const [showFleetsFor, setShowFleetsFor] = useState<XY | undefined>(undefined);
@@ -770,7 +768,6 @@ export default function Carte() {
             previewZone={zonePreview}
             onSelect={(xy, ctrl) => {
               setSelected(xy);
-              setFleetInspection(undefined);
               if (ctrl) {
                 setShowFleetsFor(xy);
               } else {
@@ -789,11 +786,7 @@ export default function Carte() {
             fleetFocus={fleetFocus}
             fleets={mapFleets}
             fleetCells={fleetCells}
-            onFleetInspect={(pos, owner, keyboard) => {
-              setSelected(pos);
-              setFleetInspection({pos, owner, focus: keyboard});
-              setInfoPanelCollapsed(false);
-            }}
+            
             showSystemRadar={showSystemRadar}
             showFleetRadar={showFleetRadar}
             showSectors={showSectors}
@@ -1391,9 +1384,6 @@ par diplo
           onClose={() => setInfoPanelCollapsed(true)}
           onMoveFleet={onMoveFleetToSelected}
           colorMode={colorMode}
-          fleetSummary={selected ? fleetCells.get(`${selected.x}_${selected.y}`) : undefined}
-          fleetInspection={fleetInspection}
-          onOpenFleetPicker={onFleetCellMouseDown}
         />
       </div>
 

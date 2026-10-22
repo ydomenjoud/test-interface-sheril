@@ -26,8 +26,6 @@ const SECTIONS: { title: string; items: Shortcut[] }[] = [
             {keys: [['Zoom']], description: 'Sous 24 px : lettre seule ; à partir de 64 px : en-têtes détaillés en focus et lignes par commandant'},
             {keys: [['c / cdt']], description: 'Nombre de commandants distincts ; +N cdt indique le surplus de commandants'},
             {keys: [['?']], description: 'Puissance inconnue, toujours incluse ; Mes flottes et Flottes neutres filtrent les propriétaires'},
-            {keys: [['Clic sur un contact']], description: 'Inspecter les flottes par commandant ; une ligne étrangère ne déclenche jamais vos ordres'},
-            {keys: [['Entrée sur la carte']], description: 'Ouvrir le détail de la case sélectionnée au clavier ; Tab atteint les boutons de commandants'},
         ],
     },
     {

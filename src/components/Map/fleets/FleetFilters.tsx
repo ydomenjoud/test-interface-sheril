@@ -1,5 +1,5 @@
 import React from 'react';
-import {FLEET_SIZE_BAND_OPTIONS, FleetOwnerVisibility, FleetSizeBand, KNOWN_FLEET_SIZE_BANDS} from '../../../utils/fleetModel';
+import {FLEET_SIZE_BAND_OPTIONS, FleetOwnerVisibility, FleetSizeBand} from '../../../utils/fleetModel';
 import './FleetFilters.css';
 
 type Props = {
@@ -13,11 +13,6 @@ type Props = {
     onBandsChange: (bands: FleetSizeBand[]) => void;
     onVisibilityChange: (visibility: FleetOwnerVisibility) => void;
 };
-const presets: {label: string; bands: readonly FleetSizeBand[]}[] = [
-    {label: 'Tout', bands: KNOWN_FLEET_SIZE_BANDS},
-    {label: 'Moyenne +', bands: ['moyenne', 'grande', 'massive']},
-    {label: 'Grande +', bands: ['grande', 'massive']},
-];
 
 /** Compteurs et contrôles de flottes restent dans Filtres, pas dans la barre d'outils. */
 export default function FleetFilters({enabled, focus, bands, visibility, visibleCount, totalCount,
@@ -53,15 +48,6 @@ export default function FleetFilters({enabled, focus, bands, visibility, visible
                     </button>
                 ))}
             </div>
-            <div className="fleet-filter-buttons fleet-filter-presets">
-                {presets.map(preset => (
-                    <button key={preset.label} type="button" disabled={!enabled}
-                        aria-pressed={preset.bands.length === bands.filter(band => band !== 'unknown').length
-                            && preset.bands.every(band => bands.includes(band))}
-                        onClick={() => changeBands(preset.bands)}>{preset.label}</button>
-                ))}
-            </div>
-            <small>Les puissances inconnues restent incluses.</small>
         </div>
     );
 }

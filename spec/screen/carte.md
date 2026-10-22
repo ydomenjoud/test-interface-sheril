@@ -336,7 +336,7 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
   curseur 16–64 px). Nos flottes sont prioritaires, les autres commandants sont ordonnés par numéro,
   pas par puissance : leur emplacement ne saute pas lorsque la puissance change.
 - Les couleurs conservent leur sens diplomatique, racial ou par joueur. Le numéro de commandant des
-  lignes et le panneau de détail distinguent les commandants partageant une même couleur. L'absence
+  lignes distingue les commandants partageant une même couleur. L'absence
   de PNA/alliance est libellée « sans accord », pas une déclaration certaine d'hostilité.
 - Les contacts de puissance inconnue restent automatiquement inclus dans les filtres de puissance ;
   les anciens réglages sont migrés sans les laisser invisibles derrière un contrôle supprimé.
@@ -347,19 +347,6 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
   Ces filtres ne suppriment ni données du rapport ni ordres préparés ; le détail reste complet.
 - Le compteur flottes visibles / total du rapport est dans le menu Filtres, pas dans la barre d'outils ;
   le détail conserve les comptes par case.
-- Clic sur un contact multiple, un surplus ou une ligne étrangère : ouvre le panneau de détail,
-  même s'il était replié, sans ouvrir le sélecteur de NOS ordres. Clic sur notre emblème : conserve le
-  sélecteur de déplacement. Clic sur le fond d'une case avec nos flottes visibles : geste existant.
-  Ctrl+clic reste réservé à la portée et Alt+glisser aux zones ; un pan annule le sélecteur.
-- Le panneau « Présence de flottes » liste TOUS les commandants du rapport de la case, avec compteur,
-  source, maximum connu visible, puis composition et flottes dépliables. Les flottes masquées par un
-  filtre sont signalées, mais restent consultables. Les dernières détections d'un ancien tour restent
-  dans une section séparée, avec leur avertissement d'obsolescence.
-- L'action explicite « Préparer un déplacement de mes flottes d'ici » réutilise FleetPicker et le même
-  schéma d'ordres. Aucune action de déplacement n'est proposée pour une détection étrangère.
-- Clavier : Tab atteint le canvas ; Maj+flèches sélectionne une case, Entrée ouvre l'inspection et donne
-  le focus au titre. Tab atteint les boutons de commandants, Entrée/Espace déplie leur contenu,
-  Échap replie le groupe et garde le focus sur son bouton. Aucune nouvelle dépendance n'est nécessaire.
 - Le chargement des ordres est gardé par l'identité du rapport, le tour et le compteur d'import :
   les effets ne peuvent pas écraser un tour avec l'état du précédent pendant l'hydratation, même
   sous StrictMode. Le stockage JSON, les directives, l'export du schéma et la remise à zéro lors d'un

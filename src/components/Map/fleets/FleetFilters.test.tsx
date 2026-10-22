@@ -24,14 +24,14 @@ describe('simplified fleet filters', () => {
         expect(screen.queryByRole('checkbox', {name: /inconnue/i})).not.toBeInTheDocument();
         expect(screen.queryByRole('button', {name: /Inconnues seules/i})).not.toBeInTheDocument();
     });
-    it('changes ownership independently of the strength preset', () => {
+    it('changes ownership independently of the strength bands', () => {
         render(<Controlled />);
         const own = screen.getByRole('checkbox', {name: 'Mes flottes'});
         const neutral = screen.getByRole('checkbox', {name: 'Flottes neutres'});
         userEvent.click(own);
         expect(own).not.toBeChecked();
         expect(neutral).toBeChecked();
-        userEvent.click(screen.getByRole('button', {name: 'Grande +'}));
+        userEvent.click(screen.getByRole('button', {name: 'Très grande +'}));
         expect(own).not.toBeChecked();
         expect(neutral).toBeChecked();
         userEvent.click(neutral);
@@ -40,8 +40,8 @@ describe('simplified fleet filters', () => {
     it('always includes unknown strength without a dedicated toggle, even after a legacy value', () => {
         const onBandsChange = jest.fn();
         render(<FleetFilters {...base} bands={['weak']} onBandsChange={onBandsChange} />);
-        userEvent.click(screen.getByRole('button', {name: 'Grande +'}));
-        expect(onBandsChange).toHaveBeenLastCalledWith(['grande', 'massive', 'unknown']);
+        userEvent.click(screen.getByRole('button', {name: 'Très grande +'}));
+        expect(onBandsChange).toHaveBeenLastCalledWith(['weak', 'massive', 'unknown']);
         userEvent.click(screen.getByRole('button', {name: 'Faible'}));
         expect(onBandsChange).toHaveBeenLastCalledWith(['unknown']);
     });
@@ -50,7 +50,7 @@ describe('simplified fleet filters', () => {
         render(<FleetFilters {...base} enabled={false} focus={false} onFocusChange={onFocusChange} />);
         expect(screen.getByRole('checkbox', {name: 'Mes flottes'})).toBeDisabled();
         expect(screen.getByRole('checkbox', {name: 'Flottes neutres'})).toBeDisabled();
-        expect(screen.getByRole('button', {name: 'Grande +'})).toBeDisabled();
+        expect(screen.getByRole('button', {name: 'Faible'})).toBeDisabled();
         userEvent.click(screen.getByRole('checkbox', {name: 'Mode focus'}));
         expect(onFocusChange).toHaveBeenCalledWith(true);
     });
