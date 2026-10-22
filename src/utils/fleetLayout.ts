@@ -2,24 +2,27 @@ import {FleetCellSummary, FleetFormation} from './fleetModel';
 
 export type FleetRect = {x: number; y: number; width: number; height: number};
 export type FleetLayoutItem =
-    | {kind: 'formation'; variant: 'micro' | 'emblem' | 'row'; rect: FleetRect; formation: FleetFormation}
+    | {kind: 'formation'; variant: 'micro' | 'emblem' | 'detail' | 'row'; rect: FleetRect; formation: FleetFormation}
     | {kind: 'contact' | 'overflow'; rect: FleetRect; formations: readonly FleetFormation[]};
+
+export const FLEET_GLYPH_MIN_CELL = 24;
+export const FLEET_DETAIL_MIN_CELL = 64;
 
 /** Rectangles locaux bornés à la case, indépendants de la puissance ou du nombre de vaisseaux. */
 export function layoutFleetCell(summary: FleetCellSummary, cellSize: number, focus: boolean): FleetLayoutItem[] {
     const groups = summary.formations;
     if (!groups.length || cellSize < 4) return [];
-    const padding = cellSize < 24 ? 1 : 2;
+    const padding = cellSize < FLEET_GLYPH_MIN_CELL ? 1 : 2;
     const available = cellSize - padding * 2;
     const centred = (width: number, height: number): FleetRect => ({
         x: (cellSize - width) / 2, y: (cellSize - height) / 2, width, height,
     });
     if (groups.length === 1) {
         const size = Math.min(available, focus ? 48 : 36);
-        return [{kind: 'formation', variant: cellSize < 24 ? 'micro' : 'emblem', rect: centred(size, size), formation: groups[0]}];
+        return [{kind: 'formation', variant: cellSize < FLEET_GLYPH_MIN_CELL ? 'micro' : focus && cellSize >= FLEET_DETAIL_MIN_CELL ? 'detail' : 'emblem', rect: centred(size, size), formation: groups[0]}];
     }
-    // Les petites cases ne peuvent pas accueillir plusieurs emblèmes complets.
-    if (cellSize < 48 || (cellSize < 56 && groups.length > 2)) {
+    // Les lignes et les en-têtes détaillés attendent la même échelle réellement confortable.
+    if (cellSize < FLEET_DETAIL_MIN_CELL) {
         const size = Math.min(available, 38);
         return [{kind: 'contact', rect: centred(size, size), formations: groups}];
     }

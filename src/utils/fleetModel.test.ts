@@ -1,7 +1,7 @@
 import {Rapport} from '../types';
 import {
     ALL_FLEET_SIZE_BANDS, applyFleetSizePreset, buildFleetCells, buildFleetFormations,
-    fleetStrength, formationShortLabel, formationStrengthLabel, MapFleet, mapFleetsForReport, strengthFromLabel,
+    fleetStrength, formationShortLabel, formationStrengthLabel, MapFleet, mapFleetsForReport, restoreFleetSizeBands, strengthFromLabel,
 } from './fleetModel';
 
 const detected = (owner: number, num: number, puiss = 'moyenne', pos = {x: 19, y: 6}): MapFleet => ({
@@ -89,5 +89,45 @@ describe('fleet presentation model', () => {
         buildFleetCells(list, bands);
         expect(list).toEqual([fleet]);
         expect(bands).toEqual(['moyenne']);
+    });
+});
+
+
+describe('fleet ownership visibility and preference migration', () => {
+    it.each([[true, true, 4], [false, true, 3], [true, false, 3], [false, false, 2]])(
+        'combines own=%s and neutral=%s without removing raw report contacts', (showOwn, showNeutral, count) => {
+            const fleets = [own(1), detected(0, 2, 'inconnue'), detected(7, 3, 'grande'), detected(8, 4)];
+            const cell = buildFleetCells(fleets, ALL_FLEET_SIZE_BANDS, {showOwn, showNeutral}).get('19_6')!;
+            expect(cell.visibleCount).toBe(count);
+            expect(cell.totalCount).toBe(4);
+            expect(cell.hiddenCount).toBe(4 - Number(count));
+            expect(cell.fleets).toEqual(fleets);
+            expect(cell.ownerCount).toBe(4);
+            expect(cell.formations.some(group => group.own)).toBe(showOwn);
+            expect(cell.formations.some(group => group.owner === 0)).toBe(showNeutral);
+        });
+    it('combines ownership with power, keeping unknown neutral contacts unknown', () => {
+        const fleets = [own(1), detected(0, 2, 'inconnue'), detected(7, 3, 'grande'), detected(8, 4)];
+        const summary = buildFleetCells(fleets, ['grande', 'unknown'], {showOwn: true, showNeutral: true}).get('19_6')!;
+        expect(summary.formations.map(group => group.owner)).toEqual([0, 7]);
+        expect(summary.visibleCount).toBe(2);
+        expect(buildFleetCells(fleets, ['grande', 'unknown'], {showOwn: true, showNeutral: false})
+            .get('19_6')!.formations.map(group => group.owner)).toEqual([7]);
+    });
+    it('keeps an all-hidden cell inspectable and does not classify a foreign commander as neutral', () => {
+        const fleets = [own(1), detected(0, 2)];
+        const summary = buildFleetCells(fleets, ALL_FLEET_SIZE_BANDS, {showOwn: false, showNeutral: false}).get('19_6')!;
+        expect(summary).toMatchObject({visibleCount: 0, totalCount: 2, hiddenCount: 2, formations: []});
+        expect(buildFleetFormations(summary.fleets, ALL_FLEET_SIZE_BANDS)).toHaveLength(2);
+        const foreign = {...detected(7, 3), nom: 'Neutre'};
+        expect(buildFleetFormations([foreign], ALL_FLEET_SIZE_BANDS, {showOwn: false, showNeutral: false})).toHaveLength(1);
+    });
+    it('restores old known-size choices and includes unknowns now that their controls are gone', () => {
+        expect(restoreFleetSizeBands('["grande","massive"]')).toEqual(['grande', 'massive', 'unknown']);
+        expect(restoreFleetSizeBands('[]')).toEqual(['unknown']);
+        expect(restoreFleetSizeBands('["unknown","grande","grande","invalid"]')).toEqual(['grande', 'unknown']);
+    });
+    it.each([null, '{broken', '{}', 'false'])('defaults safely for invalid or absent preferences %s', saved => {
+        expect(restoreFleetSizeBands(saved)).toEqual(ALL_FLEET_SIZE_BANDS);
     });
 });

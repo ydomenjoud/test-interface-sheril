@@ -322,12 +322,15 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 - Les détections répétées sont dédupliquées par couple commandant / numéro, les données propres priment.
 - La forme est un emblème abstrait de flotte (coque centrale et traits d'escorte), sans prétendre décrire
   les classes ou le nombre réel de vaisseaux. Son empreinte et son fond opaque ne dépendent pas de la
-  puissance. Les cinq traits visuels correspondent aux bandes du filtre, pas à une quantité physique.
+  puissance. La catégorie est donnée par sa lettre, sans barres de puissance redondantes.
+  Sous 24 px, le marqueur mono-commandant garde uniquement cette lettre (et les signaux de cadre/ordre),
+  sans pictogramme ni compteur concurrent. Le rendu compact à 24 px est conservé.
 - `×N` compte des flottes ; `Nc` / `Ncdt` indique des commandants distincts ; `+N cdt` compte les commandants
   en surplus. La catégorie courte (I/R/TP/P/M/AG/G/TG/GI/T/IM) reprend celle du jeu. `?` et le bord discontinu
   signalent une force inconnue, y compris dans un groupe qui contient aussi des forces connues.
 - À petite échelle : un contact multi-commandants, jamais plusieurs grands symboles superposés. Avec
-  assez d'espace : lignes bornées par commandant, au plus trois puis un surplus explicite. Les très
+  au moins 64 px par case : lignes bornées par commandant, au plus trois puis un surplus explicite.
+  Le grand en-tête mono-commandant en mode focus attend lui aussi 64 px, au lieu de 42 px environ. Les très
   petites miniatures gardent le signal de pluralité ; les comptes exacts sont dans le détail.
 - Tous les rectangles restent à l'intérieur de leur case et ne se chevauchent pas (molette 8–128 px,
   curseur 16–64 px). Nos flottes sont prioritaires, les autres commandants sont ordonnés par numéro,
@@ -335,9 +338,15 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 - Les couleurs conservent leur sens diplomatique, racial ou par joueur. Le numéro de commandant des
   lignes et le panneau de détail distinguent les commandants partageant une même couleur. L'absence
   de PNA/alliance est libellée « sans accord », pas une déclaration certaine d'hostilité.
-- Le choix « Inclure les puissances inconnues » est indépendant des préréglages de tailles connues,
-  inclus par défaut et mémorisé avec les autres filtres. « Inconnues seules » est un choix explicite.
-  La barre d'outils affiche flottes visibles / total du rapport ; le détail donne les comptes par case.
+- Les contacts de puissance inconnue restent automatiquement inclus dans les filtres de puissance ;
+  les anciens réglages sont migrés sans les laisser invisibles derrière un contrôle supprimé.
+  Les raccourcis « Inclure les puissances inconnues » et « Inconnues seules » sont supprimés.
+- « Mes flottes » et « Flottes neutres » (propriétaire 0) contrôlent séparément la visibilité des flottes
+  correspondantes, en combinaison avec les filtres de puissance. Actifs par défaut, ils sont mémorisés.
+  Les autres commandants ne sont pas assimilés aux neutres en raison de leur couleur ou de leur race.
+  Ces filtres ne suppriment ni données du rapport ni ordres préparés ; le détail reste complet.
+- Le compteur flottes visibles / total du rapport est dans le menu Filtres, pas dans la barre d'outils ;
+  le détail conserve les comptes par case.
 - Clic sur un contact multiple, un surplus ou une ligne étrangère : ouvre le panneau de détail,
   même s'il était replié, sans ouvrir le sélecteur de NOS ordres. Clic sur notre emblème : conserve le
   sélecteur de déplacement. Clic sur le fond d'une case avec nos flottes visibles : geste existant.

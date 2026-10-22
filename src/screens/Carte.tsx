@@ -1,10 +1,11 @@
 import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import {useReport} from '../context/ReportContext';
 import CanvasMap, {ZoneRect} from '../components/Map/CanvasMap';
-import {ALL_FLEET_SIZE_BANDS, KNOWN_FLEET_SIZE_BANDS, FleetSizeBand, FLEET_SIZE_BAND_OPTIONS, applyFleetSizePreset, buildFleetCells, mapFleetsForReport} from '../utils/fleetModel';
+import {FleetSizeBand, buildFleetCells, mapFleetsForReport, restoreFleetSizeBands} from '../utils/fleetModel';
 import MiniMap from '../components/Map/MiniMap';
 import InfoPanel from '../components/Map/InfoPanel';
 import {FleetInspection} from '../components/Map/fleets/FleetRoster';
+import FleetFilters from '../components/Map/fleets/FleetFilters';
 import {useStoredFleetOrders} from '../components/Map/fleets/useStoredFleetOrders';
 import ZoneDialog from '../components/Map/ZoneDialog';
 import MapHelp from '../components/Map/MapHelp';
@@ -105,20 +106,14 @@ export default function Carte() {
     return saved !== null ? JSON.parse(saved) : false;
   });
   // Filtres directement issus des termes de puissance du jeu, regroupés en bandes pratiques.
-  const [fleetSizeBands, setFleetSizeBands] = useState<FleetSizeBand[]>(() => {
-    try {
-      const saved = localStorage.getItem('carte_fleet_size_bands');
-      if (!saved) return [...ALL_FLEET_SIZE_BANDS];
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed)) return [...ALL_FLEET_SIZE_BANDS];
-      const valid = parsed.filter((band): band is FleetSizeBand => ALL_FLEET_SIZE_BANDS.includes(band));
-      return valid.length > 0 ? valid : [];
-    } catch {
-      return [...ALL_FLEET_SIZE_BANDS];
-    }
-  });
+  const [fleetSizeBands, setFleetSizeBands] = useState<FleetSizeBand[]>(() =>
+    restoreFleetSizeBands(localStorage.getItem('carte_fleet_size_bands')));
+  const [showOwnFleets, setShowOwnFleets] = useState(() => localStorage.getItem('carte_show_own_fleets') !== 'false');
+  const [showNeutralFleets, setShowNeutralFleets] = useState(() => localStorage.getItem('carte_show_neutral_fleets') !== 'false');
   const mapFleets = useMemo(() => mapFleetsForReport(rapport), [rapport]);
-  const fleetCells = useMemo(() => buildFleetCells(mapFleets, fleetSizeBands), [mapFleets, fleetSizeBands]);
+  const fleetCells = useMemo(() => buildFleetCells(mapFleets, fleetSizeBands, {
+    showOwn: showOwnFleets, showNeutral: showNeutralFleets,
+  }), [mapFleets, fleetSizeBands, showOwnFleets, showNeutralFleets]);
   const visibleFleetCount = useMemo(() => Array.from(fleetCells.values()).reduce((count, cell) => count + cell.visibleCount, 0), [fleetCells]);
 
   // Portées radar : désactivées par défaut (voile bleu sur la carte) ; à activer dans les Filtres si besoin
@@ -221,6 +216,12 @@ export default function Carte() {
   useEffect(() => {
     localStorage.setItem('carte_fleet_size_bands', JSON.stringify(fleetSizeBands));
   }, [fleetSizeBands]);
+  useEffect(() => {
+    localStorage.setItem('carte_show_own_fleets', JSON.stringify(showOwnFleets));
+  }, [showOwnFleets]);
+  useEffect(() => {
+    localStorage.setItem('carte_show_neutral_fleets', JSON.stringify(showNeutralFleets));
+  }, [showNeutralFleets]);
 
   useEffect(() => {
     localStorage.setItem('carte_show_system_radar', JSON.stringify(showSystemRadar));
@@ -570,12 +571,6 @@ export default function Carte() {
 
   const nbDeplacements = Object.keys(deplacements).length;
 
-  const toggleFleetSizeBand = (band: FleetSizeBand) => {
-    setFleetSizeBands(current => current.includes(band)
-      ? current.filter(value => value !== band)
-      : [...current, band]);
-  };
-  const setFleetSizePreset = (bands: FleetSizeBand[]) => setFleetSizeBands(current => applyFleetSizePreset(current, bands));
   const toggleFleetFocus = () => {
     setFleetFocus(current => !current);
     // Un mode focus sans couche flottes n'aurait aucun effet utile.
@@ -658,10 +653,6 @@ export default function Carte() {
           >
             <IconFleetMove size={15} /> Focus flottes
           </button>
-          {rapport && <span className="carte-toolbar-value" role="status"
-            title="Flottes visibles après filtrage / flottes du rapport. ×N = flottes ; c et cdt = commandants.">
-            Flottes {visibleFleetCount}/{mapFleets.length}
-          </span>}
           <button
             type="button"
             className={deplacementsExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'}
@@ -1065,93 +1056,20 @@ par diplo
                             Badges flottes
                           </label>
                       </div>
-                      {/* Couche tactique des flottes : une formation est filtrée avec les libellés de puissance du rapport. */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #334155', paddingTop: 8 }}>
-                          <span style={{ fontSize: '0.85em', color: '#94a3b8' }}>Flottes</span>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={fleetFocus}
-                              onChange={(e) => {
-                                setFleetFocus(e.target.checked);
-                                if (e.target.checked) setShowFleetBadges(true);
-                              }}
-                            />
-                            Mode focus
-                          </label>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                            {FLEET_SIZE_BAND_OPTIONS.filter(option => option.value !== 'unknown').map(option => {
-                              const active = fleetSizeBands.includes(option.value);
-                              return (
-                                <button
-                                  key={option.value}
-                                  type="button"
-                                  title={option.title}
-                                  aria-pressed={active}
-                                  disabled={!showFleetBadges}
-                                  onClick={() => toggleFleetSizeBand(option.value)}
-                                  style={{
-                                    padding: '4px 7px',
-                                    borderRadius: 4,
-                                    cursor: showFleetBadges ? 'pointer' : 'default',
-                                    background: active ? '#1e3a5f' : '#1e2530',
-                                    color: active ? '#e0f2fe' : '#94a3b8',
-                                    border: active ? '1px solid #38bdf8' : '1px solid #334155',
-                                    opacity: showFleetBadges ? 1 : 0.45,
-                                    fontSize: '0.78rem',
-                                  }}
-                                >
-                                  {option.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                            {([
-                              {label: 'Tout', bands: KNOWN_FLEET_SIZE_BANDS},
-                              {label: 'Moyenne +', bands: ['moyenne', 'grande', 'massive'] as FleetSizeBand[]},
-                              {label: 'Grande +', bands: ['grande', 'massive'] as FleetSizeBand[]},
-                            ]).map(preset => {
-                              const active = preset.bands.length === fleetSizeBands.filter(band => band !== 'unknown').length && preset.bands.every(band => fleetSizeBands.includes(band));
-                              return (
-                                <button
-                                  key={preset.label}
-                                  aria-pressed={active}
-                                  type="button"
-                                  disabled={!showFleetBadges}
-                                  onClick={() => setFleetSizePreset(preset.bands)}
-                                  style={{
-                                    padding: '3px 6px',
-                                    borderRadius: 4,
-                                    cursor: showFleetBadges ? 'pointer' : 'default',
-                                    background: active ? 'rgba(16, 185, 129, 0.16)' : 'transparent',
-                                    color: active ? '#6ee7b7' : '#94a3b8',
-                                    border: active ? '1px solid #10b981' : '1px solid #334155',
-                                    opacity: showFleetBadges ? 1 : 0.45,
-                                    fontSize: '0.74rem',
-                                  }}
-                                >
-                                  {preset.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85em' }}>
-                            <input
-                              type="checkbox"
-                              checked={fleetSizeBands.includes('unknown')}
-                              disabled={!showFleetBadges}
-                              onChange={() => toggleFleetSizeBand('unknown')}
-                            />
-                            Inclure les puissances inconnues
-                          </label>
-                          <button type="button" className="carte-btn" disabled={!showFleetBadges}
-                            onClick={() => setFleetSizeBands(['unknown'])}>Inconnues seules</button>
-                          <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
-                            Les préréglages ne modifient pas la visibilité des inconnues.
-                          </span>
-                      </div>
-
+                      <FleetFilters
+                        enabled={showFleetBadges} focus={fleetFocus} bands={fleetSizeBands}
+                        visibility={{showOwn: showOwnFleets, showNeutral: showNeutralFleets}}
+                        visibleCount={visibleFleetCount} totalCount={mapFleets.length}
+                        onFocusChange={focus => {
+                          setFleetFocus(focus);
+                          if (focus) setShowFleetBadges(true);
+                        }}
+                        onBandsChange={setFleetSizeBands}
+                        onVisibilityChange={visibility => {
+                          setShowOwnFleets(visibility.showOwn);
+                          setShowNeutralFleets(visibility.showNeutral);
+                        }}
+                      />
 
                       {zones.length > 0 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid #334155', paddingTop: 8 }}>

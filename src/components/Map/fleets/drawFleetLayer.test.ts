@@ -20,7 +20,7 @@ const options = {focus: true, getOwnerColor: () => '#ef4444'};
 describe('fleet glyph renderer', () => {
     it('renders fleet multiplicity separately from the power category', () => {
         const ctx = context();
-        drawFleetCell(ctx, summary(1, 3), 100, 200, 48, options);
+        drawFleetCell(ctx, summary(1, 3), 100, 200, 64, options);
         const labels = (ctx.fillText as jest.Mock).mock.calls.map(call => call[0]);
         expect(labels).toContain('×3');
         expect(labels).toContain('G');
@@ -50,5 +50,39 @@ describe('fleet glyph renderer', () => {
             expect(alphas.every(alpha => alpha === 1)).toBe(true);
             expect(ctx.save).toHaveBeenCalledTimes((ctx.restore as jest.Mock).mock.calls.length);
         });
+    });
+});
+
+
+describe('reduced low/mid-zoom clutter', () => {
+    it.each([8, 16, 20, 23])('shows only the entire strength label without a ship below 24 px (%s)', size => {
+        const ctx = context();
+        drawFleetCell(ctx, summary(1, 3, true), 0, 0, size, options);
+        expect(ctx.translate).not.toHaveBeenCalled();
+        expect((ctx.fillText as jest.Mock).mock.calls.map(call => call[0])).toEqual(['G?']);
+        expect((ctx.fillText as jest.Mock).mock.calls[0][3]).toBeGreaterThan(0);
+    });
+    it('preserves the compact 24 px pictogram', () => {
+        const ctx = context();
+        drawFleetCell(ctx, summary(1), 0, 0, 24, options);
+        expect(ctx.translate).toHaveBeenCalledTimes(1);
+        expect(ctx.fillText).toHaveBeenCalledWith('G', expect.any(Number), expect.any(Number));
+    });
+    it.each([28, 32, 40, 42, 48, 56, 62, 64, 80, 128])('does not draw redundant strength bars at %s px', size => {
+        const ctx = context();
+        drawFleetCell(ctx, summary(1), 0, 0, size, options);
+        expect(ctx.fillRect).not.toHaveBeenCalled();
+        const labels = (ctx.fillText as jest.Mock).mock.calls.map(call => call[0]);
+        expect(labels.includes('#0')).toBe(size >= 64);
+        expect(labels).toContain('G');
+    });
+    it('keeps the order-state stripe, which is not a strength bar', () => {
+        const data = summary(1);
+        data.formations[0].fleets[0] = {...data.formations[0].fleets[0], type: 'joueur', vitesse: 4,
+            as: 1200, ap: 0, directive: 0, vaisseaux: [], scan: 2};
+        const ctx = context();
+        drawFleetCell(ctx, data, 0, 0, 32, {...options, deplacements: {0: {x: 20, y: 6}}});
+        expect(ctx.fillRect).toHaveBeenCalledTimes(1);
+        expect(ctx.fillRect).toHaveBeenCalledWith(expect.any(Number), expect.any(Number), 2, expect.any(Number));
     });
 });

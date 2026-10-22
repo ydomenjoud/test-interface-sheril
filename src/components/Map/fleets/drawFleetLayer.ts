@@ -49,16 +49,6 @@ function formationColor(formation: FleetFormation, options: FleetDrawOptions): s
     return options.isOwnerSelected?.(formation.owner) === false ? '#64748b' : options.getOwnerColor(formation.owner);
 }
 
-function drawPowerBars(ctx: CanvasRenderingContext2D, rect: FleetRect, formation: FleetFormation, color: string): void {
-    const width = Math.min(25, rect.width - 8);
-    const x = rect.x + (rect.width - width) / 2;
-    const bar = (width - 4) / 5;
-    for (let i = 0; i < 5; i++) {
-        ctx.fillStyle = formation.primary.band !== 'unknown' && i <= formation.primary.rank ? color : '#283445';
-        ctx.fillRect(x + i * (bar + 1), rect.y + rect.height - 4, bar, 1.5);
-    }
-}
-
 function drawFormation(ctx: CanvasRenderingContext2D, rect: FleetRect, item: Extract<FleetLayoutItem, {kind: 'formation'}>, options: FleetDrawOptions): void {
     const f = item.formation;
     const color = formationColor(f, options);
@@ -82,17 +72,22 @@ function drawFormation(ctx: CanvasRenderingContext2D, rect: FleetRect, item: Ext
         if (ctx.measureText(label).width <= strengthWidth) fittedText(ctx, label, middleX, cy, strengthWidth);
         ctx.fillStyle = '#e2e8f0';
         fittedText(ctx, count, rect.x + rect.width - 4, cy, countWidth, 'right');
-    } else if (item.variant === 'micro' || rect.height < 24) {
-        if (rect.height < 13) drawFleetGlyph(ctx, rect.x + 1, rect.y + 1, Math.max(2, rect.height - 2), color);
-        else {
-            drawFleetGlyph(ctx, cx - 5, rect.y + 1, 10, color);
-            ctx.font = '700 8px system-ui, sans-serif';
-            fittedText(ctx, f.count > 1 ? count : label, cx, rect.y + rect.height - 4, rect.width - 2, 'center');
-        }
+    } else if (item.variant === 'micro') {
+        // Sous 24 px : la catégorie seule, sans pictogramme ni compteur concurrent.
+        // maxWidth comprime au besoin le libellé ENTIER : « TG » ne doit pas devenir « T ».
+        ctx.font = `700 ${Math.max(5, Math.min(11, Math.floor(rect.height * 0.65)))}px system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(label, cx, cy, Math.max(1, rect.width - 2));
+    } else if (rect.height < 24) {
+        // Conserver le rendu compact à 24 px, jugé lisible.
+        drawFleetGlyph(ctx, cx - 5, rect.y + 1, 10, color);
+        ctx.font = '700 8px system-ui, sans-serif';
+        fittedText(ctx, f.count > 1 ? count : label, cx, rect.y + rect.height - 4, rect.width - 2, 'center');
     } else {
-        const roomy = rect.height >= 38;
+        const roomy = item.variant === 'detail';
         const glyph = roomy ? 22 : 12;
-        drawFleetGlyph(ctx, cx - glyph / 2, rect.y + (roomy ? 9 : 2), glyph, color);
+        const top = roomy ? rect.y : rect.y + (rect.height - 24) / 2;
+        drawFleetGlyph(ctx, cx - glyph / 2, top + (roomy ? 10 : 2), glyph, color);
         ctx.font = '600 8px system-ui, sans-serif';
         if (roomy) {
             fittedText(ctx, f.own ? 'VOUS' : `#${f.owner}`, rect.x + 4, rect.y + 6, rect.width - 8);
@@ -101,7 +96,7 @@ function drawFormation(ctx: CanvasRenderingContext2D, rect: FleetRect, item: Ext
         const showCount = roomy || f.count > 1;
         const countWidth = showCount ? Math.min(rect.width * 0.65, ctx.measureText(count).width) : 0;
         const strengthWidth = rect.width - countWidth - 7;
-        const labelY = rect.y + rect.height - 9;
+        const labelY = roomy ? rect.y + rect.height - 6 : top + 19;
         if (!showCount) fittedText(ctx, label, cx, labelY, rect.width - 6, 'center');
         else if (ctx.measureText(label).width <= strengthWidth) {
             fittedText(ctx, label, rect.x + 3, labelY, strengthWidth);
@@ -111,7 +106,6 @@ function drawFormation(ctx: CanvasRenderingContext2D, rect: FleetRect, item: Ext
             ctx.fillStyle = '#e2e8f0';
             fittedText(ctx, count, cx, labelY, rect.width - 6, 'center');
         }
-        drawPowerBars(ctx, rect, f, color);
     }
     // Indicateur d'ordre intégré à l'empreinte, sans remplacer la couleur du propriétaire.
     const pending = f.fleets.filter(fleet => fleet.type === 'joueur' && options.deplacements?.[fleet.num]);
@@ -168,7 +162,7 @@ export function drawFleetCell(ctx: CanvasRenderingContext2D, summary: FleetCellS
         ctx.beginPath(); ctx.rect(rect.x - 0.5, rect.y - 0.5, rect.width + 1, rect.height + 1); ctx.clip();
         ctx.globalAlpha = 1;
         ctx.filter = 'none';
-        roundedRect(ctx, rect, Math.min(item.kind === 'formation' && item.variant === 'emblem' ? 6 : 3, rect.height / 3));
+        roundedRect(ctx, rect, Math.min(item.kind === 'formation' && (item.variant === 'emblem' || item.variant === 'detail') ? 6 : 3, rect.height / 3));
         ctx.fillStyle = options.focus ? '#0b1522' : '#111d2c';
         ctx.fill();
         ctx.strokeStyle = selected ? '#f8fafc' : color;

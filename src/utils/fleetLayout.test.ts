@@ -10,7 +10,7 @@ function cell(owners: number) {
 }
 
 describe('bounded fleet layouts', () => {
-    it.each([8, 16, 20, 24, 32, 40, 48, 56, 60, 64, 80, 96, 128])('never overlaps or leaves a %s px cell', size => {
+    it.each([8, 16, 20, 23, 24, 26, 28, 32, 40, 42, 48, 56, 60, 62, 63, 64, 80, 96, 128])('never overlaps or leaves a %s px cell', size => {
         [false, true].forEach(focus => {
             for (let owners = 1; owners <= 12; owners++) {
                 const layout = layoutFleetCell(cell(owners), size, focus);
@@ -97,5 +97,26 @@ describe('fleet marker hit regions', () => {
     it('retains background click behaviour but never creates an order action without an own fleet', () => {
         expect(shouldOpenFleetPicker(undefined, true, 1)).toBe(true);
         expect(shouldOpenFleetPicker(undefined, false, 1)).toBe(false);
+    });
+});
+
+
+describe('progressive disclosure thresholds', () => {
+    it.each([8, 16, 20, 23])('uses letter-only formations below 24 px (%s)', size => {
+        const item = layoutFleetCell(cell(1), size, true)[0];
+        expect(item.kind === 'formation' && item.variant).toBe('micro');
+    });
+    it.each([24, 28, 40, 42, 48, 56, 62, 63])('keeps compact insignia and contacts until 64 px (%s)', size => {
+        const item = layoutFleetCell(cell(1), size, true)[0];
+        expect(item.kind === 'formation' && item.variant).toBe('emblem');
+        [2, 4, 8].forEach(owners => expect(layoutFleetCell(cell(owners), size, true).map(entry => entry.kind)).toEqual(['contact']));
+    });
+    it('reveals detailed focus insignia and commander rows only from 64 px', () => {
+        const detail = layoutFleetCell(cell(1), 64, true)[0];
+        expect(detail.kind === 'formation' && detail.variant).toBe('detail');
+        expect(layoutFleetCell(cell(4), 64, true).map(item => item.kind)).toEqual(['formation', 'formation', 'formation', 'overflow']);
+        const normal = layoutFleetCell(cell(1), 64, false)[0];
+        expect(normal.kind === 'formation' && normal.variant).toBe('emblem');
+        expect(normal.rect.width).toBeLessThan(detail.rect.width);
     });
 });

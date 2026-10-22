@@ -1,0 +1,67 @@
+import React from 'react';
+import {FLEET_SIZE_BAND_OPTIONS, FleetOwnerVisibility, FleetSizeBand, KNOWN_FLEET_SIZE_BANDS} from '../../../utils/fleetModel';
+import './FleetFilters.css';
+
+type Props = {
+    enabled: boolean;
+    focus: boolean;
+    bands: readonly FleetSizeBand[];
+    visibility: FleetOwnerVisibility;
+    visibleCount: number;
+    totalCount: number;
+    onFocusChange: (focus: boolean) => void;
+    onBandsChange: (bands: FleetSizeBand[]) => void;
+    onVisibilityChange: (visibility: FleetOwnerVisibility) => void;
+};
+const presets: {label: string; bands: readonly FleetSizeBand[]}[] = [
+    {label: 'Tout', bands: KNOWN_FLEET_SIZE_BANDS},
+    {label: 'Moyenne +', bands: ['moyenne', 'grande', 'massive']},
+    {label: 'Grande +', bands: ['grande', 'massive']},
+];
+
+/** Compteurs et contrôles de flottes restent dans Filtres, pas dans la barre d'outils. */
+export default function FleetFilters({enabled, focus, bands, visibility, visibleCount, totalCount,
+    onFocusChange, onBandsChange, onVisibilityChange}: Props) {
+    const changeBands = (next: readonly FleetSizeBand[]) => onBandsChange(Array.from(new Set<FleetSizeBand>([...next, 'unknown'])));
+    return (
+        <div role="group" aria-label="Filtres des flottes" className="fleet-filter-section">
+            <div className="fleet-filter-heading">
+                <span>Flottes</span>
+                <span role="status" aria-label="Flottes visibles après filtres" title="Après filtres / total du rapport">
+                    {visibleCount}/{totalCount} visibles
+                </span>
+            </div>
+            <label><input type="checkbox" checked={focus} onChange={event => onFocusChange(event.target.checked)} />Mode focus</label>
+            <div className="fleet-filter-owners">
+                <label title="Afficher mes flottes, en respectant les tailles sélectionnées">
+                    <input type="checkbox" checked={visibility.showOwn} disabled={!enabled}
+                        onChange={event => onVisibilityChange({...visibility, showOwn: event.target.checked})} />
+                    Mes flottes
+                </label>
+                <label title="Afficher les flottes du propriétaire neutre (0), en respectant les tailles sélectionnées">
+                    <input type="checkbox" checked={visibility.showNeutral} disabled={!enabled}
+                        onChange={event => onVisibilityChange({...visibility, showNeutral: event.target.checked})} />
+                    Flottes neutres
+                </label>
+            </div>
+            <div className="fleet-filter-buttons" aria-label="Tailles de flottes">
+                {FLEET_SIZE_BAND_OPTIONS.filter(option => option.value !== 'unknown').map(option => (
+                    <button key={option.value} type="button" title={option.title} aria-pressed={bands.includes(option.value)}
+                        disabled={!enabled} onClick={() => changeBands(bands.includes(option.value)
+                            ? bands.filter(band => band !== option.value) : [...bands, option.value])}>
+                        {option.label}
+                    </button>
+                ))}
+            </div>
+            <div className="fleet-filter-buttons fleet-filter-presets">
+                {presets.map(preset => (
+                    <button key={preset.label} type="button" disabled={!enabled}
+                        aria-pressed={preset.bands.length === bands.filter(band => band !== 'unknown').length
+                            && preset.bands.every(band => bands.includes(band))}
+                        onClick={() => changeBands(preset.bands)}>{preset.label}</button>
+                ))}
+            </div>
+            <small>Les puissances inconnues restent incluses.</small>
+        </div>
+    );
+}

@@ -14,6 +14,20 @@ export const FLEET_SIZE_BAND_OPTIONS: {value: FleetSizeBand; label: string; titl
 export const ALL_FLEET_SIZE_BANDS = FLEET_SIZE_BAND_OPTIONS.map(option => option.value);
 export const KNOWN_FLEET_SIZE_BANDS = ALL_FLEET_SIZE_BANDS.filter(band => band !== 'unknown');
 
+export type FleetOwnerVisibility = {showOwn: boolean; showNeutral: boolean};
+
+/** Les anciennes préférences conservent les tailles connues ; sans contrôle dédié, les inconnues restent incluses. */
+export function restoreFleetSizeBands(saved: string | null): FleetSizeBand[] {
+    try {
+        const parsed: unknown = saved === null ? ALL_FLEET_SIZE_BANDS : JSON.parse(saved);
+        if (!Array.isArray(parsed)) return [...ALL_FLEET_SIZE_BANDS];
+        return [...KNOWN_FLEET_SIZE_BANDS.filter(band => parsed.includes(band)), 'unknown'];
+    } catch {
+        return [...ALL_FLEET_SIZE_BANDS];
+    }
+}
+
+
 export type MapFleet = (FlotteJoueur | FlotteDetectee) & {owner: number};
 export type FleetStrength = {
     label: string;
@@ -101,7 +115,8 @@ export function applyFleetSizePreset(current: readonly FleetSizeBand[], preset: 
     return [...preset.filter(band => band !== 'unknown'), ...(current.includes('unknown') ? ['unknown' as const] : [])];
 }
 
-export function buildFleetFormations(fleets: readonly MapFleet[], visibleBands: readonly FleetSizeBand[]): FleetFormation[] {
+export function buildFleetFormations(fleets: readonly MapFleet[], visibleBands: readonly FleetSizeBand[],
+    visibility: FleetOwnerVisibility = {showOwn: true, showNeutral: true}): FleetFormation[] {
     const byOwner = new Map<number, MapFleet[]>();
     fleets.forEach(fleet => {
         const list = byOwner.get(fleet.owner) || [];
@@ -111,7 +126,10 @@ export function buildFleetFormations(fleets: readonly MapFleet[], visibleBands: 
     const formations: FleetFormation[] = [];
     byOwner.forEach((all, owner) => {
         const byStrength = new Map<string, FleetComposition>();
-        const visible = all.filter(fleet => visibleBands.includes(fleetStrength(fleet).band));
+        const visible = all.filter(fleet => {
+            const ownerVisible = fleet.type === 'joueur' ? visibility.showOwn : fleet.owner !== 0 || visibility.showNeutral;
+            return ownerVisible && visibleBands.includes(fleetStrength(fleet).band);
+        });
         if (!visible.length) return;
         visible.forEach(fleet => {
             const strength = fleetStrength(fleet);
@@ -143,7 +161,8 @@ export function buildFleetFormations(fleets: readonly MapFleet[], visibleBands: 
     return formations.sort((a, b) => Number(b.own) - Number(a.own) || a.owner - b.owner);
 }
 
-export function buildFleetCells(fleets: readonly MapFleet[], visibleBands: readonly FleetSizeBand[]): Map<string, FleetCellSummary> {
+export function buildFleetCells(fleets: readonly MapFleet[], visibleBands: readonly FleetSizeBand[],
+    visibility: FleetOwnerVisibility = {showOwn: true, showNeutral: true}): Map<string, FleetCellSummary> {
     const byCell = new Map<string, MapFleet[]>();
     fleets.forEach(fleet => {
         const key = fleetCellKey(fleet.pos);
@@ -153,7 +172,7 @@ export function buildFleetCells(fleets: readonly MapFleet[], visibleBands: reado
     });
     const cells = new Map<string, FleetCellSummary>();
     byCell.forEach((list, key) => {
-        const formations = buildFleetFormations(list, visibleBands);
+        const formations = buildFleetFormations(list, visibleBands, visibility);
         const visibleCount = formations.reduce((count, formation) => count + formation.count, 0);
         cells.set(key, {
             pos: list[0].pos, fleets: list, formations, visibleCount,
