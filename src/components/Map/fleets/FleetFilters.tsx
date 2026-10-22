@@ -39,12 +39,13 @@ export default function FleetFilters({enabled, focus, bands, visibility, visible
                     Flottes neutres
                 </label>
             </div>
-            <div className="fleet-filter-buttons" aria-label="Tailles de flottes">
+            <div className="fleet-filter-segments" role="group" aria-label="Tailles de flottes">
                 {FLEET_SIZE_BAND_OPTIONS.filter(option => option.value !== 'unknown').map(option => (
-                    <button key={option.value} type="button" title={option.title} aria-pressed={bands.includes(option.value)}
+                    <button key={option.value} type="button" title={option.title} aria-label={option.label}
+                        aria-pressed={bands.includes(option.value)}
                         disabled={!enabled} onClick={() => changeBands(bands.includes(option.value)
                             ? bands.filter(band => band !== option.value) : [...bands, option.value])}>
-                        {option.label}
+                        {option.shortLabel}
                     </button>
                 ))}
             </div>

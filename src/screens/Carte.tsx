@@ -26,6 +26,7 @@ import {
   IconHelp,
   IconSliders,
   IconFleetMove,
+  IconFleetFocus,
   IconPlay,
   IconStop,
   IconAlert,
@@ -643,13 +644,12 @@ export default function Carte() {
           <button
             type="button"
             className={fleetFocus ? 'carte-icon-btn active' : 'carte-icon-btn'}
-            style={{ width: 'auto', padding: '0 8px', gap: 5, fontSize: '0.8rem' }}
             title="Mode tactique flottes : formations prioritaires, systèmes atténués"
             aria-pressed={fleetFocus}
             aria-label="Activer ou désactiver le mode tactique flottes"
             onClick={toggleFleetFocus}
           >
-            <IconFleetMove size={15} /> Focus flottes
+            <IconFleetFocus size={15} />
           </button>
           <button
             type="button"

@@ -2,10 +2,11 @@
 .fleet-filter-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; font-size: .85em; color: #94a3b8; }
 .fleet-filter-heading [role=status] { font-variant-numeric: tabular-nums; font-size: .9em; }
 .fleet-filter-section label { display: flex; align-items: center; gap: 6px; color: #f1f5f9; font-size: .85em; cursor: pointer; }
-.fleet-filter-owners, .fleet-filter-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
-.fleet-filter-owners { column-gap: 14px; }
-.fleet-filter-buttons button { padding: 4px 7px; border-radius: 4px; border: 1px solid #334155; background: #1e2530; color: #94a3b8; font-size: .78rem; cursor: pointer; }
-.fleet-filter-buttons button[aria-pressed=true] { background: #1e3a5f; color: #e0f2fe; border-color: #38bdf8; }
-.fleet-filter-buttons button:disabled { opacity: .45; cursor: default; }
-.fleet-filter-buttons button:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 2px; }
+.fleet-filter-owners { display: flex; flex-wrap: wrap; gap: 6px; column-gap: 14px; }
+.fleet-filter-segments { display: flex; border: 1px solid #334155; border-radius: 6px; overflow: hidden; }
+.fleet-filter-segments button { flex: 1; padding: 4px 0; border: none; border-right: 1px solid #334155; background: #1e2530; color: #94a3b8; font-size: .75rem; cursor: pointer; }
+.fleet-filter-segments button:last-child { border-right: none; }
+.fleet-filter-segments button[aria-pressed=true] { background: #1e3a5f; color: #e0f2fe; }
+.fleet-filter-segments button:disabled { opacity: .45; cursor: default; }
+.fleet-filter-segments button:focus-visible { outline: 2px solid #7dd3fc; outline-offset: -2px; }
 .fleet-filter-section small { color: #94a3b8; font-size: .75rem; }

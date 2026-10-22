@@ -3,13 +3,13 @@ import {getDescriptionPuissance, getPuissance} from './puissance';
 
 // Les bandes sont un filtre d'affichage, jamais une estimation de puissance cumulée.
 export type FleetSizeBand = 'weak' | 'petite' | 'moyenne' | 'grande' | 'massive' | 'unknown';
-export const FLEET_SIZE_BAND_OPTIONS: {value: FleetSizeBand; label: string; title: string}[] = [
-    {value: 'weak', label: 'Faible', title: 'Insignifiante, ridicule, très petite ou faible'},
-    {value: 'petite', label: 'Petite', title: 'Petite'},
-    {value: 'moyenne', label: 'Moyenne', title: 'Moyenne'},
-    {value: 'grande', label: 'Grande', title: 'Assez grande ou grande'},
-    {value: 'massive', label: 'Très grande +', title: 'Très grande, gigantesque, titanesque ou inimaginable'},
-    {value: 'unknown', label: '?', title: 'Puissance inconnue'},
+export const FLEET_SIZE_BAND_OPTIONS: {value: FleetSizeBand; label: string; shortLabel: string; title: string}[] = [
+    {value: 'weak', label: 'Faible', shortLabel: 'Fbl', title: 'Insignifiante, ridicule, très petite ou faible'},
+    {value: 'petite', label: 'Petite', shortLabel: 'Pte', title: 'Petite'},
+    {value: 'moyenne', label: 'Moyenne', shortLabel: 'Moy', title: 'Moyenne'},
+    {value: 'grande', label: 'Grande', shortLabel: 'Grd', title: 'Assez grande ou grande'},
+    {value: 'massive', label: 'Très grande +', shortLabel: 'TG+', title: 'Très grande, gigantesque, titanesque ou inimaginable'},
+    {value: 'unknown', label: '?', shortLabel: '?', title: 'Puissance inconnue'},
 ];
 export const ALL_FLEET_SIZE_BANDS = FLEET_SIZE_BAND_OPTIONS.map(option => option.value);
 export const KNOWN_FLEET_SIZE_BANDS = ALL_FLEET_SIZE_BANDS.filter(band => band !== 'unknown');
