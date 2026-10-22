@@ -1,6 +1,7 @@
 import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import {useReport} from '../context/ReportContext';
-import CanvasMap, {ALL_FLEET_SIZE_BANDS, FleetSizeBand, FLEET_SIZE_BAND_OPTIONS, ZoneRect} from '../components/Map/CanvasMap';
+import CanvasMap, {ZoneRect} from '../components/Map/CanvasMap';
+import {ALL_FLEET_SIZE_BANDS, KNOWN_FLEET_SIZE_BANDS, FleetSizeBand, FLEET_SIZE_BAND_OPTIONS, applyFleetSizePreset, buildFleetCells, mapFleetsForReport} from '../utils/fleetModel';
 import MiniMap from '../components/Map/MiniMap';
 import InfoPanel from '../components/Map/InfoPanel';
 import ZoneDialog from '../components/Map/ZoneDialog';
@@ -113,6 +114,9 @@ export default function Carte() {
       return [...ALL_FLEET_SIZE_BANDS];
     }
   });
+  const mapFleets = useMemo(() => mapFleetsForReport(rapport), [rapport]);
+  const fleetCells = useMemo(() => buildFleetCells(mapFleets, fleetSizeBands), [mapFleets, fleetSizeBands]);
+
   // Portées radar : désactivées par défaut (voile bleu sur la carte) ; à activer dans les Filtres si besoin
   const [showSystemRadar, setShowSystemRadar] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_show_system_radar');
@@ -573,7 +577,7 @@ export default function Carte() {
       ? current.filter(value => value !== band)
       : [...current, band]);
   };
-  const setFleetSizePreset = (bands: FleetSizeBand[]) => setFleetSizeBands(bands);
+  const setFleetSizePreset = (bands: FleetSizeBand[]) => setFleetSizeBands(current => applyFleetSizePreset(current, bands));
   const toggleFleetFocus = () => {
     setFleetFocus(current => !current);
     // Un mode focus sans couche flottes n'aurait aucun effet utile.
@@ -648,7 +652,8 @@ export default function Carte() {
           <button
             type="button"
             className={fleetFocus ? 'carte-icon-btn active' : 'carte-icon-btn'}
-            title="Mode tactique flottes : grandes formations, systèmes atténués"
+            title="Mode tactique flottes : formations prioritaires, systèmes atténués"
+            aria-pressed={fleetFocus}
             aria-label="Activer ou désactiver le mode tactique flottes"
             onClick={toggleFleetFocus}
           >
@@ -787,7 +792,8 @@ export default function Carte() {
             showOwnerBadges={showOwnerBadges}
             showFleetBadges={showFleetBadges}
             fleetFocus={fleetFocus}
-            fleetSizeBands={fleetSizeBands}
+            fleets={mapFleets}
+            fleetCells={fleetCells}
             showSystemRadar={showSystemRadar}
             showFleetRadar={showFleetRadar}
             showSectors={showSectors}
@@ -1065,13 +1071,14 @@ par diplo
                             Mode focus
                           </label>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                            {FLEET_SIZE_BAND_OPTIONS.map(option => {
+                            {FLEET_SIZE_BAND_OPTIONS.filter(option => option.value !== 'unknown').map(option => {
                               const active = fleetSizeBands.includes(option.value);
                               return (
                                 <button
                                   key={option.value}
                                   type="button"
                                   title={option.title}
+                                  aria-pressed={active}
                                   disabled={!showFleetBadges}
                                   onClick={() => toggleFleetSizeBand(option.value)}
                                   style={{
@@ -1092,15 +1099,15 @@ par diplo
                           </div>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                             {([
-                              {label: 'Tout', bands: ALL_FLEET_SIZE_BANDS},
+                              {label: 'Tout', bands: KNOWN_FLEET_SIZE_BANDS},
                               {label: 'Moyenne +', bands: ['moyenne', 'grande', 'massive'] as FleetSizeBand[]},
                               {label: 'Grande +', bands: ['grande', 'massive'] as FleetSizeBand[]},
-                              {label: '?', bands: ['unknown'] as FleetSizeBand[]},
                             ]).map(preset => {
-                              const active = preset.bands.length === fleetSizeBands.length && preset.bands.every(band => fleetSizeBands.includes(band));
+                              const active = preset.bands.length === fleetSizeBands.filter(band => band !== 'unknown').length && preset.bands.every(band => fleetSizeBands.includes(band));
                               return (
                                 <button
                                   key={preset.label}
+                                  aria-pressed={active}
                                   type="button"
                                   disabled={!showFleetBadges}
                                   onClick={() => setFleetSizePreset(preset.bands)}
@@ -1120,6 +1127,20 @@ par diplo
                               );
                             })}
                           </div>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85em' }}>
+                            <input
+                              type="checkbox"
+                              checked={fleetSizeBands.includes('unknown')}
+                              disabled={!showFleetBadges}
+                              onChange={() => toggleFleetSizeBand('unknown')}
+                            />
+                            Inclure les puissances inconnues
+                          </label>
+                          <button type="button" className="carte-btn" disabled={!showFleetBadges}
+                            onClick={() => setFleetSizeBands(['unknown'])}>Inconnues seules</button>
+                          <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                            Les préréglages ne modifient pas la visibilité des inconnues.
+                          </span>
                       </div>
 
 
