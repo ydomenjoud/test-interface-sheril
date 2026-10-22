@@ -8,8 +8,12 @@ export type FleetLayoutItem =
 export const FLEET_GLYPH_MIN_CELL = 24;
 export const FLEET_DETAIL_MIN_CELL = 64;
 
-/** Rectangles locaux bornés à la case, indépendants de la puissance ou du nombre de vaisseaux. */
-export function layoutFleetCell(summary: FleetCellSummary, cellSize: number, focus: boolean): FleetLayoutItem[] {
+/**
+ * Rectangles locaux bornés à la case, indépendants de la puissance ou du nombre de vaisseaux.
+ * Une seule échelle pour tous les modes : le mode focus ne change que l'ordre des couches,
+ * jamais la géométrie des marqueurs.
+ */
+export function layoutFleetCell(summary: FleetCellSummary, cellSize: number): FleetLayoutItem[] {
     const groups = summary.formations;
     if (!groups.length || cellSize < 4) return [];
     const padding = cellSize < FLEET_GLYPH_MIN_CELL ? 1 : 2;
@@ -18,12 +22,13 @@ export function layoutFleetCell(summary: FleetCellSummary, cellSize: number, foc
         x: (cellSize - width) / 2, y: (cellSize - height) / 2, width, height,
     });
     if (groups.length === 1) {
-        const size = Math.min(available, focus ? 48 : 36);
-        return [{kind: 'formation', variant: cellSize < FLEET_GLYPH_MIN_CELL ? 'micro' : focus && cellSize >= FLEET_DETAIL_MIN_CELL ? 'detail' : 'emblem', rect: centred(size, size), formation: groups[0]}];
+        const size = Math.min(available, 48);
+        return [{kind: 'formation', variant: cellSize < FLEET_GLYPH_MIN_CELL ? 'micro' : cellSize >= FLEET_DETAIL_MIN_CELL ? 'detail' : 'emblem', rect: centred(size, size), formation: groups[0]}];
     }
-    // Les lignes et les en-têtes détaillés attendent la même échelle réellement confortable.
+    // Les lignes et le surplus n'apparaissent qu'à l'échelle réellement confortable.
+    // Même boîtier que la formation seule : 1cdt et Ncdt ont toujours la même taille.
     if (cellSize < FLEET_DETAIL_MIN_CELL) {
-        const size = Math.min(available, 38);
+        const size = Math.min(available, 48);
         return [{kind: 'contact', rect: centred(size, size), formations: groups}];
     }
     const gap = 2;
@@ -34,7 +39,7 @@ export function layoutFleetCell(summary: FleetCellSummary, cellSize: number, foc
         Math.floor((available - overflowHeight) / (rowHeight + gap)));
     const overflow = groups.slice(visibleRows);
     const height = visibleRows * rowHeight + Math.max(0, visibleRows - 1) * gap + (overflow.length ? gap + overflowHeight : 0);
-    const width = Math.min(available, focus ? 92 : 84);
+    const width = Math.min(available, 92);
     const bounds = centred(width, height);
     const items: FleetLayoutItem[] = groups.slice(0, visibleRows).map((formation, i) => ({
         kind: 'formation', variant: 'row', formation,
@@ -53,11 +58,15 @@ export function containsFleetPoint(rect: FleetRect, x: number, y: number): boole
 
 export type FleetScenePass = 'reportRoutes' | 'fleets' | 'combats' | 'reachability' | 'selection' | 'orders';
 
-/** Une seule politique de couches, également utilisée par les tests de régression. */
+/**
+ * Une seule politique de couches, également utilisée par les tests de régression.
+ * Le marqueur de combat est TOUJOURS la couche persistante la plus haute :
+ * il ne doit jamais être masqué par un badge de flotte.
+ */
 export function drawFleetScene(focus: boolean, draw: Record<FleetScenePass, () => void>): void {
     const order: FleetScenePass[] = focus
-        ? ['reportRoutes', 'combats', 'reachability', 'selection', 'orders', 'fleets']
-        : ['reportRoutes', 'fleets', 'combats', 'reachability', 'selection', 'orders'];
+        ? ['reportRoutes', 'reachability', 'selection', 'orders', 'fleets', 'combats']
+        : ['reportRoutes', 'fleets', 'reachability', 'selection', 'orders', 'combats'];
     order.forEach(pass => draw[pass]());
 }
 

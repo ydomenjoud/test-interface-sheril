@@ -1,4 +1,7 @@
-/** Marqueurs de combat sur la carte — dessinés au-dessus des systèmes. */
+/**
+ * Marqueurs de combat sur la carte — coin HAUT-DROIT de la case, au-dessus de toutes les
+ * couches persistantes (jamais masqués par les badges de flottes).
+ */
 
 const SPATIAL_COLOR = '#ff6b1a';
 const PLANETARY_COLOR = '#c77dff';
@@ -50,7 +53,7 @@ function drawCountBadge(
     ctx.fillText(String(count), x + sz / 2, y + sz / 2);
 }
 
-/** Losange orange + « S » = combat spatial (coin bas-gauche). */
+/** Losange orange + « S » = combat spatial (coin haut-droit, sous le planétaire). */
 function drawSpatialIcon(ctx: CanvasRenderingContext2D, x: number, y: number, sz: number, cellSize: number) {
     drawIconHalo(ctx, x, y, sz, cellSize);
     const cx = x + sz / 2;
@@ -72,7 +75,7 @@ function drawSpatialIcon(ctx: CanvasRenderingContext2D, x: number, y: number, sz
     ctx.fillText('S', cx, cy + (sz * 0.03)); // Décalage vertical léger et proportionnel
 }
 
-/** Cercle violet + « P » = combat planétaire (coin haut-gauche). */
+/** Cercle violet + « P » = combat planétaire (coin haut-droit). */
 function drawPlanetaryIcon(ctx: CanvasRenderingContext2D, x: number, y: number, sz: number, cellSize: number) {
     drawIconHalo(ctx, x, y, sz, cellSize);
     const cx = x + sz / 2;
@@ -100,27 +103,24 @@ export function drawCombatMarkers(
 ) {
     if (spatialCount <= 0 && planetaryCount <= 0) return;
 
-    // --- MODIFICATIONS CLÉS ICI ---
-    // 1. Suppression du Math.max(16, ...) pour que l'icône puisse devenir plus petite que 16px.
-    // 2. Réduction du ratio à 0.38 (au lieu de 0.44) pour éviter que les deux icônes ne se marchent dessus si cellSize est très petit.
-    const sz = Math.floor(cellSize * 0.38); 
-    
-    // 3. Marge proportionnelle à la taille de la case (5% de la case) au lieu d'un '2' fixe.
+    // Icône proportionnelle (0.38 de la case, sans plancher : elle suit le zoom)
+    // et marge de 5 % de la case.
+    const sz = Math.floor(cellSize * 0.38);
     const pad = Math.max(1, Math.floor(cellSize * 0.05));
 
+    // Pile verticale en haut à droite : le planétaire d'abord, le spatial juste dessous.
+    const bx = px + cellSize - sz - pad;
+    let by = py + pad;
     if (planetaryCount > 0) {
-        const bx = px + pad;
-        const by = py + pad;
         if (planetaryCount === 1) {
             drawPlanetaryIcon(ctx, bx, by, sz, cellSize);
         } else {
             drawCountBadge(ctx, bx, by, sz, PLANETARY_COLOR, planetaryCount, cellSize);
         }
+        by += sz + pad;
     }
 
     if (spatialCount > 0) {
-        const bx = px + pad;
-        const by = py + cellSize - sz - pad;
         if (spatialCount === 1) {
             drawSpatialIcon(ctx, bx, by, sz, cellSize);
         } else {

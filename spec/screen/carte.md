@@ -252,10 +252,12 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 - La flotte apparaît « modifiée par rapport au rapport » : anneau ambre (#ff9800) et flèche vers sa nouvelle
   destination (qui remplace la direction du rapport, rappelée ⚠ « déjà en route vers x_y » dans le panneau quand
   le rapport en avait une).
-- En vue normale, la flèche d'ordre de déplacement reste au-dessus des marqueurs de flottes, des combats
-  et du cadre de sélection. En **focus flottes**, exception explicite : systèmes, combats, remplissages de
+- En vue normale, la flèche d'ordre de déplacement reste au-dessus des marqueurs de flottes
+  et du cadre de sélection. En **focus flottes**, exception explicite : systèmes, remplissages de
   sélection et TOUTES les routes persistantes (rapport, portée, ordres) sont dessinés avant le passage
-  global des emblèmes de flottes, sur fond opaque. Le survol et le glisser actif restent au-dessus.
+  global des emblèmes de flottes, sur fond opaque. Le marqueur de combat (S / P, dans le coin
+  HAUT-DROIT de la case) est toujours la couche persistante la plus haute dans les deux modes :
+  il n'est jamais masqué par un badge de flotte. Le survol et le glisser actif restent au-dessus.
 - Les directions du rapport et les ordres utilisent le même delta court torique, pour toutes les copies
   visibles du tore. Aucun tracé de direction d'une case ne repeint les marqueurs d'une autre case.
 - Couleur de la flèche : verte (#4caf50) si la destination est à portée de la flotte ce tour, rouge (#f44336) sinon.
@@ -323,15 +325,39 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 - La forme est un emblème abstrait de flotte (coque centrale et traits d'escorte), sans prétendre décrire
   les classes ou le nombre réel de vaisseaux. Son empreinte et son fond opaque ne dépendent pas de la
   puissance. La catégorie est donnée par sa lettre, sans barres de puissance redondantes.
-  Sous 24 px, le marqueur mono-commandant garde uniquement cette lettre (et les signaux de cadre/ordre),
-  sans pictogramme ni compteur concurrent. Le rendu compact à 24 px est conservé.
-- `×N` compte des flottes ; `Nc` / `Ncdt` indique des commandants distincts ; `+N cdt` compte les commandants
-  en surplus. La catégorie courte (I/R/TP/P/M/AG/G/TG/GI/T/IM) reprend celle du jeu. `?` et le bord discontinu
-  signalent une force inconnue, y compris dans un groupe qui contient aussi des forces connues.
-- À petite échelle : un contact multi-commandants, jamais plusieurs grands symboles superposés. Avec
-  au moins 64 px par case : lignes bornées par commandant, au plus trois puis un surplus explicite.
-  Le grand en-tête mono-commandant en mode focus attend lui aussi 64 px, au lieu de 42 px environ. Les très
-  petites miniatures gardent le signal de pluralité ; les comptes exacts sont dans le détail.
+
+#### Révélation progressive des marqueurs
+
+Principe : chaque niveau de zoom affiche tout ce qui tient, dans l'ordre de priorité couleur du
+propriétaire → signal du groupe (lettre / nombre de commandants) → emblème → compteur de flottes →
+numéro de commandant → pastilles. Zoomer n'ajoute que de l'information, il ne la remplace jamais.
+Le mode focus ne change que l'ordre des couches et l'atténuation des systèmes, jamais le contenu
+ni la géométrie des marqueurs.
+
+**Une formation seule sur la case**
+
+| Taille de case | Boîte | Toujours affiché | Ajouté si cela tient |
+|---|---|---|---|
+| 8–23 px | `case − 2` | la lettre de catégorie, fonte réduite pour tenir, centrée optiquement, jamais de débordement | — |
+| 24–63 px | `min(case − 4, 48)` | emblème + lettre, le bloc centré dans la boîte ; l'emblème grossit proportionnellement (10 px à 24 px → 22 px à la carte 64 px) | `×N` flottes, centré AVEC la lettre (jamais aux extrémités de la boîte) |
+| ≥ 64 px | 48 | grand emblème + lettre + `×N`, et `#n` du commandant s'il n'est pas le nôtre | — |
+
+**Plusieurs commandants sur la case (contact)**
+
+| Taille de case | Boîte | Toujours affiché | Ajouté si cela tient |
+|---|---|---|---|
+| 8–14 px | `case − 2` | deux barres de 1 px (signal de pluralité) | — |
+| 15–63 px | `min(case − 4, 48)` — la même boîte que la formation seule | `N cdt` (→ `Nc` si cela ne tient pas), dans la même couleur que le total | total `×N` dès que la boîte fait 26 px, pastilles de couleur des commandants (max 5) |
+| ≥ 64 px | largeur `min(case − 4, 92)` | trois lignes `#n` (si non propriétaire) + lettre + `×N`, sans pictogramme ; au-delà, un surplus `+N cdt` | — |
+
+- `×N` compte des flottes ; `N cdt` / `+N cdt` indique des commandants distincts. La catégorie courte
+  (I/R/TP/P/M/AG/G/TG/GI/T/IM) reprend celle du jeu. `?` et le bord discontinu signalent une force
+  inconnue, y compris dans un groupe qui contient aussi des forces connues.
+- La lettre est le signal principal : elle est toujours visible dès 24 px, le compteur ne la remplace
+  jamais — il est ajouté seulement s'il tient à ses côtés.
+- Notre propre formation ne porte pas de libellé : la couleur et la position (triée en tête)
+  suffisent ; les autres commandants sont signalés `#n`. Les très petites miniatures gardent le
+  signal de pluralité ; les comptes exacts restent dans le détail (infobulle / panneau).
 - Tous les rectangles restent à l'intérieur de leur case et ne se chevauchent pas (molette 8–128 px,
   curseur 16–64 px). Nos flottes sont prioritaires, les autres commandants sont ordonnés par numéro,
   pas par puissance : leur emplacement ne saute pas lorsque la puissance change.

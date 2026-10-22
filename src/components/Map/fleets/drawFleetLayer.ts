@@ -59,46 +59,75 @@ function drawFormation(ctx: CanvasRenderingContext2D, rect: FleetRect, item: Ext
     ctx.fillStyle = color;
     ctx.textBaseline = 'middle';
     if (item.variant === 'row') {
+        // Pas de pictogramme en ligne : le numéro, la lettre et le compteur tiennent sur 14 px.
         ctx.font = '600 9px system-ui, sans-serif';
         const countWidth = Math.min(rect.width * 0.5, ctx.measureText(count).width);
-        const showGlyph = rect.width >= 56;
-        const ownerX = rect.x + (showGlyph ? 14 : 4);
-        const ownerLabel = f.own ? 'MOI' : `#${f.owner}`;
-        const ownerWidth = Math.min(ctx.measureText(ownerLabel).width, 25, rect.width - countWidth - (showGlyph ? 23 : 12));
-        if (showGlyph) drawFleetGlyph(ctx, rect.x + 3, cy - 5, 10, color);
-        fittedText(ctx, ownerLabel, ownerX, cy, ownerWidth);
-        const middleX = ownerX + ownerWidth + 2;
+        // Notre formation n'a pas de libellé : couleur et position (triée en tête) suffisent.
+        const ownerLabel = f.own ? '' : `#${f.owner}`;
+        const ownerWidth = ownerLabel ? Math.min(ctx.measureText(ownerLabel).width, 25) : 0;
+        const textX = rect.x + 4;
+        if (ownerLabel) fittedText(ctx, ownerLabel, textX, cy, ownerWidth);
+        const middleX = textX + ownerWidth + (ownerLabel ? 2 : 0);
         const strengthWidth = rect.x + rect.width - countWidth - 6 - middleX;
         if (ctx.measureText(label).width <= strengthWidth) fittedText(ctx, label, middleX, cy, strengthWidth);
         ctx.fillStyle = '#e2e8f0';
         fittedText(ctx, count, rect.x + rect.width - 4, cy, countWidth, 'right');
     } else if (item.variant === 'micro') {
         // Sous 24 px : la catégorie seule, sans pictogramme ni compteur concurrent.
-        // maxWidth comprime au besoin le libellé ENTIER : « TG » ne doit pas devenir « T ».
-        ctx.font = `700 ${Math.max(5, Math.min(11, Math.floor(rect.height * 0.65)))}px system-ui, sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.fillText(label, cx, cy, Math.max(1, rect.width - 2));
-    } else if (rect.height < 24) {
-        // Conserver le rendu compact à 24 px, jugé lisible.
-        drawFleetGlyph(ctx, cx - 5, rect.y + 1, 10, color);
-        ctx.font = '700 8px system-ui, sans-serif';
-        fittedText(ctx, f.count > 1 ? count : label, cx, rect.y + rect.height - 4, rect.width - 2, 'center');
-    } else {
-        const roomy = item.variant === 'detail';
-        const glyph = roomy ? 22 : 12;
-        const top = roomy ? rect.y : rect.y + (rect.height - 24) / 2;
-        drawFleetGlyph(ctx, cx - glyph / 2, top + (roomy ? 10 : 2), glyph, color);
-        ctx.font = '600 8px system-ui, sans-serif';
-        if (roomy) {
-            fittedText(ctx, f.own ? 'VOUS' : `#${f.owner}`, rect.x + 4, rect.y + 6, rect.width - 8);
-            ctx.font = '700 10px system-ui, sans-serif';
+        // La lettre doit tenir ENTIÈRE dans la boîte : on réduit la fonte d'abord, on ne
+        // tronque qu'en dernier recours (« TG » ne doit pas devenir « T »).
+        const maxWidth = Math.max(1, rect.width - 2);
+        let fontSize = Math.max(5, Math.min(11, Math.floor(rect.height * 0.65)));
+        ctx.font = `700 ${fontSize}px system-ui, sans-serif`;
+        while (fontSize > 5 && ctx.measureText(label).width > maxWidth) {
+            fontSize -= 1;
+            ctx.font = `700 ${fontSize}px system-ui, sans-serif`;
         }
-        const showCount = roomy || f.count > 1;
-        const countWidth = showCount ? Math.min(rect.width * 0.65, ctx.measureText(count).width) : 0;
+        let fitted = label;
+        while (fitted.length > 1 && ctx.measureText(fitted).width > maxWidth) fitted = fitted.slice(0, -1);
+        // Centre OPTIQUE des majuscules : « middle » n'est pas un vrai centrage, la ligne
+        // alphabétique à demi-hauteur de casse (0.35 em) le est, arrondie au pixel.
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(fitted, cx, Math.round(cy + fontSize * 0.35));
+    } else if (item.variant === 'emblem') {
+        // La lettre est le signal principal : toujours visible, le compteur n'est ajouté
+        // qu'à sa droite s'il y tient (jamais l'inverse).
+        // L'emblème grandit PROPORTIONNELLEMENT de la boîte 24 px (10 px) vers la carte
+        // 64 px (22 px) : une seule échelle continue, le bloc [emblème + ligne] reste
+        // centré dans la boîte, et la ligne est centrée ENSEMBLE ([lettre + compteur]).
+        const glyphSize = rect.height < 24 ? 10 : Math.max(10, Math.min(22, Math.round((rect.height * 22) / 64)));
+        const lineH = 9;
+        const glyphTop = rect.height < 24
+            ? rect.y + 1 // boîte serrée 20–22 px : le bloc la remplit (rendu 24 px, jugé lisible)
+            : rect.y + Math.max(1, (rect.height - (glyphSize + 2 + lineH)) / 2);
+        const labelY = rect.height < 24 ? rect.y + rect.height - 4 : glyphTop + glyphSize + 2 + lineH / 2;
+        drawFleetGlyph(ctx, cx - glyphSize / 2, glyphTop, glyphSize, color);
+        ctx.font = '700 8px system-ui, sans-serif';
+        const labelW = ctx.measureText(label).width;
+        const countW = Math.min(rect.width * 0.5, ctx.measureText(count).width);
+        const gap = 4;
+        if (f.count > 1 && labelW + gap + countW <= rect.width - 2) {
+            const startX = cx - (labelW + gap + countW) / 2;
+            ctx.textAlign = 'left';
+            ctx.fillText(label, startX, labelY);
+            ctx.fillStyle = '#e2e8f0';
+            ctx.fillText(count, startX + labelW + gap, labelY);
+        } else {
+            fittedText(ctx, label, cx, labelY, rect.width - 2, 'center');
+        }
+    } else {
+        // detail (≥ 64 px, tous modes) : grand emblème, numéro du commandant s'il n'est pas
+        // le nôtre, lettre et compteur en pied.
+        const glyph = 22;
+        drawFleetGlyph(ctx, cx - glyph / 2, rect.y + 10, glyph, color);
+        ctx.font = '600 8px system-ui, sans-serif';
+        if (!f.own) fittedText(ctx, `#${f.owner}`, rect.x + 4, rect.y + 6, rect.width - 8);
+        ctx.font = '700 10px system-ui, sans-serif';
+        const countWidth = Math.min(rect.width * 0.65, ctx.measureText(count).width);
         const strengthWidth = rect.width - countWidth - 7;
-        const labelY = roomy ? rect.y + rect.height - 6 : top + 19;
-        if (!showCount) fittedText(ctx, label, cx, labelY, rect.width - 6, 'center');
-        else if (ctx.measureText(label).width <= strengthWidth) {
+        const labelY = rect.y + rect.height - 6;
+        if (ctx.measureText(label).width <= strengthWidth) {
             fittedText(ctx, label, rect.x + 3, labelY, strengthWidth);
             ctx.fillStyle = '#e2e8f0';
             fittedText(ctx, count, rect.x + rect.width - 3, labelY, countWidth, 'right');
@@ -134,12 +163,15 @@ function drawContact(ctx: CanvasRenderingContext2D, rect: FleetRect, item: Exclu
     }
     ctx.font = '700 9px system-ui, sans-serif';
     const owners = item.formations.length;
-    const ownerLabel = rect.width >= 24 && owners < 10 ? `${owners}cdt` : `${owners > 99 ? '99+' : owners}c`;
-    fittedText(ctx, ownerLabel, cx, rect.y + rect.height * 0.35, rect.width - 4, 'center');
-    if (rect.height >= 30) {
+    const ownerPrefix = owners > 99 ? '99+' : String(owners);
+    const fullLabel = `${ownerPrefix}cdt`;
+    // Le libellé complet d'abord ; la forme courte est l'unique repli, jamais un seuil de pixels.
+    const ownerLabel = ctx.measureText(fullLabel).width <= rect.width - 4 ? fullLabel : `${ownerPrefix}c`;
+    fittedText(ctx, ownerLabel, cx, rect.y + rect.height * 0.33, rect.width - 4, 'center');
+    if (rect.height >= 26) {
+        // Mème couleur que le libellé de commandants : un seul gris pour les comptes.
         ctx.font = '600 8px system-ui, sans-serif';
-        ctx.fillStyle = '#b6c7d6';
-        fittedText(ctx, fleetCountLabel(item.formations.reduce((n, f) => n + f.count, 0)), cx, rect.y + rect.height * 0.65, rect.width - 4, 'center');
+        fittedText(ctx, fleetCountLabel(item.formations.reduce((n, f) => n + f.count, 0)), cx, rect.y + rect.height * 0.68, rect.width - 4, 'center');
     }
     const shown = item.formations.slice(0, 5);
     const width = rect.width - 6;
@@ -152,7 +184,7 @@ function drawContact(ctx: CanvasRenderingContext2D, rect: FleetRect, item: Exclu
 
 /** Tous les fonds sont opaques et chaque item possède son propre clip. */
 export function drawFleetCell(ctx: CanvasRenderingContext2D, summary: FleetCellSummary, x: number, y: number, cellSize: number, options: FleetDrawOptions): FleetLayoutItem[] {
-    const layout = layoutFleetCell(summary, cellSize, options.focus);
+    const layout = layoutFleetCell(summary, cellSize);
     layout.forEach(item => {
         const rect = {...item.rect, x: item.rect.x + x, y: item.rect.y + y};
         const formations = item.kind === 'formation' ? [item.formation] : item.formations;

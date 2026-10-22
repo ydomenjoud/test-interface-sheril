@@ -1419,8 +1419,10 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }));
         };
 
-        // En focus, TOUTES les routes persistantes et tous les remplissages passent sous les flottes.
-        // En vue normale, on conserve la priorité des ordres par-dessus les marqueurs.
+        // En focus, TOUTES les routes persistantes et tous les remplissages passent sous les flottes ;
+        // en vue normale, on conserve la priorité des ordres par-dessus les marqueurs.
+        // Les marqueurs de combat (haut-droit de la case) restent la couche persistante
+        // la plus haute dans les deux modes : jamais masqués par un badge de flotte.
         drawFleetScene(fleetFocus, {
             reportRoutes: drawReportDirections, fleets: drawFleetMarkers, combats: drawCombats,
             reachability: drawReachability, selection: drawSelection, orders: drawOrders,
