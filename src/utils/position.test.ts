@@ -2,6 +2,7 @@ import {Rapport} from '../types';
 import {
     BOUNDS,
     appliquerBornesDepuisPositions,
+    etendreBornesDepuisPositions,
     getTorusDistance,
     positionsDuRapport,
     reinitialiserBornesGalaxie,
@@ -54,6 +55,26 @@ describe('appliquerBornesDepuisPositions', () => {
         expect(wrapY(0)).toBe(40);
         expect(torusDelta(40, 1, 40)).toBe(1);
         expect(torusDelta(1, -1, 40)).toBe(40);
+    });
+});
+
+describe('etendreBornesDepuisPositions', () => {
+    afterEach(reinitialiserBornesGalaxie);
+
+    test('un rapport partiel ne replie pas une galaxie 60×60 sur la zone observée', () => {
+        etendreBornesDepuisPositions([{x: 30, y: 30}, {x: 12, y: 18}]);
+
+        expect(BOUNDS.maxX).toBe(60);
+        expect(BOUNDS.maxY).toBe(60);
+        expect(wrapX(31)).toBe(31);
+        expect(wrapY(31)).toBe(31);
+    });
+
+    test('une position réellement hors des bornes connues étend la carte', () => {
+        etendreBornesDepuisPositions([{x: 67, y: 72}]);
+
+        expect(BOUNDS.maxX).toBe(70);
+        expect(BOUNDS.maxY).toBe(80);
     });
 });
 
