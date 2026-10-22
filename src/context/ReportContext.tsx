@@ -6,7 +6,7 @@ import {parseRapportXml, addManualDetectedSystems, getCachedDetectedSystems} fro
 import {parsePublicCombatsHtml} from '../parsers/parsePublicCombats';
 import {parseManualDetectedSystems} from '../parsers/parseManualSystems';
 import {parseDataXml} from '../parsers/parseData';
-import {CENTER, appliquerBornesDepuisPositions, positionsDuRapport} from '../utils/position';
+import {CENTER, appliquerBornesDepuisPositions, etendreBornesDepuisPositions, positionsDuRapport} from '../utils/position';
 import {FleetSnapshot, SystemSnapshot, fleetSnapshotOf, getFleetSnapshots, getLatestRapport, getRapport, getRapportsUpTo, getSystemSnapshots, listTours, saveRapport, systemSnapshotOf} from '../storage/rapportStore';
 
 export type ImportResult = { tour: number; affiche: boolean };
@@ -111,13 +111,22 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         localStorage.setItem('carte_hidden_zone_labels', JSON.stringify(hiddenZoneLabels));
     }, [hiddenZoneLabels]);
 
-    // Le jeu ne donne pas la taille de la galaxie : elle est déduite du max des coordonnées
-    // observées, arrondi à la dizaine supérieure (47→50, 53→60, 60→60).
-    // Le rapport affiché fait foi (un rapport peut venir d'une galaxie de taille différente) ;
-    // à défaut de rapport, les systèmes publics de data.xml servent de base.
+    // data.xml décrit toute la galaxie, un rapport seulement la zone observée : les bornes ne
+    // peuvent que s'étendre tant que data.xml manque, et sont recalculées dès qu'il est chargé.
+    const synchroniserBornesGalaxie = useCallback((r?: Rapport) => {
+        const positionsPubliques = (global?.systemes ?? []).map(s => s.pos);
+        const positionsRapport = r ? positionsDuRapport(r) : [];
+        if (positionsPubliques.length > 0) {
+            appliquerBornesDepuisPositions([...positionsPubliques, ...positionsRapport]);
+        } else {
+            etendreBornesDepuisPositions(positionsRapport);
+        }
+    }, [global]);
+
+    // Relance la synchro quand data.xml arrive après un rapport déjà affiché.
     useEffect(() => {
-        if (!rapport) appliquerBornesDepuisPositions((global?.systemes ?? []).map(s => s.pos));
-    }, [global, rapport]);
+        if (global?.systemes?.length) synchroniserBornesGalaxie(rapport);
+    }, [global, rapport, synchroniserBornesGalaxie]);
 
     const zoneLabels = useMemo(
         () => Array.from(new Set(zones.map(z => z.label).filter((l): l is string => !!l))).sort(),
@@ -201,12 +210,11 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         displayedTourRef.current = r.tour;
         noteLatestTour(r.tour);
         const merged = {...r, systemesDetectes: mergeDetectedWithOwned(r)};
-        // Bornes de la galaxie déduites du rapport AFFICHÉ (détections du cache comprises),
-        // avant le render, pour que la carte s'enroule correctement dès le premier dessin
-        appliquerBornesDepuisPositions(positionsDuRapport(merged));
+        // Bornes à jour avant le render pour que la carte ne soit jamais dessinée avec un tore réduit.
+        synchroniserBornesGalaxie(merged);
         setRapport(merged);
         if (recenter && r.joueur?.capitale) setCenter(r.joueur.capitale);
-    }, [mergeDetectedWithOwned, noteLatestTour]);
+    }, [mergeDetectedWithOwned, noteLatestTour, synchroniserBornesGalaxie]);
 
     const selectTour = useCallback(async (tour: number) => {
         const request = ++selectRequestRef.current;
@@ -223,12 +231,14 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
             const detected = new Map<string, SystemeDetecte>();
             rapports.forEach(rp => rp.systemesDetectes.forEach(sd => detected.set(`${sd.pos.x}_${sd.pos.y}`, sd)));
             const owned = new Set(r.systemesJoueur.map(s => `${s.pos.x}_${s.pos.y}`));
+            const merged = {...r, systemesDetectes: Array.from(detected.values()).filter(sd => !owned.has(`${sd.pos.x}_${sd.pos.y}`))};
             displayedTourRef.current = tour;
-            setRapport({...r, systemesDetectes: Array.from(detected.values()).filter(sd => !owned.has(`${sd.pos.x}_${sd.pos.y}`))});
+            synchroniserBornesGalaxie(merged);
+            setRapport(merged);
         } catch (e) {
             console.warn('[rapports] impossible d\'afficher le tour', tour, e);
         }
-    }, [displayRapport]);
+    }, [displayRapport, synchroniserBornesGalaxie]);
 
     // Stocke le rapport extrait de son tour (avec ses seules détections) et met à jour la liste des tours
     const storeRapport = useCallback(async (r: Rapport) => {
@@ -261,12 +271,12 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
             setRapport(prev => {
                 if (!prev) return prev;
                 const updated = { ...prev, systemesDetectes: mergeDetectedWithOwned(prev) };
-                appliquerBornesDepuisPositions(positionsDuRapport(updated));
+                synchroniserBornesGalaxie(updated);
                 return updated;
             });
         }
         return {tour: r.tour, affiche: false};
-    }, [storeRapport, displayRapport, mergeDetectedWithOwned]);
+    }, [storeRapport, displayRapport, mergeDetectedWithOwned, synchroniserBornesGalaxie]);
 
     const getRapportForTour = useCallback((tour: number) => getRapport(tour).catch(() => undefined), []);
 
@@ -279,13 +289,12 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
                 if (!prev) return prev;
                 // Mettre à jour la liste des systèmes détectés depuis le cache
                 const updated = { ...prev, systemesDetectes: mergeDetectedWithOwned(prev) };
-                // Les nouvelles positions peuvent dépasser les bornes actuelles
-                appliquerBornesDepuisPositions(positionsDuRapport(updated));
+                synchroniserBornesGalaxie(updated);
                 return updated;
             });
         }
         return { added: systems.length, errors };
-    }, [mergeDetectedWithOwned, rapport?.tour]);
+    }, [mergeDetectedWithOwned, rapport?.tour, synchroniserBornesGalaxie]);
 
     const refreshStats = useCallback(async () => {
         try {
@@ -318,6 +327,11 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
             if (dataTxt) {
                 try {
                     const data = parseDataXml(dataTxt);
+                    // Mettre les bornes à jour AVANT le render qui suit setGlobal.
+                    appliquerBornesDepuisPositions([
+                        ...data.systemes.map(s => s.pos),
+                        ...(rapport ? positionsDuRapport(rapport) : []),
+                    ]);
                     setGlobal(data);
                     const style = document.createElement("style");
                     style.innerHTML = data.races
@@ -343,7 +357,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         } catch {
             // ignore
         }
-    }, []);
+    }, [rapport]);
 
     useEffect(() => {
         let alive = true;
@@ -352,6 +366,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
                 const txt = await fetch(`https://sheril.pbem-france.net/stats/data.xml`, { cache: STATS_CACHE }).then(r => r.text());
                 if (!alive) return;
                 const data = parseDataXml(txt);
+                appliquerBornesDepuisPositions(data.systemes.map(s => s.pos));
                 setGlobal(data);
 
                 const style = document.createElement("style");

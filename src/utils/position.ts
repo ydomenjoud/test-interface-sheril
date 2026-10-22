@@ -1,8 +1,7 @@
 import { Rapport, XY } from '../types';
-// Bornes de la galaxie (coordonnées 1-based : 1..maxX / 1..maxY).
-// Le jeu ne donne nulle part la taille de la galaxie : la valeur par défaut est 60×60,
-// puis BOUNDS est recalculée à chaque chargement via appliquerBornesDepuisPositions
-// (max des coordonnées observées, arrondi à la dizaine supérieure).
+// Bornes de la galaxie (coordonnées 1-based : 1..maxX / 1..maxY), par défaut 60×60.
+// Une source complète (data.xml) peut les recalculer, y compris les réduire ; des positions
+// partielles (rapport de joueur) ne peuvent que les étendre.
 export const BOUNDS = { minX: 0, maxX: 60, minY: 0, maxY: 60 };
 export const CENTER = { x: 30, y: 30 }; // centre par défaut, avant tout chargement de rapport
 
@@ -13,11 +12,18 @@ export function tailleAxeDepuisCoord(coords: number[]): number {
     return Math.max(10, Math.ceil(max / 10) * 10);
 }
 
-/** Recalcule BOUNDS (in place) depuis les positions observées ; sans effet si la liste est vide. */
+/** Recalcule BOUNDS (in place) depuis une liste de positions couvrant toute la galaxie ; sans effet si la liste est vide. */
 export function appliquerBornesDepuisPositions(positions: XY[]): void {
     if (!positions || positions.length === 0) return;
     BOUNDS.maxX = tailleAxeDepuisCoord(positions.map(p => p.x));
     BOUNDS.maxY = tailleAxeDepuisCoord(positions.map(p => p.y));
+}
+
+/** Étend BOUNDS (in place) sans jamais le rétrécir ; sans effet si la liste est vide. */
+export function etendreBornesDepuisPositions(positions: XY[]): void {
+    if (!positions || positions.length === 0) return;
+    BOUNDS.maxX = Math.max(BOUNDS.maxX, tailleAxeDepuisCoord(positions.map(p => p.x)));
+    BOUNDS.maxY = Math.max(BOUNDS.maxY, tailleAxeDepuisCoord(positions.map(p => p.y)));
 }
 
 export function reinitialiserBornesGalaxie(): void {
