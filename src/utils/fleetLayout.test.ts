@@ -1,5 +1,5 @@
 import {buildFleetCells, ALL_FLEET_SIZE_BANDS, MapFleet} from './fleetModel';
-import {containsFleetPoint, drawFleetScene, FleetScenePass, layoutFleetCell} from './fleetLayout';
+import {containsFleetPoint, drawFleetScene, FleetScenePass, fleetHitRegions, findFleetHit, layoutFleetCell, shouldOpenFleetPicker} from './fleetLayout';
 
 function cell(owners: number) {
     const fleets: MapFleet[] = Array.from({length: owners}, (_,i) => ({
@@ -72,5 +72,30 @@ describe('persistent map layer policy', () => {
         const order = run(false);
         expect(order.indexOf('fleets')).toBeLessThan(order.indexOf('orders'));
         expect(order.indexOf('reportRoutes')).toBeLessThan(order.indexOf('fleets'));
+    });
+});
+
+
+describe('fleet marker hit regions', () => {
+    it('does not open our picker when inspecting another commander in a shared cell', () => {
+        const summary = cell(4);
+        const regions = fleetHitRegions(layoutFleetCell(summary, 64, true), 100, 200, summary.pos);
+        const foreign = regions[1];
+        const hit = findFleetHit(regions, foreign.rect.x + 1, foreign.rect.y + 1);
+        expect(hit?.owner).toBe(1);
+        expect(shouldOpenFleetPicker(hit, true, 0)).toBe(false);
+        expect(shouldOpenFleetPicker(regions[0], true, 0)).toBe(true);
+    });
+    it('inspects compact multi-owner contacts and overflow instead of implicitly moving our fleets', () => {
+        const summary = cell(6);
+        const contact = fleetHitRegions(layoutFleetCell(summary, 32, true), 0, 0, summary.pos)[0];
+        const overflow = fleetHitRegions(layoutFleetCell(summary, 64, true), 0, 0, summary.pos).slice(-1)[0];
+        expect(shouldOpenFleetPicker(contact, true, 0)).toBe(false);
+        expect(shouldOpenFleetPicker(overflow, true, 0)).toBe(false);
+        expect(findFleetHit([contact], -1, -1)).toBeUndefined();
+    });
+    it('retains background click behaviour but never creates an order action without an own fleet', () => {
+        expect(shouldOpenFleetPicker(undefined, true, 1)).toBe(true);
+        expect(shouldOpenFleetPicker(undefined, false, 1)).toBe(false);
     });
 });

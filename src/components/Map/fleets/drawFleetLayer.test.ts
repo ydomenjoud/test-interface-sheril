@@ -35,7 +35,7 @@ describe('fleet glyph renderer', () => {
     it('labels compact multi-owner contacts and overflow as owners, not fleets', () => {
         const ctx = context();
         drawFleetCell(ctx, summary(6), 0, 0, 32, options);
-        expect(ctx.fillText).toHaveBeenCalledWith('6c', expect.any(Number), expect.any(Number));
+        expect(ctx.fillText).toHaveBeenCalledWith('6cdt', expect.any(Number), expect.any(Number));
         drawFleetCell(ctx, summary(6), 0, 0, 64, options);
         expect(ctx.fillText).toHaveBeenCalledWith('+3 cdt', expect.any(Number), expect.any(Number));
     });

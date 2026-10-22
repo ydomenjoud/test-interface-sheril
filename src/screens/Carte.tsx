@@ -4,6 +4,8 @@ import CanvasMap, {ZoneRect} from '../components/Map/CanvasMap';
 import {ALL_FLEET_SIZE_BANDS, KNOWN_FLEET_SIZE_BANDS, FleetSizeBand, FLEET_SIZE_BAND_OPTIONS, applyFleetSizePreset, buildFleetCells, mapFleetsForReport} from '../utils/fleetModel';
 import MiniMap from '../components/Map/MiniMap';
 import InfoPanel from '../components/Map/InfoPanel';
+import {FleetInspection} from '../components/Map/fleets/FleetRoster';
+import {useStoredFleetOrders} from '../components/Map/fleets/useStoredFleetOrders';
 import ZoneDialog from '../components/Map/ZoneDialog';
 import MapHelp from '../components/Map/MapHelp';
 import GotoDialog from '../components/Map/GotoDialog';
@@ -13,8 +15,8 @@ import {wrapX, wrapY, posToString} from '../utils/position';
 import Modal from '../components/utils/Modal';
 import {GlobalData, XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
-import {loadDeplacements, saveDeplacements, clearDeplacements} from '../storage/deplacementOrdersStorage';
-import {DeplacementEnAttente, DeplacementOrdre, DIRECTIVE_DEFAUT, OPTIONS_DIRECTIVES, PRECISION_DEFAUT, PRECISION_PLANETE_MAX, PRECISION_PLANETE_MIN, STRATEGIE_DEFAUT, schemaDeplacements} from '../utils/ordreDeplacement';
+import {clearDeplacements} from '../storage/deplacementOrdersStorage';
+import {DeplacementOrdre, DIRECTIVE_DEFAUT, OPTIONS_DIRECTIVES, PRECISION_DEFAUT, PRECISION_PLANETE_MAX, PRECISION_PLANETE_MIN, STRATEGIE_DEFAUT, schemaDeplacements} from '../utils/ordreDeplacement';
 import {copierSchema} from '../utils/ordreSchema';
 import {
   IconSystem,
@@ -72,6 +74,7 @@ export default function Carte() {
     setZonePreview(undefined); // validée ou annulée, l'aperçu disparaît
   }, []);
   const [selected, setSelected] = useState<XY | undefined>(undefined);
+  const [fleetInspection, setFleetInspection] = useState<FleetInspection | undefined>();
   // Case mise en surbrillance sur la carte quand on survole une ligne de flotte du panneau info
   const [hoverFleetPos, setHoverFleetPos] = useState<XY | undefined>(undefined);
   const [showFleetsFor, setShowFleetsFor] = useState<XY | undefined>(undefined);
@@ -116,6 +119,7 @@ export default function Carte() {
   });
   const mapFleets = useMemo(() => mapFleetsForReport(rapport), [rapport]);
   const fleetCells = useMemo(() => buildFleetCells(mapFleets, fleetSizeBands), [mapFleets, fleetSizeBands]);
+  const visibleFleetCount = useMemo(() => Array.from(fleetCells.values()).reduce((count, cell) => count + cell.visibleCount, 0), [fleetCells]);
 
   // Portées radar : désactivées par défaut (voile bleu sur la carte) ; à activer dans les Filtres si besoin
   const [showSystemRadar, setShowSystemRadar] = useState<boolean>(() => {
@@ -383,7 +387,7 @@ export default function Carte() {
   // ---- Déplacements de flottes : schéma d'ordres (glisser-déposer sur la carte) ----
   // Les déplacements sont rattachés au tour du rapport affiché, comme la planification des revenus
   const tour = rapport?.tour;
-  const [deplacements, setDeplacements] = useState<Record<number, DeplacementEnAttente>>(() => (tour !== undefined ? loadDeplacements(tour) : {}));
+  const [deplacements, setDeplacements] = useStoredFleetOrders(tour, rapport, importCount);
   // Panneau des déplacements : replié par défaut (comme Filtres), s'ouvre tout seul au premier dépos
   const [deplacementsExpanded, setDeplacementsExpanded] = useState(false);
   // Le sélecteur de flotte, ancré sur le mousedown qui l'a ouvert (coordonnées client)
@@ -405,18 +409,12 @@ export default function Carte() {
   // Fermeture du sélecteur seule (bouton ×, Échap) : sans le suivi de drag
   const fermerPicker = useCallback(() => setPicker(null), []);
 
-  // Nouveau rapport ou changement de tour : recharger les déplacements stockés pour le tour affiché
-  // (importCount : un import d'un tour plus ancien ne change pas le rapport affiché mais vide le
-  // stockage — sans ce compteur, les déplacements en mémoire ressusciteraient à la sauvegarde)
+  // Le hook recharge les ordres sans écraser le stockage pendant l'hydratation.
+  // Un changement de rapport/tour ou tout import annule aussi le geste en cours.
+  // importCount couvre l'import d'un ancien tour qui vide le stockage sans changer le rapport affiché.
   useEffect(() => {
-    setDeplacements(tour !== undefined ? loadDeplacements(tour) : {});
     resetFleetDrag();
   }, [tour, rapport, importCount, resetFleetDrag]);
-
-  // Sauvegarde à chaque modification
-  useEffect(() => {
-    if (tour !== undefined) saveDeplacements(tour, deplacements);
-  }, [deplacements, tour]);
 
   // Le mousedown ouvre le sélecteur ; le CanvasMap appelant « tout mousedown » AVANT « mousedown sur
   // case de flotte » dans la même tâche, les deux setPicker sont groupés et l'ouverture l'emporte —
@@ -499,7 +497,7 @@ export default function Carte() {
       setDeplacementsExpanded(true); // on ouvre le panneau pour montrer le résultat du dépos
     }
     resetFleetDrag();
-  }, [rapport, resetFleetDrag]);
+  }, [rapport, resetFleetDrag, setDeplacements]);
   // Alternative clavier au glisser-déposer : le bouton « → » de « Mes flottes » (panneau info)
   // déplace la flotte vers la case sélectionnée (même règle qu'un dépos : case d'origine = annulation)
   const onMoveFleetToSelected = useCallback((fleetNum: number) => {
@@ -508,7 +506,7 @@ export default function Carte() {
     if (flotte.pos.x === selected.x && flotte.pos.y === selected.y) return;
     setDeplacements(d => ({ ...d, [fleetNum]: { to: selected, directive: DIRECTIVE_DEFAUT, strategy: STRATEGIE_DEFAUT } }));
     setDeplacementsExpanded(true);
-  }, [rapport, selected]);
+  }, [rapport, selected, setDeplacements]);
 
   // Schéma d'ordres : un ordre par déplacement dont la flotte est encore dans le rapport
   // (une flotte introuvable, ex. tour différent, est ignorée ici et en ligne repliée du panneau)
@@ -568,7 +566,7 @@ export default function Carte() {
       if (!actuel) return d;
       return { ...d, [num]: { ...actuel, ...champ } };
     });
-  }, []);
+  }, [setDeplacements]);
 
   const nbDeplacements = Object.keys(deplacements).length;
 
@@ -652,13 +650,18 @@ export default function Carte() {
           <button
             type="button"
             className={fleetFocus ? 'carte-icon-btn active' : 'carte-icon-btn'}
+            style={{ width: 'auto', padding: '0 8px', gap: 5, fontSize: '0.8rem' }}
             title="Mode tactique flottes : formations prioritaires, systèmes atténués"
             aria-pressed={fleetFocus}
             aria-label="Activer ou désactiver le mode tactique flottes"
             onClick={toggleFleetFocus}
           >
-            <IconFleetMove size={15} />
+            <IconFleetMove size={15} /> Focus flottes
           </button>
+          {rapport && <span className="carte-toolbar-value" role="status"
+            title="Flottes visibles après filtrage / flottes du rapport. ×N = flottes ; c et cdt = commandants.">
+            Flottes {visibleFleetCount}/{mapFleets.length}
+          </span>}
           <button
             type="button"
             className={deplacementsExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'}
@@ -776,6 +779,7 @@ export default function Carte() {
             previewZone={zonePreview}
             onSelect={(xy, ctrl) => {
               setSelected(xy);
+              setFleetInspection(undefined);
               if (ctrl) {
                 setShowFleetsFor(xy);
               } else {
@@ -794,6 +798,11 @@ export default function Carte() {
             fleetFocus={fleetFocus}
             fleets={mapFleets}
             fleetCells={fleetCells}
+            onFleetInspect={(pos, owner, keyboard) => {
+              setSelected(pos);
+              setFleetInspection({pos, owner, focus: keyboard});
+              setInfoPanelCollapsed(false);
+            }}
             showSystemRadar={showSystemRadar}
             showFleetRadar={showFleetRadar}
             showSectors={showSectors}
@@ -821,7 +830,7 @@ export default function Carte() {
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#10b981' }} /> moi</span>
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#3b82f6' }} /> alliance</span>
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#fde047' }} /> PNA</span>
-              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#ef4444' }} /> ennemi</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#ef4444' }} /> sans accord</span>
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#94a3b8' }} /> neutre</span>
               <span className="map-legend-item" title="Système avec une capacité de réparation (insigne « + » en haut-gauche de la case)"><span className="map-legend-dot" style={{ background: '#0f172a', border: '1.5px solid #cbd5e1', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>+</span> réparation</span>
             </div>
@@ -1464,6 +1473,9 @@ par diplo
           onClose={() => setInfoPanelCollapsed(true)}
           onMoveFleet={onMoveFleetToSelected}
           colorMode={colorMode}
+          fleetSummary={selected ? fleetCells.get(`${selected.x}_${selected.y}`) : undefined}
+          fleetInspection={fleetInspection}
+          onOpenFleetPicker={onFleetCellMouseDown}
         />
       </div>
 

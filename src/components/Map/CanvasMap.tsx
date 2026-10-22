@@ -9,7 +9,7 @@ import {Alliance, GlobalData, XY, Zone} from '../../types';
 import {lightenHexColor, getColorForPlayer} from "../../utils/global";
 import {isTypingTarget} from '../../utils/keyboard';
 import {FleetCellSummary, MapFleet, verboseCompositionLabel} from '../../utils/fleetModel';
-import {drawFleetScene} from '../../utils/fleetLayout';
+import {drawFleetScene, FleetHitRegion, fleetHitRegions, findFleetHit, shouldOpenFleetPicker} from '../../utils/fleetLayout';
 import {projectFleetRoute, visibleFleetCopies} from '../../utils/fleetProjection';
 import {drawFleetCell} from './fleets/drawFleetLayer';
 
@@ -105,6 +105,7 @@ type Props = {
     fleetFocus?: boolean;
     fleets: MapFleet[];
     fleetCells: ReadonlyMap<string, FleetCellSummary>;
+    onFleetInspect?: (pos: XY, owner?: number, keyboard?: boolean) => void;
     showSystemRadar: boolean;
     showFleetRadar: boolean;
     showSectors: boolean;
@@ -162,10 +163,11 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#ef4444';
 }
 
-export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, fleetFocus = false, fleets, fleetCells, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
+export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, fleetFocus = false, fleets, fleetCells, onFleetInspect, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
                        deplacements, dragFleet, highlightPos, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort, onFleetDragOver, onFleetDragLeave, onFleetDrop}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const fleetHitsRef = useRef<FleetHitRegion[]>([]);
     // Case survolée : dessinée sur un canvas séparé pour ne pas redessiner toute la carte à chaque mouvement de souris
     const hoverCanvasRef = useRef<HTMLCanvasElement>(null);
     const tooltipRef = useRef<HTMLDivElement>(null);
@@ -179,6 +181,11 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
     // Conteneur (pour le dragleave HTML5 : savoir si le pointeur sort vraiment de la carte)
     const hostRef = useRef<HTMLDivElement>(null);
+
+    const fleetHitAt = useCallback((clientX: number, clientY: number) => {
+        const rect = canvasRef.current?.getBoundingClientRect();
+        return rect ? findFleetHit(fleetHitsRef.current, clientX - rect.left, clientY - rect.top) : undefined;
+    }, []);
 
     // Gestion du drag
     const dragRef = useRef({dragging: false, lastX: 0, lastY: 0, accX: 0, accY: 0, moved: false, startX: 0, startY: 0, fleetAbortFired: false});
@@ -493,6 +500,8 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         // Toujours repartir d'une transform neutre avant d'appliquer le scale DPR
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.scale(dpr, dpr);
+
+        fleetHitsRef.current = [];
 
         // fond
         ctx.fillStyle = '#000';
@@ -1274,7 +1283,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             fleetCells.forEach(summary => {
                 if (!summary.visibleCount) return;
                 visibleFleetCopies(summary.pos, fleetView).forEach(({x, y}) => {
-                    drawFleetCell(ctx, summary, x, y, cellSize, {
+                    const layout = drawFleetCell(ctx, summary, x, y, cellSize, {
                         focus: fleetFocus,
                         getOwnerColor: owner => colorForOwnership(currentPlayerId, [owner], rapport?.joueur.alliances,
                             rapport?.joueur.pna, colorMode, global) || '#94a3b8',
@@ -1282,6 +1291,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                         hasOwnerFilter: !!selectedOwners?.length,
                         deplacements,
                     });
+                    fleetHitsRef.current.push(...fleetHitRegions(layout, x, y, summary.pos));
                 });
             });
             ctx.restore();
@@ -1613,18 +1623,27 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         const xy = cellAt(evt.clientX, evt.clientY);
         if (!xy) return;
         onSelect(xy, evt.ctrlKey);
+        const hit = fleetHitAt(evt.clientX, evt.clientY);
+        if (hit && !evt.ctrlKey) onFleetInspect?.(hit.pos, hit.owner);
     };
 
     const handleMouseDown = useCallback((evt: React.MouseEvent<HTMLCanvasElement>) => {
         if (evt.button !== 0) return; // seulement clic gauche
+        // Le pan appelle preventDefault : donner explicitement le focus au canvas accessible,
+        // sinon un ancien champ (ex. zoom) garderait les touches Entrée/Échap/flèches.
+        evt.currentTarget.focus({preventScroll: true});
 
         // Ordres de déplacement : notification pour tout clic gauche (avant la logique de pan),
         // et détection d'une case contenant au moins une flotte du joueur (=> FleetPicker)
         onAnyCanvasMouseDown?.();
         const mdCell = cellAt(evt.clientX, evt.clientY);
-        const isFleetCell = !!mdCell && fleets.some(f => f.type === 'joueur' && f.pos.x === mdCell.x && f.pos.y === mdCell.y);
-        // Alt est réservé au tracé de zone : le sélecteur de flotte ne s'ouvre pas en Alt+clic
-        if (isFleetCell && mdCell && !evt.altKey) {
+        const hit = fleetHitAt(evt.clientX, evt.clientY);
+        const hasOwnFleet = !!mdCell && (showFleetBadges
+            ? !!fleetCells.get(`${mdCell.x}_${mdCell.y}`)?.formations.some(group => group.own)
+            : fleets.some(f => f.type === 'joueur' && f.pos.x === mdCell.x && f.pos.y === mdCell.y));
+        const isFleetCell = shouldOpenFleetPicker(hit, hasOwnFleet, currentPlayerId);
+        // Alt trace une zone ; Ctrl interroge la portée ; les autres commandants ouvrent l'inspection.
+        if (isFleetCell && mdCell && !evt.altKey && !evt.ctrlKey) {
             onFleetCellMouseDown?.(mdCell, evt.clientX, evt.clientY);
         }
 
@@ -1740,7 +1759,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
-    }, [cellSize, setCenter, cellAt, onCreateZone, onSelect, hideTooltip, fleets, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort]);
+    }, [cellSize, setCenter, cellAt, onCreateZone, onSelect, hideTooltip, fleets, fleetCells, showFleetBadges, currentPlayerId, fleetHitAt, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort]);
 
     const handleWheel = useCallback((evt: React.WheelEvent<HTMLCanvasElement>) => {
         const zoomSpeed = 0.1;
@@ -1784,6 +1803,15 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             <canvas
                 ref={canvasRef}
                 style={{width: '100%', height: '100vh'}}
+                tabIndex={0}
+                aria-label="Carte tactique. Maj et flèches sélectionnent une case ; Entrée inspecte ses flottes."
+                aria-describedby="fleet-map-keyboard-help"
+                onKeyDown={event => {
+                    if (event.key === 'Enter' && selected) {
+                        event.preventDefault();
+                        onFleetInspect?.(selected, undefined, true);
+                    }
+                }}
                 onClick={handleClick}
                 onMouseDown={handleMouseDown}
                 onWheel={handleWheel}
@@ -1793,6 +1821,10 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 onDragLeave={handleFleetDragLeave}
                 onDrop={handleFleetDrop}
             />
+            <span id="fleet-map-keyboard-help" className="fleet-map-a11y">
+                Un contact multiple ou une ligne étrangère ouvre le détail par commandant.
+                Les ordres sont réservés à vos flottes. Le glisser de la carte et Alt+glisser restent disponibles.
+            </span>
             {/* Surcouche transparente : contour de la case survolée */}
             <canvas
                 ref={hoverCanvasRef}
@@ -1804,7 +1836,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 style={{
                     position: 'absolute', display: 'none', pointerEvents: 'none', zIndex: 200,
                     background: 'rgba(15, 23, 42, 0.95)', border: '1px solid #334155', borderRadius: 6,
-                    padding: '5px 10px', fontSize: '0.8rem', color: '#f1f5f9', whiteSpace: 'nowrap',
+                    padding: '5px 10px', fontSize: '0.8rem', color: '#f1f5f9', whiteSpace: 'normal', maxWidth: 'min(520px, calc(100vw - 24px))', overflowWrap: 'anywhere',
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
                 }}
             />

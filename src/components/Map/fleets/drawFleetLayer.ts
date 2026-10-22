@@ -138,8 +138,10 @@ function drawContact(ctx: CanvasRenderingContext2D, rect: FleetRect, item: Exclu
         ctx.fillRect(rect.x + 2, rect.y + 3, Math.max(1, rect.width - 3), 1);
         return;
     }
-    ctx.font = '700 10px system-ui, sans-serif';
-    fittedText(ctx, `${item.formations.length}c`, cx, rect.y + rect.height * 0.35, rect.width - 4, 'center');
+    ctx.font = '700 9px system-ui, sans-serif';
+    const owners = item.formations.length;
+    const ownerLabel = rect.width >= 24 && owners < 10 ? `${owners}cdt` : `${owners > 99 ? '99+' : owners}c`;
+    fittedText(ctx, ownerLabel, cx, rect.y + rect.height * 0.35, rect.width - 4, 'center');
     if (rect.height >= 30) {
         ctx.font = '600 8px system-ui, sans-serif';
         ctx.fillStyle = '#b6c7d6';

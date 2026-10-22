@@ -57,3 +57,29 @@ export function drawFleetScene(focus: boolean, draw: Record<FleetScenePass, () =
         : ['reportRoutes', 'fleets', 'combats', 'reachability', 'selection', 'orders'];
     order.forEach(pass => draw[pass]());
 }
+
+export type FleetHitRegion = {
+    rect: FleetRect;
+    pos: FleetCellSummary['pos'];
+    kind: FleetLayoutItem['kind'];
+    owner?: number;
+};
+
+export function fleetHitRegions(items: readonly FleetLayoutItem[], x: number, y: number, pos: FleetCellSummary['pos']): FleetHitRegion[] {
+    return items.map(item => ({
+        rect: {...item.rect, x: x + item.rect.x, y: y + item.rect.y}, pos, kind: item.kind,
+        owner: item.kind === 'formation' ? item.formation.owner : undefined,
+    }));
+}
+
+export function findFleetHit(regions: readonly FleetHitRegion[], x: number, y: number): FleetHitRegion | undefined {
+    for (let i = regions.length - 1; i >= 0; i--) {
+        if (containsFleetPoint(regions[i].rect, x, y)) return regions[i];
+    }
+    return undefined;
+}
+
+/** Un contact multiple, un surplus ou un autre propriétaire ouvre l'inspection, jamais nos ordres. */
+export function shouldOpenFleetPicker(hit: FleetHitRegion | undefined, hasOwnFleet: boolean, currentPlayer: number): boolean {
+    return hasOwnFleet && (!hit || (hit.kind === 'formation' && hit.owner === currentPlayer));
+}

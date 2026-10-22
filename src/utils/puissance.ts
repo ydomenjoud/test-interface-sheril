@@ -36,14 +36,11 @@ export function getDescriptionPuissance(p: number) {
     return desc[desc.length - 1];
 }
 
-export function getPuissanceFromString(p: string){
-    const index = desc.indexOf(p.toLowerCase());
-    if(index < 0 ){
-        return "";
-    }
-    if (index === 0){
-        return `0-${seuil[0]}`
-    }
-
-    return `${seuil[index-1]}-${seuil[index]}`;
+export function getPuissanceFromString(p: string): string {
+    const index = desc.indexOf(p.trim().toLowerCase());
+    if (index < 0) return '';
+    // Les bornes supérieures du tableau sont exclusives ; le dernier niveau n'en a pas.
+    if (index === desc.length - 1) return `≥${seuil[index - 1]}`;
+    const lower = index === 0 ? 0 : seuil[index - 1];
+    return `${lower}-${seuil[index] - 1}`;
 }

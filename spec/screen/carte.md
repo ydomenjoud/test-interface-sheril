@@ -313,3 +313,46 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 - Les déplacements en attente sont stockés par tour dans le localStorage, clé `deplacements_tour_<tour>` ; un
   changement de tour recharge ceux du tour affiché.
 - Le chargement d'un nouveau rapport efface les déplacements de tous les tours (à refaire sur le nouveau rapport).
+
+## Présence tactique des flottes
+
+- Les résumés sont typés et calculés une seule fois par rapport et filtre. Un groupe = un commandant
+  sur une case, pas une fusion de ses flottes. La puissance principale est la plus forte catégorie
+  connue visible ; les différentes catégories et les contacts inconnus restent dans la composition.
+- Les détections répétées sont dédupliquées par couple commandant / numéro, les données propres priment.
+- La forme est un emblème abstrait de flotte (coque centrale et traits d'escorte), sans prétendre décrire
+  les classes ou le nombre réel de vaisseaux. Son empreinte et son fond opaque ne dépendent pas de la
+  puissance. Les cinq traits visuels correspondent aux bandes du filtre, pas à une quantité physique.
+- `×N` compte des flottes ; `Nc` / `Ncdt` indique des commandants distincts ; `+N cdt` compte les commandants
+  en surplus. La catégorie courte (I/R/TP/P/M/AG/G/TG/GI/T/IM) reprend celle du jeu. `?` et le bord discontinu
+  signalent une force inconnue, y compris dans un groupe qui contient aussi des forces connues.
+- À petite échelle : un contact multi-commandants, jamais plusieurs grands symboles superposés. Avec
+  assez d'espace : lignes bornées par commandant, au plus trois puis un surplus explicite. Les très
+  petites miniatures gardent le signal de pluralité ; les comptes exacts sont dans le détail.
+- Tous les rectangles restent à l'intérieur de leur case et ne se chevauchent pas (molette 8–128 px,
+  curseur 16–64 px). Nos flottes sont prioritaires, les autres commandants sont ordonnés par numéro,
+  pas par puissance : leur emplacement ne saute pas lorsque la puissance change.
+- Les couleurs conservent leur sens diplomatique, racial ou par joueur. Le numéro de commandant des
+  lignes et le panneau de détail distinguent les commandants partageant une même couleur. L'absence
+  de PNA/alliance est libellée « sans accord », pas une déclaration certaine d'hostilité.
+- Le choix « Inclure les puissances inconnues » est indépendant des préréglages de tailles connues,
+  inclus par défaut et mémorisé avec les autres filtres. « Inconnues seules » est un choix explicite.
+  La barre d'outils affiche flottes visibles / total du rapport ; le détail donne les comptes par case.
+- Clic sur un contact multiple, un surplus ou une ligne étrangère : ouvre le panneau de détail,
+  même s'il était replié, sans ouvrir le sélecteur de NOS ordres. Clic sur notre emblème : conserve le
+  sélecteur de déplacement. Clic sur le fond d'une case avec nos flottes visibles : geste existant.
+  Ctrl+clic reste réservé à la portée et Alt+glisser aux zones ; un pan annule le sélecteur.
+- Le panneau « Présence de flottes » liste TOUS les commandants du rapport de la case, avec compteur,
+  source, maximum connu visible, puis composition et flottes dépliables. Les flottes masquées par un
+  filtre sont signalées, mais restent consultables. Les dernières détections d'un ancien tour restent
+  dans une section séparée, avec leur avertissement d'obsolescence.
+- L'action explicite « Préparer un déplacement de mes flottes d'ici » réutilise FleetPicker et le même
+  schéma d'ordres. Aucune action de déplacement n'est proposée pour une détection étrangère.
+- Clavier : Tab atteint le canvas ; Maj+flèches sélectionne une case, Entrée ouvre l'inspection et donne
+  le focus au titre. Tab atteint les boutons de commandants, Entrée/Espace déplie leur contenu,
+  Échap replie le groupe et garde le focus sur son bouton. Aucune nouvelle dépendance n'est nécessaire.
+- Le chargement des ordres est gardé par l'identité du rapport, le tour et le compteur d'import :
+  les effets ne peuvent pas écraser un tour avec l'état du précédent pendant l'hydratation, même
+  sous StrictMode. Le stockage JSON, les directives, l'export du schéma et la remise à zéro lors d'un
+  import ne changent pas. Les intervalles textuels des catégories sont disjoints et se terminent par
+  `≥18000` pour « inimaginable », jamais par une borne `undefined`.

@@ -19,6 +19,17 @@ const SECTIONS: { title: string; items: Shortcut[] }[] = [
         ],
     },
     {
+        title: 'Lecture des flottes',
+        items: [
+            {keys: [['Focus flottes']], description: 'Les emblèmes opaques restent au-dessus des systèmes, combats et routes persistantes'},
+            {keys: [['×N']], description: 'Nombre de flottes, pas de vaisseaux ni puissance ; les traits indiquent cinq familles de puissance'},
+            {keys: [['c / cdt']], description: 'Nombre de commandants distincts ; +N cdt indique le surplus de commandants'},
+            {keys: [['?']], description: 'Puissance inconnue, indépendante des filtres de tailles connues'},
+            {keys: [['Clic sur un contact']], description: 'Inspecter les flottes par commandant ; une ligne étrangère ne déclenche jamais vos ordres'},
+            {keys: [['Entrée sur la carte']], description: 'Ouvrir le détail de la case sélectionnée au clavier ; Tab atteint les boutons de commandants'},
+        ],
+    },
+    {
         title: 'Historique',
         items: [
             {keys: [['Alt', '←']], description: 'Afficher le tour précédent (plus ancien)'},

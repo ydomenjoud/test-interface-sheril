@@ -1,6 +1,6 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
-import {CombatEvent, FlotteBase, FlotteDetectee, FlotteJoueur, XY, Note} from '../../types';
+import {CombatEvent, XY, Note} from '../../types';
 import { getTorusDistance } from '../../utils/position';
 import {
   combatsAtPosition,
@@ -11,9 +11,11 @@ import {
 import Commandant from "../utils/Commandant";
 import Position from "../utils/Position";
 import {colorForOwnership} from "./CanvasMap";
-import {getDescriptionPuissance, getPuissance, getPuissanceFromString} from "../../utils/puissance";
+import {getPuissanceFromString} from "../../utils/puissance";
 
 import ZoneEditor from './ZoneEditor';
+import FleetRoster, {FleetInspection} from './fleets/FleetRoster';
+import {FleetCellSummary} from '../../utils/fleetModel';
 import { zoneCovers } from '../../utils/zones';
 import { isObserved, lastKnownFleets } from '../../utils/fleetHistory';
 import { lastKnownSystem } from '../../utils/systemHistory';
@@ -29,6 +31,9 @@ type Props = {
   // Alternative clavier au glisser-déposer : déplacer la flotte vers la case sélectionnée
   onMoveFleet?: (fleetNum: number) => void;
   colorMode?: 'status' | 'race' | 'player';
+  fleetSummary?: FleetCellSummary;
+  fleetInspection?: FleetInspection;
+  onOpenFleetPicker?: (pos: XY, clientX: number, clientY: number) => void;
 };
 
 // Formatage des nombres avec séparateur de milliers (ex. 59 485)
@@ -47,8 +52,15 @@ const StaleIcon = () => (
 
 
 
-export default function InfoPanel({ selected, onFleetHover, onMoveFleet, colorMode = 'status' }: Props) {
+export default function InfoPanel({ selected, onFleetHover, onMoveFleet, colorMode = 'status', fleetSummary, fleetInspection, onOpenFleetPicker }: Props) {
   const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats, zones, zoneLabels, fleetSnapshots, systemSnapshots } = useReport();
+
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (fleetInspection?.focus && !fleetSummary && fleetInspection.pos.x === selected?.x && fleetInspection.pos.y === selected?.y) {
+      headingRef.current?.focus();
+    }
+  }, [fleetInspection, fleetSummary, selected?.x, selected?.y]);
 
   // Zones affichées : celles qui couvrent la case, plus celles déjà listées pour cette sélection
   // (une zone déplacée ou réduite hors de la case reste éditable jusqu'au prochain clic)
@@ -244,7 +256,7 @@ export default function InfoPanel({ selected, onFleetHover, onMoveFleet, colorMo
     <div className="carte-info">
       <div className="info-block">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0 }}>
+          <h3 ref={headingRef} tabIndex={-1} style={{ margin: 0 }}>
             Case <Position pos={selected} />
             {rapport && (
               <span style={{ marginLeft: 10, fontSize: '0.8rem', fontWeight: 'normal', color: '#94a3b8' }}>
@@ -300,11 +312,22 @@ export default function InfoPanel({ selected, onFleetHover, onMoveFleet, colorMo
         </div>
       )}
 
+      {fleetSummary && (
+        <FleetRoster key={`${selected.x}_${selected.y}`} summary={fleetSummary}
+          inspection={fleetInspection?.pos.x === selected.x && fleetInspection?.pos.y === selected.y ? fleetInspection : undefined}
+          getOwnerName={owner => owner === rapport?.joueur.numero ? 'Vous' : owner === 0 ? 'Neutre'
+            : global?.commandants.find(commandant => commandant.numero === owner)?.nom || `Commandant ${owner}`}
+          getOwnerColor={owner => colorForOwnership(rapport?.joueur.numero, [owner], rapport?.joueur.alliances,
+            rapport?.joueur.pna, colorMode, global) || '#94a3b8'}
+          onFleetHover={onFleetHover} onOpenFleetPicker={onOpenFleetPicker}
+        />
+      )}
+
       {/* Le détail système (nom, possesseurs, planètes, population) est dans le récapitulatif en tête de panneau */}
 
-      {(atPos.fleets.length > 0 || pastFleets) && (
+      {pastFleets && (
       <div className="info-block">
-        <h4>Flottes</h4>
+        <h4>Dernières flottes connues (tour {pastFleets.tour})</h4>
         <table className="tech-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
           <tr>
@@ -316,33 +339,6 @@ export default function InfoPanel({ selected, onFleetHover, onMoveFleet, colorMo
           </tr>
           </thead>
           <tbody>
-          {atPos.fleets.map((f: FlotteBase, i: number) => {
-            const owner = (f as any).proprio ?? (rapport?.joueur?.numero ?? undefined);
-            // const puissance = (f as any).puiss ?? ((typeof f.as === 'number') ? f.as : '—');
-            let puissanceDesc = "";
-
-            if(f.type === 'joueur') {
-                const local = f as FlotteJoueur;
-                const puissance = getPuissance(local);
-                const p = getDescriptionPuissance(puissance);
-                puissanceDesc = `AS: ${local.as}/ AP: ${local.ap} (${p})`;
-            } else if (f.type === 'detecte') {
-                const local = f as FlotteDetectee;
-                puissanceDesc = `${getPuissanceFromString(local.puiss)} - ${local.puiss}`;
-
-            }
-            return (
-              <tr key={`flt-${i}`} {...(f.type === 'joueur' ? { onMouseEnter: showFleetHover(f), onMouseLeave: hideFleetHover } : {})}>
-                <td style={{ textAlign: 'right' }}>{f.num + 1}</td>
-                <td>{f.nom}</td>
-                <td style={{ textAlign: 'right' }}>
-                  {typeof owner === 'number' ? <Commandant num={owner} /> : '—'}
-                </td>
-                  <td>{f.nbVso}</td>
-                <td style={{ textAlign: 'right' }}>{puissanceDesc}</td>
-              </tr>
-            );
-          })}
           {pastFleets?.flottes.map((f, i) => (
             <tr key={`old-${i}`} style={staleRowStyle}>
               <td style={{ textAlign: 'right' }}>{f.num + 1}</td>
