@@ -9,7 +9,6 @@ type Props = {
   onCenter: (x: number, y: number) => void;
   colorMode?: 'status' | 'race' | 'player';
   sectorData?: PresenceData | null; // aperçu par secteurs (couche présence)
-  focusPlayer?: number | null; // commandant isolé
 };
 
 function torusDelta(a: number, b: number, max: number): number {
@@ -21,7 +20,7 @@ function torusDelta(a: number, b: number, max: number): number {
   return d;
 }
 
-export default function MiniMap({ onCenter, colorMode = 'status', sectorData = null, focusPlayer = null }: Props) {
+export default function MiniMap({ onCenter, colorMode = 'status', sectorData = null }: Props) {
   const { rapport, center, viewportCols, viewportRows, global } = useReport();
   const currentCenter = useMemo(() => center || CENTER, [center]);
   const ref = useRef<HTMLCanvasElement>(null);
@@ -55,14 +54,12 @@ export default function MiniMap({ onCenter, colorMode = 'status', sectorData = n
       return { px: midX + (dCol / BOUNDS.maxY) * cvs.clientWidth, py: midY + (dRow / BOUNDS.maxX) * cvs.clientHeight };
     };
 
-    // Aperçu par secteurs : teinte la case à la couleur du commandant dominant du secteur
-    // (ou du commandant focus, si un focus est actif). Un secteur sans donnée reste sombre.
+    // Aperçu par secteurs : teinte la case à la couleur du commandant dominant du secteur.
+    // Un secteur sans donnée reste sombre.
     if (sectorData) {
       let maxCount = 0;
       sectorData.sectors.forEach(sec => {
-        const c = focusPlayer != null
-          ? (sec.counts.get(focusPlayer) || 0)
-          : (sec.dominant >= 0 ? (sec.counts.get(sec.dominant) || 0) : 0);
+        const c = sec.dominant >= 0 ? (sec.counts.get(sec.dominant) || 0) : 0;
         if (c > maxCount) maxCount = c;
       });
       if (maxCount <= 0) maxCount = 1;
@@ -71,15 +68,8 @@ export default function MiniMap({ onCenter, colorMode = 'status', sectorData = n
           const { row, col } = getSectorGridCoords(x, y);
           const sec = sectorData.sectors.get(`${row}_${col}`);
           if (!sec) continue;
-          let owner = -1;
-          let count = 0;
-          if (focusPlayer != null) {
-            const f = sec.counts.get(focusPlayer) || 0;
-            if (f > 0) { owner = focusPlayer; count = f; }
-          } else {
-            owner = sec.dominant;
-            count = owner >= 0 ? (sec.counts.get(owner) || 0) : 0;
-          }
+          const owner = sec.dominant;
+          const count = owner >= 0 ? (sec.counts.get(owner) || 0) : 0;
           if (owner < 0 || count <= 0) continue;
           const { px, py } = cellCenter(x, y);
           ctx.globalAlpha = 0.10 + 0.30 * Math.min(1, count / maxCount);
@@ -117,7 +107,7 @@ export default function MiniMap({ onCenter, colorMode = 'status', sectorData = n
       ctx.lineWidth = 2;
       ctx.strokeRect(midX - rectW / 2, midY - rectH / 2, rectW, rectH);
     }
-  }, [rapport, playerId, currentCenter, viewportCols, viewportRows, colorMode, global, sectorData, focusPlayer]);
+  }, [rapport, playerId, currentCenter, viewportCols, viewportRows, colorMode, global, sectorData]);
 
   // Secteur sous le curseur (même math que le clic, sans arrondi) -> infobulle de composition
   const sectorAtCursor = (e: React.MouseEvent<HTMLCanvasElement>): { key: string; summary: SectorSummary } | null => {

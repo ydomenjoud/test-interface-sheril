@@ -110,17 +110,6 @@ describe('computePresence', () => {
         expect(data.winner[idx(30, 30)]).toBe(7);
     });
 
-    test('le mode focus isole un commandant', () => {
-        reinitialiserBornesGalaxie();
-        const rapport = mkRapport({
-            systemesJoueur: [{pos: {x: 20, y: 20}, proprietaires: [1]}],
-            systemesDetectes: [{pos: {x: 40, y: 40}, proprietaires: [9], tour: 100}],
-        });
-        const data = computePresence(rapport, null, 1, {focusPlayer: 9});
-        expect(data.winner[idx(40, 40)]).toBe(9);
-        expect(data.winner[idx(20, 20)]).toBe(-1);
-    });
-
     test('un système isolé fait un petit nuage, pas une large région', () => {
         reinitialiserBornesGalaxie();
         const rapport = mkRapport({systemesJoueur: [{pos: {x: 30, y: 30}, proprietaires: [1]}]});

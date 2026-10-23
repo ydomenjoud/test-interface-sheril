@@ -110,7 +110,6 @@ type Props = {
     presenceMode?: 'presence' | 'voronoi'; // 'voronoi' = ancienne influence au plus proche
     presenceData?: PresenceData | null; // grille précalculée sur toute la galaxie (mode présence)
     presenceDecay?: number; // fenêtre de fraîcheur (tours) des détections
-    presenceFocus?: number | null; // commandant isolé par le focus
     // ---- Ordres de déplacement (drag & drop de flottes) ----
     deplacements?: Record<number, XY>; // flotteNum → cible commandée
     dragFleet?: { from: XY; vitesse: number; cursor: XY } | null; // drag en cours : anneau de vitesse + ligne + distance
@@ -160,7 +159,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
 }
 
 export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
-                        presenceMode = 'voronoi', presenceData = null, presenceDecay = 10, presenceFocus = null,
+                        presenceMode = 'voronoi', presenceData = null, presenceDecay = 10,
                         deplacements, dragFleet, highlightPos, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort, onFleetDragOver, onFleetDragLeave, onFleetDrop}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1079,12 +1078,10 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             const cx = px + cellSize / 2;
             const cy = py + cellSize / 2;
 
-            // Couche présence : on estompe les détections anciennes et, en mode focus, les systèmes
-            // qui n'appartiennent pas au commandant focus (disque, contour et insigne).
+            // Couche présence : on estompe les détections anciennes (disque, contour et insigne).
             let presenceDim = 1;
             if (presenceMode === 'presence') {
                 if (s.tour != null && detectionWeight(rapport?.tour ?? 0, s.tour, presenceDecay) < 0.5) presenceDim *= 0.5;
-                if (presenceFocus != null && !(owners || []).includes(presenceFocus)) presenceDim *= 0.35;
             }
 
             const c2d = ctx as CanvasRenderingContext2D;
@@ -1755,7 +1752,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         // Le survol dépend de la géométrie (centre, taille de case) : on resynchronise l'overlay après chaque dessin
         redrawHoverOverlay();
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, presenceMode, presenceData, presenceDecay, presenceFocus, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, presenceMode, presenceData, presenceDecay, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
