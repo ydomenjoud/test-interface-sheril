@@ -2,7 +2,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
 import {BOUNDS, CENTER, getTorusDistance, torusDelta, wrapX, wrapY} from '../../utils/position';
 import {capaciteReparation} from '../../utils/reparation';
-import {getSectorNumber, isSectorLabelCell, sectorBackgroundColor, sectorLabelColor} from '../../utils/sectors';
+import {getSectorNumber, isSectorLabelCell, sectorLabelColor} from '../../utils/sectors';
 import {countCombatsByKind} from '../../parsers/parseCombatMessages';
 import {drawCombatMarkers} from '../../utils/combatMarkers';
 import {Alliance, GlobalData, XY, Zone} from '../../types';
@@ -119,6 +119,7 @@ type Props = {
     presenceMode?: 'presence' | 'voronoi'; // 'voronoi' = ancienne influence au plus proche
     presenceData?: PresenceData | null; // grille précalculée sur toute la galaxie (mode présence)
     presenceDecay?: number; // fenêtre de fraîcheur (tours) des détections
+    presenceLabels?: boolean; // n° du commandant par blob (automatique à case ≤ 16 px)
     // ---- Ordres de déplacement (drag & drop de flottes) ----
     deplacements?: Record<number, XY>; // flotteNum → cible commandée
     dragFleet?: { from: XY; vitesse: number; cursor: XY } | null; // drag en cours : anneau de vitesse + ligne + distance
@@ -168,7 +169,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
 }
 
 export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, fleetFocus = false, fleets, fleetCells, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
-                        presenceMode = 'voronoi', presenceData = null, presenceDecay = 10,
+                        presenceMode = 'voronoi', presenceData = null, presenceDecay = 10, presenceLabels = false,
                         deplacements, dragFleet, highlightPos, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort, onFleetDragOver, onFleetDragLeave, onFleetDrop}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -594,7 +595,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
         }
 
-        // fond des secteurs 10×10
+        // cases de la carte (couche présence / influence, libellés de secteurs)
         for (let r = 0; r < rows; r++) {
             const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
             for (let c = 0; c < cols; c++) {
@@ -603,13 +604,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 // Ne pas dessiner le contenu dans les en-têtes (ligne 0 et colonne 0 du canvas)
                 if (r === 0 || c === 0) continue;
 
-                const sectorBg = showSectors ? sectorBackgroundColor(xCoord, yCoord) : null;
-                if (sectorBg) {
-                    ctx.fillStyle = sectorBg;
-                    ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
-                }
-
-                // Couche présence / influence - dessinée après le damier pour plus de clarté
+                // Couche présence / influence
                 const presenceIdx = presenceData ? (xCoord - 1) * presenceData.maxY + (yCoord - 1) : -1;
                 if (usePresenceGrid && presenceData) {
                     const winner = presenceData.winner[presenceIdx];
@@ -1499,13 +1494,13 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             reachability: drawReachability, selection: drawSelection, orders: drawOrders,
         });
 
-        // Très petit zoom (case ≤ 16 px, minimum de la barre de zoom) : un libellé par « blob »
-        // de présence — le numéro du
-        // commandant au point de densité locale la plus forte du blob (ex. #39), blanc à
-        // contour sombre pour rester lisible sur n'importe quelle teinte. Le maximum local est
-        // précalculé sur le tore complet (une seule passe), puis chaque copie visible du tore
-        // est libellée au dessin.
-        if (usePresenceGrid && presenceData && cellSize <= 16) {
+        // Libellé par « blob » de présence — le nom du commandant et son numéro au point de densité
+        // locale la plus forte du blob (ex. « Dergon (#39) », repli « #39 » si le nom est inconnu),
+        // blanc à contour sombre pour rester lisible sur n'importe quelle teinte. Automatique en
+        // très petit zoom (case ≤ 16 px, minimum de la barre de zoom), sinon seulement si le
+        // réglage « Afficher commandants » est actif. Le maximum local est précalculé sur le
+        // tore complet (une seule passe), puis chaque copie visible du tore est libellée au dessin.
+        if (usePresenceGrid && presenceData && (cellSize <= 16 || presenceLabels)) {
             const pMaxX = presenceData.maxX;
             const pMaxY = presenceData.maxY;
             const isBlobAnchor = new Uint8Array(pMaxX * pMaxY);
@@ -1534,8 +1529,19 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     if (anchor) isBlobAnchor[i] = 1;
                 }
             }
+            // « Nom (#numéro) » par commandant, mis en cache pendant le passage de dessin
+            const blobLabelCache = new Map<number, string>();
+            const blobLabel = (w: number): string => {
+                let t = blobLabelCache.get(w);
+                if (t === undefined) {
+                    const nom = global?.commandants?.find(c => c.numero === w)?.nom;
+                    t = nom ? `${nom} (#${w})` : `#${w}`;
+                    blobLabelCache.set(w, t);
+                }
+                return t;
+            };
             const pCtx = ctx as CanvasRenderingContext2D;
-            const pFont = Math.max(7, Math.min(9, Math.round(cellSize * 0.55)));
+            const pFont = Math.max(8, Math.min(10, Math.round(cellSize * 0.63)));
             pCtx.save();
             pCtx.font = `700 ${pFont}px sans-serif`;
             pCtx.textAlign = 'center';
@@ -1551,8 +1557,9 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     if (!isBlobAnchor[i]) continue;
                     const px = c * cellSize + cellSize / 2;
                     const py = r * cellSize + cellSize / 2;
-                    pCtx.strokeText(`#${presenceData.winner[i]}`, px, py);
-                    pCtx.fillText(`#${presenceData.winner[i]}`, px, py);
+                    const txt = blobLabel(presenceData.winner[i]);
+                    pCtx.strokeText(txt, px, py);
+                    pCtx.fillText(txt, px, py);
                 }
             }
             pCtx.restore();
@@ -1674,7 +1681,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         // Le survol dépend de la géométrie (centre, taille de case) : on resynchronise l'overlay après chaque dessin
         redrawHoverOverlay();
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, fleetFocus, fleetCells, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, presenceMode, presenceData, presenceDecay, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, fleetFocus, fleetCells, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, presenceMode, presenceData, presenceDecay, presenceLabels, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {

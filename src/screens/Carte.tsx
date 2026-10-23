@@ -147,6 +147,11 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_presence_decay');
     return saved !== null ? Math.max(4, Math.min(20, Number(JSON.parse(saved)) || 10)) : 10;
   });
+  // Libellé n° de commandant par blob de présence (automatique en très petit zoom, case ≤ 16 px)
+  const [presenceLabels, setPresenceLabels] = useState<boolean>(() => {
+    const saved = localStorage.getItem('carte_presence_labels');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
   const [showSectors, setShowSectors] = useState(() => {
     const saved = localStorage.getItem('carte_show_sectors');
     return saved !== null ? JSON.parse(saved) : false;
@@ -269,6 +274,9 @@ export default function Carte() {
   useEffect(() => {
     localStorage.setItem('carte_presence_decay', JSON.stringify(presenceDecay));
   }, [presenceDecay]);
+  useEffect(() => {
+    localStorage.setItem('carte_presence_labels', JSON.stringify(presenceLabels));
+  }, [presenceLabels]);
   useEffect(() => {
     localStorage.setItem('carte_show_sectors', JSON.stringify(showSectors));
   }, [showSectors]);
@@ -837,6 +845,7 @@ export default function Carte() {
             showInfluence={presenceOn}
             presenceMode={presenceMode}
             presenceData={presence}
+            presenceLabels={presenceLabels}
             influenceOpacity={influenceOpacity}
             colorMode={colorMode}
             showStabilityZones={showStabilityZones}
@@ -1049,20 +1058,30 @@ checked={presenceOn}
                                         style={{ width: '100%', cursor: 'pointer' }}
                                     />
                                     {presenceMode === 'presence' && (
-                                        <div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <span style={{ fontSize: '0.8em', color: '#94a3b8' }}>Fraîcheur des détections</span>
-                                                <span style={{ fontSize: '0.8em', color: '#f1f5f9' }}>{presenceDecay} tours</span>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                            <div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.8em', color: '#94a3b8' }}>Fraîcheur des détections</span>
+                                                    <span style={{ fontSize: '0.8em', color: '#f1f5f9' }}>{presenceDecay} tours</span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min={4}
+                                                    max={20}
+                                                    step={1}
+                                                    value={presenceDecay}
+                                                    onChange={(e) => setPresenceDecay(parseInt(e.target.value, 10))}
+                                                    style={{ width: '100%', cursor: 'pointer' }}
+                                                />
                                             </div>
-                                            <input
-                                                type="range"
-                                                min={4}
-                                                max={20}
-                                                step={1}
-                                                value={presenceDecay}
-                                                onChange={(e) => setPresenceDecay(parseInt(e.target.value, 10))}
-                                                style={{ width: '100%', cursor: 'pointer' }}
-                                            />
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.85em', cursor: 'pointer' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={presenceLabels}
+                                                    onChange={(e) => setPresenceLabels(e.target.checked)}
+                                                />
+                                                Afficher commandants
+                                            </label>
                                         </div>
                                     )}
                                 </div>
