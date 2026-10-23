@@ -1158,8 +1158,10 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             // Capacité de réparation > 0 : petit insigne « + » en haut-gauche de la case.
             // (Avant : anneau blanc épais autour du disque — visuellement dominant, il
             // rivalisait avec la sélection et lavait le contraste des systèmes voisins.)
+            // Masqué en très petit zoom (case ≤ 16 px, minimum de la barre de zoom) : à cette
+            // échelle l'insigne ne se lit plus.
             const reparation = reparationByPos.get(`${s.pos.x}_${s.pos.y}`) ?? 0;
-            if (reparation > 0 && isSystemSelected(owners)) {
+            if (reparation > 0 && isSystemSelected(owners) && cellSize > 16) {
                 const chip = Math.max(10, Math.round(cellSize * 0.42));
                 const pad = Math.max(2, Math.round(cellSize * 0.06));
                 const bx = px + pad;
@@ -1576,6 +1578,65 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     dx += BOUNDS.maxY;
                 }
             }
+        }
+
+        // Très petit zoom (case ≤ 16 px, minimum de la barre de zoom) : un libellé par « blob »
+        // de présence — le numéro du
+        // commandant au point de densité locale la plus forte du blob (ex. #39), blanc à
+        // contour sombre pour rester lisible sur n'importe quelle teinte. Le maximum local est
+        // précalculé sur le tore complet (une seule passe), puis chaque copie visible du tore
+        // est libellée au dessin.
+        if (usePresenceGrid && presenceData && cellSize <= 16) {
+            const pMaxX = presenceData.maxX;
+            const pMaxY = presenceData.maxY;
+            const isBlobAnchor = new Uint8Array(pMaxX * pMaxY);
+            for (let x = 1; x <= pMaxX; x++) {
+                for (let y = 1; y <= pMaxY; y++) {
+                    const i = (x - 1) * pMaxY + (y - 1);
+                    const w = presenceData.winner[i];
+                    if (w < 0) continue;
+                    const d = presenceData.density[i];
+                    let anchor = true;
+                    for (let dx = -2; dx <= 2 && anchor; dx++) {
+                        for (let dy = -2; dy <= 2; dy++) {
+                            if (dx === 0 && dy === 0) continue;
+                            const nx = wrapX(x + dx);
+                            const ny = wrapY(y + dy);
+                            const ni = (nx - 1) * pMaxY + (ny - 1);
+                            if (presenceData.winner[ni] !== w) continue;
+                            const dn = presenceData.density[ni];
+                            // Égalité tranchée par les coordonnées : un blob plat ne sort qu'un libellé
+                            if (dn > d || (dn === d && (nx < x || (nx === x && ny < y)))) {
+                                anchor = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (anchor) isBlobAnchor[i] = 1;
+                }
+            }
+            const pCtx = ctx as CanvasRenderingContext2D;
+            const pFont = Math.max(7, Math.min(9, Math.round(cellSize * 0.55)));
+            pCtx.save();
+            pCtx.font = `700 ${pFont}px sans-serif`;
+            pCtx.textAlign = 'center';
+            pCtx.textBaseline = 'middle';
+            pCtx.lineWidth = Math.max(1, Math.round(pFont / 5));
+            pCtx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+            pCtx.fillStyle = '#ffffff';
+            for (let r = 1; r < rows; r++) {
+                const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
+                for (let c = 1; c < cols; c++) {
+                    const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
+                    const i = (xCoord - 1) * pMaxY + (yCoord - 1);
+                    if (!isBlobAnchor[i]) continue;
+                    const px = c * cellSize + cellSize / 2;
+                    const py = r * cellSize + cellSize / 2;
+                    pCtx.strokeText(`#${presenceData.winner[i]}`, px, py);
+                    pCtx.fillText(`#${presenceData.winner[i]}`, px, py);
+                }
+            }
+            pCtx.restore();
         }
 
         // SURBRILLANCE DE CASE (survol d'une flotte dans le panneau info) : même style que la case
