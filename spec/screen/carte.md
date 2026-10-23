@@ -144,7 +144,8 @@ s'affichent à moitié taille.
 
 Un système dont la capacité de réparation par tour est > 0 (somme des caractéristiques « capacité réparation
 vaisseaux » des bâtiments de ses planètes) reçoit une bordure blanche épaisse autour de son disque, pour le
-repérer d'un coup d'œil (entrée « réparation » de la légende).
+repérer d'un coup d'œil (entrée « réparation » de la légende). En très petit zoom (case ≤ 16 px, minimum
+de la barre de zoom), l'insigne est masqué (il ne se lit plus à cette échelle).
 
 il faut utiliser une image correspondante à sa propriété "typeEtoile" et utiliser l'image
 public/img/etoile{typeEtoile}.gif (images pack étoiles).
@@ -246,6 +247,10 @@ couche « Présence », calculée sur TOUT le tore (pas seulement le viewport) p
   leur contour et leur insigne estompés.
 - Les cases où la carte galactique (data.xml) signale un système jamais observé sont hachurées :
   « le système existe, son propriétaire est inconnu ». L'espace vraiment vide reste noir.
+- En très petit zoom (case ≤ 16 px, minimum de la barre de zoom), chaque blob porte le numéro de son
+  commandant (ex. `#39`) au
+  point de densité locale la plus forte, en blanc à contour sombre ; chaque copie visible du tore
+  est libellée.
 
 ### réglages (panneau Filtres)
 
