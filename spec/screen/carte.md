@@ -71,7 +71,8 @@ conséquence.
 
 Une légende compacte (couleurs de possession moi / alliance / PNA / ennemi / neutre, marqueur flotte, et
 « réparation » = bordure blanche du disque) est affichée en bas à gauche de la carte, au ras du bord, en mode
-de couleur "Par diplo".
+de couleur "Par diplo". Quand la couche présence est active, elle ajoute les entrées « présence »
+(teinte de densité) et « inconnu » (hachures : système de la carte galactique jamais observé).
 
 Les portées radar (systèmes et flottes) sont désactivées par défaut pour ne pas voiler la carte ; elles peuvent
 être activées par les boutons ◎ et ◉ de la barre d'outils (filtres rapides).
@@ -91,7 +92,8 @@ panneau "Filtres", qui garde la même liste complète) :
 * ⇢ : ouvre / replie le tiroir des déplacements de flottes (avec leur nombre en attente)
 * ⚙ : ouvre / ferme le panneau "Filtres" (options avancées, fermé par défaut ; le panneau n'est monté que
   lorsqu'il est ouvert, sans onglet permanent sur la carte) : Commandants, Tags, Afficher
-  systèmes, Carte galactique, Secteurs, Influence (+ opacité), Minimap, Mode de couleur, Badges (combats /
+  systèmes, Carte galactique, Secteurs, Présence (mode présence / Voronoi, opacité, fraîcheur,
+  afficher commandants), Minimap, Mode de couleur, Badges (combats /
   propriétaires / flottes), Zones manuelles, Portées Radar (systèmes / flottes), Distance Capitale (zones de
   stabilité et choix du système de référence)
 * ? : aide et raccourcis (touche `?`)
@@ -117,6 +119,10 @@ panneau "Filtres", qui garde la même liste complète) :
   - Un clic sur la mini-carte recadre la carte principale autour du point visé (par offset relatif au centre).
   - L'icône ▣ dans les filtres rapides de la barre d'outils (et une case à cocher dans les Filtres) permet de
     l'afficher/masquer ; elle est affichée par défaut.
+  - Aperçu par secteurs (actif quand « Afficher influence » est cochée) : chaque secteur 10×10 est
+    teinté à la couleur du commandant dominant (voir « Couche présence ») ; au survol d'un secteur,
+    une infobulle donne la composition par commandant, les systèmes neutres et les systèmes jamais
+    observés.
 - Header: un bouton "Capitale" recentre la carte principale sur la capitale du joueur.
 - Panneau d'informations : repliable via un bouton dédié dans la barre d'outils, le raccourci Alt + I ou le bouton de fermeture dans l'en-tête, offrant une vue pleine largeur à la carte (colonne à 0 px ; le ré-ouvre depuis la barre d'outils ou Alt + I, pas de bouton en double sur la carte). L'intérieur est organisé en onglets rapides (Tout / Système / Flottes / Tactique) avec badges de comptage évitant le défilement vertical infini.
 
@@ -139,7 +145,8 @@ s'affichent à moitié taille.
 
 Un système dont la capacité de réparation par tour est > 0 (somme des caractéristiques « capacité réparation
 vaisseaux » des bâtiments de ses planètes) reçoit une bordure blanche épaisse autour de son disque, pour le
-repérer d'un coup d'œil (entrée « réparation » de la légende).
+repérer d'un coup d'œil (entrée « réparation » de la légende). En très petit zoom (case ≤ 16 px, minimum
+de la barre de zoom), l'insigne est masqué (il ne se lit plus à cette échelle).
 
 il faut utiliser une image correspondante à sa propriété "typeEtoile" et utiliser l'image
 public/img/etoile{typeEtoile}.gif (images pack étoiles).
@@ -212,6 +219,49 @@ une case sans aucun contenu (ni système, ni flotte, ni combat, ni zone) affiche
 - zones couvrant la case (éditables)
 - notes de la case (le formulaire d'ajout est replié derrière un bouton)
 
+## Couche présence (« qui est où »)
+
+Objectif : savoir, à l'échelle de toute la galaxie, où est quel commandant, sans se laisser tromper
+par les données inconnues. L'ancienne couche « Influence » (Voronoi dur : chaque case est attribuée
+au système connu le plus proche) est conservée sous le mode « Voronoi » ; le mode par défaut est la
+couche « Présence », calculée sur TOUT le tore (pas seulement le viewport) par
+`src/utils/presence.ts` et mise en cache par rapport/réglage (aucun recalcul par image).
+
+### calcul
+
+- Sources : les systèmes du joueur (poids plein) et les systèmes détectés. Le poids d'une détection
+  décroît avec son âge : plein jusqu'à 3 tours, puis linéairement jusqu'à 0 au tour N (réglage
+  « Fraîcheur », défaut 10). Une détection d'âge inconnu (anciens caches) reçoit un poids fixe de
+  0.25. Les systèmes neutres (propriétaire 0) sont exclus.
+- Chaque système est un « splat » gaussien de bande σ propre au commandant (bornée 3–8, estimée sur
+  l'écart médian entre ses systèmes connus, repli sur l'écartement des systèmes du joueur puis 6),
+  avec contributions négligées au-delà de 2.5σ : un système isolé ne fait qu'un petit nuage, un
+  amas dense fait une région.
+- Le propriétaire d'une case est le commandant à la densité la plus forte, s'il est au-dessus du
+  seuil (2 %) ; sinon la case reste **inconnue** et n'est colorée pour personne — c'est ce qui
+  corrige le « trou avalé par le voisin » du Voronoi.
+- L'opacité de la teinte est proportionnelle à la densité gagnante (plus c'est dense, plus c'est
+  net) et bornée par le réglage « Opacité ».
+- Les systèmes détectés plus anciens que la moitié de la fenêtre (poids < 0.5) voient leur disque,
+  leur contour et leur insigne estompés.
+- Les cases où la carte galactique (data.xml) signale un système jamais observé sont hachurées :
+  « le système existe, son propriétaire est inconnu ». L'espace vraiment vide reste noir.
+- Chaque blob porte le nom de son commandant et son numéro (ex. `Dergon (#39)`, repli `#39` si le
+  nom est inconnu) au point de densité locale la plus forte, en blanc à contour sombre ; chaque
+  copie visible du tore est libellée. Affichage automatique en très petit zoom (case ≤ 16 px,
+  minimum de la barre de zoom), sinon seulement si le réglage « Afficher commandants » est actif.
+
+### réglages (panneau Filtres)
+
+- « Afficher influence » : active / désactive la couche, et avec elle l'aperçu par secteurs de la
+  mini-carte (le réglage de l'ancienne couche influence est migré).
+- Mode : `Présence` (défaut) / `Voronoi` (ancienne influence au plus proche, inchangée).
+- Opacité : 5–50 %, défaut 18 % (commune aux deux modes).
+- Fraîcheur : fenêtre de décroissance des détections, 4–20 tours, défaut 10.
+- « Afficher commandants » : affiche le nom et le numéro du commandant sur chaque blob
+  (défaut inactif ; l'affichage reste automatique en très petit zoom, case ≤ 16 px).
+- Les réglages sont mémorisés (localStorage, clés `carte_presence_*`).
+
 ## déplacements de flottes (schéma d'ordres)
 
 La carte permet de préparer des ordres de déplacement de ses flottes par glisser-déposer : le résultat est un
@@ -252,9 +302,14 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 - La flotte apparaît « modifiée par rapport au rapport » : anneau ambre (#ff9800) et flèche vers sa nouvelle
   destination (qui remplace la direction du rapport, rappelée ⚠ « déjà en route vers x_y » dans le panneau quand
   le rapport en avait une).
-- La flèche d'ordre de déplacement est dessinée dans un passage dédié PAR-DESSUS TOUT le reste de la carte
-  (disques de flottes, marqueurs de combat, cadre de sélection) : la cible commandée n'est jamais masquée
-  (seuls le tracé du glisser en cours et la surbrillance de survol d'une flotte se dessinent au-dessus).
+- En vue normale, la flèche d'ordre de déplacement reste au-dessus des marqueurs de flottes
+  et du cadre de sélection. En **focus flottes**, exception explicite : systèmes, remplissages de
+  sélection et TOUTES les routes persistantes (rapport, portée, ordres) sont dessinés avant le passage
+  global des emblèmes de flottes, sur fond opaque. Le marqueur de combat (S / P, dans le coin
+  HAUT-DROIT de la case) est toujours la couche persistante la plus haute dans les deux modes :
+  il n'est jamais masqué par un badge de flotte. Le survol et le glisser actif restent au-dessus.
+- Les directions du rapport et les ordres utilisent le même delta court torique, pour toutes les copies
+  visibles du tore. Aucun tracé de direction d'une case ne repeint les marqueurs d'une autre case.
 - Couleur de la flèche : verte (#4caf50) si la destination est à portée de la flotte ce tour, rouge (#f44336) sinon.
   L'orange (#ff9800) est réservé aux flèches de « direction » préexistantes du rapport.
 
@@ -310,3 +365,66 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 - Les déplacements en attente sont stockés par tour dans le localStorage, clé `deplacements_tour_<tour>` ; un
   changement de tour recharge ceux du tour affiché.
 - Le chargement d'un nouveau rapport efface les déplacements de tous les tours (à refaire sur le nouveau rapport).
+
+## Présence tactique des flottes
+
+- Les résumés sont typés et calculés une seule fois par rapport et filtre. Un groupe = un commandant
+  sur une case, pas une fusion de ses flottes. La puissance principale est la plus forte catégorie
+  connue visible ; les différentes catégories et les contacts inconnus restent dans la composition.
+- Les détections répétées sont dédupliquées par couple commandant / numéro, les données propres priment.
+- La forme est un emblème abstrait de flotte (coque centrale et traits d'escorte), sans prétendre décrire
+  les classes ou le nombre réel de vaisseaux. Son empreinte et son fond opaque ne dépendent pas de la
+  puissance. La catégorie est donnée par sa lettre, sans barres de puissance redondantes.
+
+#### Révélation progressive des marqueurs
+
+Principe : chaque niveau de zoom affiche tout ce qui tient, dans l'ordre de priorité couleur du
+propriétaire → signal du groupe (lettre / nombre de commandants) → emblème → compteur de flottes →
+numéro de commandant → pastilles. Zoomer n'ajoute que de l'information, il ne la remplace jamais.
+Le mode focus ne change que l'ordre des couches et l'atténuation des systèmes, jamais le contenu
+ni la géométrie des marqueurs.
+
+**Une formation seule sur la case**
+
+| Taille de case | Boîte | Toujours affiché | Ajouté si cela tient |
+|---|---|---|---|
+| 8–23 px | `case − 2` | la lettre de catégorie, fonte réduite pour tenir, centrée optiquement, jamais de débordement | — |
+| 24–63 px | `min(case − 4, 48)` | emblème + lettre, le bloc centré dans la boîte ; l'emblème grossit proportionnellement (10 px à 24 px → 22 px à la carte 64 px) | `×N` flottes, centré AVEC la lettre (jamais aux extrémités de la boîte) |
+| ≥ 64 px | 48 | grand emblème + lettre + `×N`, et `#n` du commandant s'il n'est pas le nôtre | — |
+
+**Plusieurs commandants sur la case (contact)**
+
+| Taille de case | Boîte | Toujours affiché | Ajouté si cela tient |
+|---|---|---|---|
+| 8–14 px | `case − 2` | deux barres de 1 px (signal de pluralité) | — |
+| 15–63 px | `min(case − 4, 48)` — la même boîte que la formation seule | `N cdt` (→ `Nc` si cela ne tient pas), dans la même couleur que le total | total `×N` dès que la boîte fait 26 px, pastilles de couleur des commandants (max 5) |
+| ≥ 64 px | largeur `min(case − 4, 92)` | trois lignes `#n` (si non propriétaire) + lettre + `×N`, sans pictogramme ; au-delà, un surplus `+N cdt` | — |
+
+- `×N` compte des flottes ; `N cdt` / `+N cdt` indique des commandants distincts. La catégorie courte
+  (I/R/TP/P/M/AG/G/TG/GI/T/IM) reprend celle du jeu. `?` et le bord discontinu signalent une force
+  inconnue, y compris dans un groupe qui contient aussi des forces connues.
+- La lettre est le signal principal : elle est toujours visible dès 24 px, le compteur ne la remplace
+  jamais — il est ajouté seulement s'il tient à ses côtés.
+- Notre propre formation ne porte pas de libellé : la couleur et la position (triée en tête)
+  suffisent ; les autres commandants sont signalés `#n`. Les très petites miniatures gardent le
+  signal de pluralité ; les comptes exacts restent dans le détail (infobulle / panneau).
+- Tous les rectangles restent à l'intérieur de leur case et ne se chevauchent pas (molette 8–128 px,
+  curseur 16–64 px). Nos flottes sont prioritaires, les autres commandants sont ordonnés par numéro,
+  pas par puissance : leur emplacement ne saute pas lorsque la puissance change.
+- Les couleurs conservent leur sens diplomatique, racial ou par joueur. Le numéro de commandant des
+  lignes distingue les commandants partageant une même couleur. L'absence
+  de PNA/alliance est libellée « sans accord », pas une déclaration certaine d'hostilité.
+- Les contacts de puissance inconnue restent automatiquement inclus dans les filtres de puissance ;
+  les anciens réglages sont migrés sans les laisser invisibles derrière un contrôle supprimé.
+  Les raccourcis « Inclure les puissances inconnues » et « Inconnues seules » sont supprimés.
+- « Mes flottes » et « Flottes neutres » (propriétaire 0) contrôlent séparément la visibilité des flottes
+  correspondantes, en combinaison avec les filtres de puissance. Actifs par défaut, ils sont mémorisés.
+  Les autres commandants ne sont pas assimilés aux neutres en raison de leur couleur ou de leur race.
+  Ces filtres ne suppriment ni données du rapport ni ordres préparés ; le détail reste complet.
+- Le compteur flottes visibles / total du rapport est dans le menu Filtres, pas dans la barre d'outils ;
+  le détail conserve les comptes par case.
+- Le chargement des ordres est gardé par l'identité du rapport, le tour et le compteur d'import :
+  les effets ne peuvent pas écraser un tour avec l'état du précédent pendant l'hydratation, même
+  sous StrictMode. Le stockage JSON, les directives, l'export du schéma et la remise à zéro lors d'un
+  import ne changent pas. Les intervalles textuels des catégories sont disjoints et se terminent par
+  `≥18000` pour « inimaginable », jamais par une borne `undefined`.

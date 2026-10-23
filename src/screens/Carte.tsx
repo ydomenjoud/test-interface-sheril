@@ -1,19 +1,23 @@
 import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import {useReport} from '../context/ReportContext';
 import CanvasMap, {ZoneRect} from '../components/Map/CanvasMap';
+import {FleetSizeBand, buildFleetCells, mapFleetsForReport, restoreFleetSizeBands} from '../utils/fleetModel';
 import MiniMap from '../components/Map/MiniMap';
 import InfoPanel from '../components/Map/InfoPanel';
+import FleetFilters from '../components/Map/fleets/FleetFilters';
+import {useStoredFleetOrders} from '../components/Map/fleets/useStoredFleetOrders';
 import ZoneDialog from '../components/Map/ZoneDialog';
 import MapHelp from '../components/Map/MapHelp';
 import GotoDialog from '../components/Map/GotoDialog';
 import {FleetPicker} from '../components/Map/FleetPicker';
 import {isTypingTarget} from '../utils/keyboard';
 import {wrapX, wrapY, posToString} from '../utils/position';
+import {computePresence, PresenceData} from '../utils/presence';
 import Modal from '../components/utils/Modal';
 import {GlobalData, XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
-import {loadDeplacements, saveDeplacements, clearDeplacements} from '../storage/deplacementOrdersStorage';
-import {DeplacementEnAttente, DeplacementOrdre, DIRECTIVE_DEFAUT, OPTIONS_DIRECTIVES, PRECISION_DEFAUT, PRECISION_PLANETE_MAX, PRECISION_PLANETE_MIN, STRATEGIE_DEFAUT, schemaDeplacements} from '../utils/ordreDeplacement';
+import {clearDeplacements} from '../storage/deplacementOrdersStorage';
+import {DeplacementOrdre, DIRECTIVE_DEFAUT, OPTIONS_DIRECTIVES, PRECISION_DEFAUT, PRECISION_PLANETE_MAX, PRECISION_PLANETE_MIN, STRATEGIE_DEFAUT, schemaDeplacements} from '../utils/ordreDeplacement';
 import {copierSchema} from '../utils/ordreSchema';
 import {
   IconSystem,
@@ -23,6 +27,7 @@ import {
   IconHelp,
   IconSliders,
   IconFleetMove,
+  IconFleetFocus,
   IconPlay,
   IconStop,
   IconAlert,
@@ -40,6 +45,8 @@ import {
 // Libellé du commandant visé par la directive « Attaque flottes cdt » (infobulle du menu)
 const commandantViserLabel = (globalData: GlobalData | undefined, num: number): string =>
     num === PRECISION_DEFAUT ? 'Neutre' : (globalData?.commandants.find(c => c.numero === num)?.nom ?? `cdt ${num}`);
+
+
 
 // Durée d'affichage de chaque tour pendant la lecture automatique de l'historique (en secondes, modifiable)
 const DEFAULT_PLAY_STEP_S = 2;
@@ -95,6 +102,22 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_fleet_badges');
     return saved !== null ? JSON.parse(saved) : true;
   });
+  // Mode tactique : les formations de flottes deviennent dominantes et les systèmes passent au second plan.
+  const [fleetFocus, setFleetFocus] = useState<boolean>(() => {
+    const saved = localStorage.getItem('carte_fleet_focus');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+  // Filtres directement issus des termes de puissance du jeu, regroupés en bandes pratiques.
+  const [fleetSizeBands, setFleetSizeBands] = useState<FleetSizeBand[]>(() =>
+    restoreFleetSizeBands(localStorage.getItem('carte_fleet_size_bands')));
+  const [showOwnFleets, setShowOwnFleets] = useState(() => localStorage.getItem('carte_show_own_fleets') !== 'false');
+  const [showNeutralFleets, setShowNeutralFleets] = useState(() => localStorage.getItem('carte_show_neutral_fleets') !== 'false');
+  const mapFleets = useMemo(() => mapFleetsForReport(rapport), [rapport]);
+  const fleetCells = useMemo(() => buildFleetCells(mapFleets, fleetSizeBands, {
+    showOwn: showOwnFleets, showNeutral: showNeutralFleets,
+  }), [mapFleets, fleetSizeBands, showOwnFleets, showNeutralFleets]);
+  const visibleFleetCount = useMemo(() => Array.from(fleetCells.values()).reduce((count, cell) => count + cell.visibleCount, 0), [fleetCells]);
+
   // Portées radar : désactivées par défaut (voile bleu sur la carte) ; à activer dans les Filtres si besoin
   const [showSystemRadar, setShowSystemRadar] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_show_system_radar');
@@ -108,8 +131,25 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_minimap');
     return saved !== null ? JSON.parse(saved) : true;
   });
-  const [showInfluence, setShowInfluence] = useState(() => {
-    const saved = localStorage.getItem('carte_show_influence');
+  // Couche « présence » (qui est où), case « Afficher influence » : le réglage de l'ancienne
+  // couche influence (migré) est réutilisé pour que les utilisateurs aient la couche activée par défaut.
+  const [presenceOn, setPresenceOn] = useState<boolean>(() => {
+    const saved = localStorage.getItem('carte_presence_on');
+    if (saved !== null) return JSON.parse(saved);
+    const legacy = localStorage.getItem('carte_show_influence');
+    return legacy !== null ? JSON.parse(legacy) : true;
+  });
+  const [presenceMode, setPresenceMode] = useState<'presence' | 'voronoi'>(() => {
+    const saved = localStorage.getItem('carte_presence_mode');
+    return saved === 'voronoi' ? 'voronoi' : 'presence';
+  });
+  const [presenceDecay, setPresenceDecay] = useState<number>(() => {
+    const saved = localStorage.getItem('carte_presence_decay');
+    return saved !== null ? Math.max(4, Math.min(20, Number(JSON.parse(saved)) || 10)) : 10;
+  });
+  // Libellé n° de commandant par blob de présence (automatique en très petit zoom, case ≤ 16 px)
+  const [presenceLabels, setPresenceLabels] = useState<boolean>(() => {
+    const saved = localStorage.getItem('carte_presence_labels');
     return saved !== null ? JSON.parse(saved) : false;
   });
   const [showSectors, setShowSectors] = useState(() => {
@@ -146,6 +186,17 @@ export default function Carte() {
   const [showPaste, setShowPaste] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
+
+  // ---- Couche « présence » : calculée sur TOUTE la galaxie, une fois par rapport/réglage ----
+  const playerId = rapport?.joueur?.numero ?? 0;
+  const presence = useMemo<PresenceData | null>(() => {
+    if (!rapport || !presenceOn) return null;
+    return computePresence(rapport, global, playerId, {
+      decayTurns: presenceDecay,
+    });
+    // BOUNDS est mutée in place lors des chargements, toujours accompagnée d'un nouvel objet rapport
+    // (voir ReportContext) : la dépendance `rapport` suffit à re-calculer.
+  }, [rapport, global, playerId, presenceOn, presenceDecay]);
 
   const [filtersExpanded, setFiltersExpanded] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_filters_expanded');
@@ -188,6 +239,19 @@ export default function Carte() {
   useEffect(() => {
     localStorage.setItem('carte_show_fleet_badges', JSON.stringify(showFleetBadges));
   }, [showFleetBadges]);
+  useEffect(() => {
+    localStorage.setItem('carte_fleet_focus', JSON.stringify(fleetFocus));
+  }, [fleetFocus]);
+
+  useEffect(() => {
+    localStorage.setItem('carte_fleet_size_bands', JSON.stringify(fleetSizeBands));
+  }, [fleetSizeBands]);
+  useEffect(() => {
+    localStorage.setItem('carte_show_own_fleets', JSON.stringify(showOwnFleets));
+  }, [showOwnFleets]);
+  useEffect(() => {
+    localStorage.setItem('carte_show_neutral_fleets', JSON.stringify(showNeutralFleets));
+  }, [showNeutralFleets]);
 
   useEffect(() => {
     localStorage.setItem('carte_show_system_radar', JSON.stringify(showSystemRadar));
@@ -202,9 +266,17 @@ export default function Carte() {
   }, [showMiniMap]);
 
   useEffect(() => {
-    localStorage.setItem('carte_show_influence', JSON.stringify(showInfluence));
-  }, [showInfluence]);
-
+    localStorage.setItem('carte_presence_on', JSON.stringify(presenceOn));
+  }, [presenceOn]);
+  useEffect(() => {
+    localStorage.setItem('carte_presence_mode', JSON.stringify(presenceMode));
+  }, [presenceMode]);
+  useEffect(() => {
+    localStorage.setItem('carte_presence_decay', JSON.stringify(presenceDecay));
+  }, [presenceDecay]);
+  useEffect(() => {
+    localStorage.setItem('carte_presence_labels', JSON.stringify(presenceLabels));
+  }, [presenceLabels]);
   useEffect(() => {
     localStorage.setItem('carte_show_sectors', JSON.stringify(showSectors));
   }, [showSectors]);
@@ -354,7 +426,7 @@ export default function Carte() {
   // ---- Déplacements de flottes : schéma d'ordres (glisser-déposer sur la carte) ----
   // Les déplacements sont rattachés au tour du rapport affiché, comme la planification des revenus
   const tour = rapport?.tour;
-  const [deplacements, setDeplacements] = useState<Record<number, DeplacementEnAttente>>(() => (tour !== undefined ? loadDeplacements(tour) : {}));
+  const [deplacements, setDeplacements] = useStoredFleetOrders(tour, rapport, importCount);
   // Panneau des déplacements : replié par défaut (comme Filtres), s'ouvre tout seul au premier dépos
   const [deplacementsExpanded, setDeplacementsExpanded] = useState(false);
   // Le sélecteur de flotte, ancré sur le mousedown qui l'a ouvert (coordonnées client)
@@ -376,18 +448,12 @@ export default function Carte() {
   // Fermeture du sélecteur seule (bouton ×, Échap) : sans le suivi de drag
   const fermerPicker = useCallback(() => setPicker(null), []);
 
-  // Nouveau rapport ou changement de tour : recharger les déplacements stockés pour le tour affiché
-  // (importCount : un import d'un tour plus ancien ne change pas le rapport affiché mais vide le
-  // stockage — sans ce compteur, les déplacements en mémoire ressusciteraient à la sauvegarde)
+  // Le hook recharge les ordres sans écraser le stockage pendant l'hydratation.
+  // Un changement de rapport/tour ou tout import annule aussi le geste en cours.
+  // importCount couvre l'import d'un ancien tour qui vide le stockage sans changer le rapport affiché.
   useEffect(() => {
-    setDeplacements(tour !== undefined ? loadDeplacements(tour) : {});
     resetFleetDrag();
   }, [tour, rapport, importCount, resetFleetDrag]);
-
-  // Sauvegarde à chaque modification
-  useEffect(() => {
-    if (tour !== undefined) saveDeplacements(tour, deplacements);
-  }, [deplacements, tour]);
 
   // Le mousedown ouvre le sélecteur ; le CanvasMap appelant « tout mousedown » AVANT « mousedown sur
   // case de flotte » dans la même tâche, les deux setPicker sont groupés et l'ouverture l'emporte —
@@ -470,7 +536,7 @@ export default function Carte() {
       setDeplacementsExpanded(true); // on ouvre le panneau pour montrer le résultat du dépos
     }
     resetFleetDrag();
-  }, [rapport, resetFleetDrag]);
+  }, [rapport, resetFleetDrag, setDeplacements]);
   // Alternative clavier au glisser-déposer : le bouton « → » de « Mes flottes » (panneau info)
   // déplace la flotte vers la case sélectionnée (même règle qu'un dépos : case d'origine = annulation)
   const onMoveFleetToSelected = useCallback((fleetNum: number) => {
@@ -479,7 +545,7 @@ export default function Carte() {
     if (flotte.pos.x === selected.x && flotte.pos.y === selected.y) return;
     setDeplacements(d => ({ ...d, [fleetNum]: { to: selected, directive: DIRECTIVE_DEFAUT, strategy: STRATEGIE_DEFAUT } }));
     setDeplacementsExpanded(true);
-  }, [rapport, selected]);
+  }, [rapport, selected, setDeplacements]);
 
   // Schéma d'ordres : un ordre par déplacement dont la flotte est encore dans le rapport
   // (une flotte introuvable, ex. tour différent, est ignorée ici et en ligne repliée du panneau)
@@ -539,9 +605,28 @@ export default function Carte() {
       if (!actuel) return d;
       return { ...d, [num]: { ...actuel, ...champ } };
     });
-  }, []);
+  }, [setDeplacements]);
 
   const nbDeplacements = Object.keys(deplacements).length;
+
+  const toggleFleetFocus = () => {
+    setFleetFocus(current => !current);
+    // Un mode focus sans couche flottes n'aurait aucun effet utile.
+    if (!showFleetBadges) setShowFleetBadges(true);
+  };
+
+  // Entrées de légende de la couche présence, insérées dans la légende du mode de couleur actif
+  const presenceLegendItems = presenceOn && presenceMode === 'presence' ? (
+      <>
+          <span className="map-legend-item" title="Teinte = densité des systèmes connus du propriétaire (plus c'est dense, plus c'est opaque)">
+              <span className="map-legend-dot" style={{ background: 'radial-gradient(circle, rgba(56, 189, 248, 0.85), rgba(56, 189, 248, 0.1))' }} /> présence
+          </span>
+          <span className="map-legend-item" title="Système de la carte galactique jamais observé : il existe, mais on ne sait pas à qui">
+              <span className="map-legend-dot" style={{ background: 'repeating-linear-gradient(45deg, rgba(148, 163, 184, 0.9) 0, rgba(148, 163, 184, 0.9) 1px, transparent 1px, transparent 3px)', border: '1px solid #475569', borderRadius: 2 }} /> inconnu
+          </span>
+      </>
+  ) : null;
+
   return (
     // Colonnes gérées par App.css (.carte-wrap / .carte-wrap.info-collapsed) : une seule source de vérité
     <div className={`carte-wrap ${infoPanelCollapsed ? 'info-collapsed' : ''}`}>
@@ -606,6 +691,16 @@ export default function Carte() {
             onClick={() => setShowMiniMap(v => !v)}
           >
             <IconMiniMap size={15} />
+          </button>
+          <button
+            type="button"
+            className={fleetFocus ? 'carte-icon-btn active' : 'carte-icon-btn'}
+            title="Mode tactique flottes : formations prioritaires, systèmes atténués"
+            aria-pressed={fleetFocus}
+            aria-label="Activer ou désactiver le mode tactique flottes"
+            onClick={toggleFleetFocus}
+          >
+            <IconFleetFocus size={15} />
           </button>
           <button
             type="button"
@@ -739,11 +834,18 @@ export default function Carte() {
             showCombatBadges={showCombatBadges}
             showOwnerBadges={showOwnerBadges}
             showFleetBadges={showFleetBadges}
+            fleetFocus={fleetFocus}
+            fleets={mapFleets}
+            fleetCells={fleetCells}
+            
             showSystemRadar={showSystemRadar}
             showFleetRadar={showFleetRadar}
             showSectors={showSectors}
             showZones={showZones && !playing}
-            showInfluence={showInfluence}
+            showInfluence={presenceOn}
+            presenceMode={presenceMode}
+            presenceData={presence}
+            presenceLabels={presenceLabels}
             influenceOpacity={influenceOpacity}
             colorMode={colorMode}
             showStabilityZones={showStabilityZones}
@@ -759,26 +861,35 @@ export default function Carte() {
           />
           {/* Le ré-ouverture du panneau info se fait depuis la barre d'outils (« Détails » / Alt + I) :
               pas de bouton en double sur la carte */}
-          {showMiniMap && <MiniMap onCenter={(x, y) => setCenter({ x, y })} colorMode={colorMode} />}
+          {showMiniMap && (
+            <MiniMap
+              onCenter={(x, y) => setCenter({ x, y })}
+              colorMode={colorMode}
+              sectorData={presence}
+            />
+          )}
           {/* Légende des couleurs — la carte se suffit à elle-même au coup d'œil */}
           {colorMode === 'status' && (
             <div className="map-legend" title="Couleurs de possession des systèmes et des flottes">
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#10b981' }} /> moi</span>
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#3b82f6' }} /> alliance</span>
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#fde047' }} /> PNA</span>
-              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#ef4444' }} /> ennemi</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#ef4444' }} /> sans accord</span>
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#94a3b8' }} /> neutre</span>
               <span className="map-legend-item" title="Système avec une capacité de réparation (insigne « + » en haut-gauche de la case)"><span className="map-legend-dot" style={{ background: '#0f172a', border: '1.5px solid #cbd5e1', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>+</span> réparation</span>
+                {presenceLegendItems}
             </div>
           )}
           {colorMode === 'race' && (
             <div className="map-legend" title="Les couleurs représentent les races. L'insigne « + » indique un centre de réparation.">
               <span className="map-legend-item" title="Centre de réparation (insigne « + » en haut-gauche de la case)"><span className="map-legend-dot" style={{ background: '#0f172a', border: '1.5px solid #cbd5e1', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>+</span> réparation</span>
+                {presenceLegendItems}
             </div>
           )}
           {colorMode === 'player' && (
             <div className="map-legend" title="Les couleurs représentent les joueurs. L'insigne « + » indique un centre de réparation.">
               <span className="map-legend-item" title="Centre de réparation (insigne « + » en haut-gauche de la case)"><span className="map-legend-dot" style={{ background: '#0f172a', border: '1.5px solid #cbd5e1', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>+</span> réparation</span>
+                {presenceLegendItems}
             </div>
           )}
           {/* Filtres avancés : monté uniquement quand il est ouvert (⚙ de la barre d'outils) — pas
@@ -888,32 +999,93 @@ export default function Carte() {
                             />
                             Afficher secteurs
                           </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={showInfluence}
-                              onChange={(e) => setShowInfluence(e.target.checked)}
-                            />
-                            Afficher influence
-                          </label>
+                           <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
+                             <input
+                               type="checkbox"
+checked={presenceOn}
+                                onChange={(e) => setPresenceOn(e.target.checked)}
+                              />
+                              Afficher influence
+                           </label>
 
-                          {showInfluence && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginLeft: 20 }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                      <span style={{ fontSize: '0.8em', color: '#94a3b8' }}>Opacité ( défaut 18% )</span>
-                                      <span style={{ fontSize: '0.8em', color: '#f1f5f9' }}>{Math.round(influenceOpacity * 100)}%</span>
-                                  </div>
-                                  <input
-                                      type="range"
-                                      min={0.05}
-                                      max={0.5}
-                                      step={0.01}
-                                      value={influenceOpacity}
-                                      onChange={(e) => setInfluenceOpacity(parseFloat(e.target.value))}
-                                      style={{ width: '100%', cursor: 'pointer' }}
-                                  />
-                              </div>
-                          )}
+                            {presenceOn && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginLeft: 20 }}>
+                                    <div style={{ display: 'flex', gap: 4 }}>
+                                        <button
+                                            onClick={() => setPresenceMode('presence')}
+                                            title="Densité des systèmes connus, avec cases inconnues explicites"
+                                            style={{
+                                                flex: 1,
+                                                fontSize: '0.8rem',
+                                                padding: '5px 4px',
+                                                cursor: 'pointer',
+                                                backgroundColor: presenceMode === 'presence' ? '#1e3a5f' : '#1e2530',
+                                                color: presenceMode === 'presence' ? '#38bdf8' : '#94a3b8',
+                                                border: presenceMode === 'presence' ? '1px solid #38bdf8' : '1px solid #334155',
+                                                borderRadius: 4
+                                            }}
+                                        >
+                                            Présence
+                                        </button>
+                                        <button
+                                            onClick={() => setPresenceMode('voronoi')}
+                                            title="Influence au sens classique : chaque case au propriétaire du système connu le plus proche"
+                                            style={{
+                                                flex: 1,
+                                                fontSize: '0.8rem',
+                                                padding: '5px 4px',
+                                                cursor: 'pointer',
+                                                backgroundColor: presenceMode === 'voronoi' ? '#1e3a5f' : '#1e2530',
+                                                color: presenceMode === 'voronoi' ? '#38bdf8' : '#94a3b8',
+                                                border: presenceMode === 'voronoi' ? '1px solid #38bdf8' : '1px solid #334155',
+                                                borderRadius: 4
+                                            }}
+                                        >
+                                            Voronoi
+                                        </button>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ fontSize: '0.8em', color: '#94a3b8' }}>Opacité ( défaut 18% )</span>
+                                        <span style={{ fontSize: '0.8em', color: '#f1f5f9' }}>{Math.round(influenceOpacity * 100)}%</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min={0.05}
+                                        max={0.5}
+                                        step={0.01}
+                                        value={influenceOpacity}
+                                        onChange={(e) => setInfluenceOpacity(parseFloat(e.target.value))}
+                                        style={{ width: '100%', cursor: 'pointer' }}
+                                    />
+                                    {presenceMode === 'presence' && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                            <div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.8em', color: '#94a3b8' }}>Fraîcheur des détections</span>
+                                                    <span style={{ fontSize: '0.8em', color: '#f1f5f9' }}>{presenceDecay} tours</span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min={4}
+                                                    max={20}
+                                                    step={1}
+                                                    value={presenceDecay}
+                                                    onChange={(e) => setPresenceDecay(parseInt(e.target.value, 10))}
+                                                    style={{ width: '100%', cursor: 'pointer' }}
+                                                />
+                                            </div>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.85em', cursor: 'pointer' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={presenceLabels}
+                                                    onChange={(e) => setPresenceLabels(e.target.checked)}
+                                                />
+                                                Afficher commandants
+                                            </label>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                           <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
                             <input
@@ -993,11 +1165,28 @@ par diplo
                             <input
                               type="checkbox"
                               checked={showFleetBadges}
-                              onChange={(e) => setShowFleetBadges(e.target.checked)}
+                              onChange={(e) => {
+                                setShowFleetBadges(e.target.checked);
+                                if (!e.target.checked) setFleetFocus(false);
+                              }}
                             />
                             Badges flottes
                           </label>
                       </div>
+                      <FleetFilters
+                        enabled={showFleetBadges} focus={fleetFocus} bands={fleetSizeBands}
+                        visibility={{showOwn: showOwnFleets, showNeutral: showNeutralFleets}}
+                        visibleCount={visibleFleetCount} totalCount={mapFleets.length}
+                        onFocusChange={focus => {
+                          setFleetFocus(focus);
+                          if (focus) setShowFleetBadges(true);
+                        }}
+                        onBandsChange={setFleetSizeBands}
+                        onVisibilityChange={visibility => {
+                          setShowOwnFleets(visibility.showOwn);
+                          setShowNeutralFleets(visibility.showNeutral);
+                        }}
+                      />
 
                       {zones.length > 0 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid #334155', paddingTop: 8 }}>

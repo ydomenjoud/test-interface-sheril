@@ -19,6 +19,16 @@ const SECTIONS: { title: string; items: Shortcut[] }[] = [
         ],
     },
     {
+        title: 'Lecture des flottes',
+        items: [
+            {keys: [['Focus flottes']], description: 'Les emblèmes opaques restent au-dessus des systèmes, combats et routes persistantes'},
+            {keys: [['×N']], description: 'Nombre de flottes, pas de vaisseaux ni puissance ; la lettre donne la plus forte catégorie connue'},
+            {keys: [['Zoom']], description: 'Sous 24 px : lettre seule ; à partir de 64 px : en-têtes détaillés en focus et lignes par commandant'},
+            {keys: [['c / cdt']], description: 'Nombre de commandants distincts ; +N cdt indique le surplus de commandants'},
+            {keys: [['?']], description: 'Puissance inconnue, toujours incluse ; Mes flottes et Flottes neutres filtrent les propriétaires'},
+        ],
+    },
+    {
         title: 'Historique',
         items: [
             {keys: [['Alt', '←']], description: 'Afficher le tour précédent (plus ancien)'},

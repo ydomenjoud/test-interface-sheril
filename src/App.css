@@ -420,16 +420,41 @@ a:hover {
     position: relative;
 }
 
-.mini-map {
+.mini-map-wrap {
     position: absolute;
     right: 8px;
     bottom: 8px;
+    width: 160px;
+    height: 160px;
+    z-index: 90;
+}
+
+.mini-map {
+    display: block;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     background: #0b0f17;
     width: 160px;
     height: 160px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* Infobulle de composition de secteur au survol de la mini-carte (au-dessus, ne masque pas le canvas) */
+.mini-map-tooltip {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 0;
+    z-index: 95;
+    min-width: 110px;
+    max-width: 170px;
+    background: rgba(15, 23, 42, 0.96);
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 0.75rem;
+    color: #e2e8f0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
 }
 
 /* Légende compacte des couleurs de possession : en bas à gauche, au ras du bord */
