@@ -92,8 +92,8 @@ panneau "Filtres", qui garde la même liste complète) :
 * ⇢ : ouvre / replie le tiroir des déplacements de flottes (avec leur nombre en attente)
 * ⚙ : ouvre / ferme le panneau "Filtres" (options avancées, fermé par défaut ; le panneau n'est monté que
   lorsqu'il est ouvert, sans onglet permanent sur la carte) : Commandants, Tags, Afficher
-  systèmes, Carte galactique, Secteurs, Présence (mode présence / Voronoi, opacité, fraîcheur, focus
-  commandant, aperçu secteurs sur la minimap), Minimap, Mode de couleur, Badges (combats /
+  systèmes, Carte galactique, Secteurs, Présence (mode présence / Voronoi, opacité, fraîcheur),
+  Minimap, Mode de couleur, Badges (combats /
   propriétaires / flottes), Zones manuelles, Portées Radar (systèmes / flottes), Distance Capitale (zones de
   stabilité et choix du système de référence)
 * ? : aide et raccourcis (touche `?`)
@@ -119,9 +119,10 @@ panneau "Filtres", qui garde la même liste complète) :
   - Un clic sur la mini-carte recadre la carte principale autour du point visé (par offset relatif au centre).
   - L'icône ▣ dans les filtres rapides de la barre d'outils (et une case à cocher dans les Filtres) permet de
     l'afficher/masquer ; elle est affichée par défaut.
-  - Aperçu par secteurs : chaque secteur 10×10 est teinté à la couleur du commandant dominant (voir
-    « Couche présence ») ; au survol d'un secteur, une infobulle donne la composition par commandant,
-    les systèmes neutres et les systèmes jamais observés.
+  - Aperçu par secteurs (actif quand « Afficher influence » est cochée) : chaque secteur 10×10 est
+    teinté à la couleur du commandant dominant (voir « Couche présence ») ; au survol d'un secteur,
+    une infobulle donne la composition par commandant, les systèmes neutres et les systèmes jamais
+    observés.
 - Header: un bouton "Capitale" recentre la carte principale sur la capitale du joueur.
 - Panneau d'informations : repliable via un bouton dédié dans la barre d'outils, le raccourci Alt + I ou le bouton de fermeture dans l'en-tête, offrant une vue pleine largeur à la carte (colonne à 0 px ; le ré-ouvre depuis la barre d'outils ou Alt + I, pas de bouton en double sur la carte). L'intérieur est organisé en onglets rapides (Tout / Système / Flottes / Tactique) avec badges de comptage évitant le défilement vertical infini.
 
@@ -241,8 +242,6 @@ couche « Présence », calculée sur TOUT le tore (pas seulement le viewport) p
   corrige le « trou avalé par le voisin » du Voronoi.
 - L'opacité de la teinte est proportionnelle à la densité gagnante (plus c'est dense, plus c'est
   net) et bornée par le réglage « Opacité ».
-- Le mode « focus commandant » ne calcule que les positions du commandant choisi : la carte isole
-  sa présence, et les systèmes des autres commandants sont estompés (×0.35).
 - Les systèmes détectés plus anciens que la moitié de la fenêtre (poids < 0.5) voient leur disque,
   leur contour et leur insigne estompés.
 - Les cases où la carte galactique (data.xml) signale un système jamais observé sont hachurées :
@@ -254,14 +253,11 @@ couche « Présence », calculée sur TOUT le tore (pas seulement le viewport) p
 
 ### réglages (panneau Filtres)
 
-- « Présence (qui est où) » : active / désactive la couche (mémoïsée ; le réglage « Afficher
-  influence » de l'ancienne version est migré).
+- « Afficher influence » : active / désactive la couche, et avec elle l'aperçu par secteurs de la
+  mini-carte (le réglage de l'ancienne couche influence est migré).
 - Mode : `Présence` (défaut) / `Voronoi` (ancienne influence au plus proche, inchangée).
 - Opacité : 5–50 %, défaut 18 % (commune aux deux modes).
 - Fraîcheur : fenêtre de décroissance des détections, 4–20 tours, défaut 10.
-- Focus commandant : liste des commandants observés (systèmes et flottes) ; « Tous les
-  commandants » par défaut.
-- « Aperçu par secteurs (minimmap) » : teinte des secteurs sur la mini-carte (activé par défaut).
 - Les réglages sont mémorisés (localStorage, clés `carte_presence_*`).
 
 ## déplacements de flottes (schéma d'ordres)

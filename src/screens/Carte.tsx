@@ -46,13 +46,7 @@ import {
 const commandantViserLabel = (globalData: GlobalData | undefined, num: number): string =>
     num === PRECISION_DEFAUT ? 'Neutre' : (globalData?.commandants.find(c => c.numero === num)?.nom ?? `cdt ${num}`);
 
-// Libellé d'un commandant pour le focus de la couche présence (numéro + race quand connue)
-const presenceFocusLabel = (globalData: GlobalData | undefined, num: number): string => {
-    const nom = globalData?.commandants?.find(c => c.numero === num)?.nom;
-    const race = globalData?.races?.find(r => r.id === globalData?.commandants?.find(c => c.numero === num)?.raceId)?.nom;
-    const extra = [nom, race].filter(Boolean).join(' · ');
-    return extra ? `#${num} · ${extra}` : `#${num}`;
-};
+
 
 // Durée d'affichage de chaque tour pendant la lecture automatique de l'historique (en secondes, modifiable)
 const DEFAULT_PLAY_STEP_S = 2;
@@ -137,8 +131,8 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_minimap');
     return saved !== null ? JSON.parse(saved) : true;
   });
-  // Couche « présence » (qui est où) : remplace l'ancienne case « Afficher influence », qui garde
-  // son réglage (migré) pour que les utilisateurs aient la couche activée par défaut.
+  // Couche « présence » (qui est où), case « Afficher influence » : le réglage de l'ancienne
+  // couche influence (migré) est réutilisé pour que les utilisateurs aient la couche activée par défaut.
   const [presenceOn, setPresenceOn] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_presence_on');
     if (saved !== null) return JSON.parse(saved);
@@ -152,14 +146,6 @@ export default function Carte() {
   const [presenceDecay, setPresenceDecay] = useState<number>(() => {
     const saved = localStorage.getItem('carte_presence_decay');
     return saved !== null ? Math.max(4, Math.min(20, Number(JSON.parse(saved)) || 10)) : 10;
-  });
-  const [presenceFocus, setPresenceFocus] = useState<number | null>(() => {
-    const saved = localStorage.getItem('carte_presence_focus');
-    return saved !== null ? (JSON.parse(saved) === null ? null : Number(JSON.parse(saved))) : null;
-  });
-  const [presenceMinimapSectors, setPresenceMinimapSectors] = useState<boolean>(() => {
-    const saved = localStorage.getItem('carte_presence_minimap_sectors');
-    return saved !== null ? JSON.parse(saved) : true;
   });
   const [showSectors, setShowSectors] = useState(() => {
     const saved = localStorage.getItem('carte_show_sectors');
@@ -202,20 +188,10 @@ export default function Carte() {
     if (!rapport || !presenceOn) return null;
     return computePresence(rapport, global, playerId, {
       decayTurns: presenceDecay,
-      focusPlayer: presenceFocus ?? undefined,
     });
     // BOUNDS est mutée in place lors des chargements, toujours accompagnée d'un nouvel objet rapport
     // (voir ReportContext) : la dépendance `rapport` suffit à re-calculer.
-  }, [rapport, global, playerId, presenceOn, presenceDecay, presenceFocus]);
-
-  // Commandants proposés pour le focus : tous ceux observés sur un système ou une flotte
-  const presenceFocusOptions = useMemo(() => {
-    const ids = new Set<number>();
-    (rapport?.systemesJoueur || []).forEach(s => (s.proprietaires || []).forEach(o => { if (o !== 0) ids.add(o); }));
-    (rapport?.systemesDetectes || []).forEach(s => (s.proprietaires || []).forEach(o => { if (o !== 0) ids.add(o); }));
-    (rapport?.flottesDetectees || []).forEach(f => { if (f.proprio > 0) ids.add(f.proprio); });
-    return Array.from(ids).sort((a, b) => a - b);
-  }, [rapport]);
+  }, [rapport, global, playerId, presenceOn, presenceDecay]);
 
   const [filtersExpanded, setFiltersExpanded] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_filters_expanded');
@@ -293,13 +269,6 @@ export default function Carte() {
   useEffect(() => {
     localStorage.setItem('carte_presence_decay', JSON.stringify(presenceDecay));
   }, [presenceDecay]);
-  useEffect(() => {
-    localStorage.setItem('carte_presence_focus', JSON.stringify(presenceFocus));
-  }, [presenceFocus]);
-  useEffect(() => {
-    localStorage.setItem('carte_presence_minimap_sectors', JSON.stringify(presenceMinimapSectors));
-  }, [presenceMinimapSectors]);
-
   useEffect(() => {
     localStorage.setItem('carte_show_sectors', JSON.stringify(showSectors));
   }, [showSectors]);
@@ -887,8 +856,7 @@ export default function Carte() {
             <MiniMap
               onCenter={(x, y) => setCenter({ x, y })}
               colorMode={colorMode}
-              sectorData={presenceMinimapSectors ? presence : null}
-              focusPlayer={presenceFocus}
+              sectorData={presence}
             />
           )}
           {/* Légende des couleurs — la carte se suffit à elle-même au coup d'œil */}
@@ -1025,10 +993,10 @@ export default function Carte() {
                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.9em', cursor: 'pointer' }}>
                              <input
                                type="checkbox"
-                               checked={presenceOn}
-                               onChange={(e) => setPresenceOn(e.target.checked)}
-                             />
-                             Présence (qui est où)
+checked={presenceOn}
+                                onChange={(e) => setPresenceOn(e.target.checked)}
+                              />
+                              Afficher influence
                            </label>
 
                             {presenceOn && (
@@ -1081,50 +1049,20 @@ export default function Carte() {
                                         style={{ width: '100%', cursor: 'pointer' }}
                                     />
                                     {presenceMode === 'presence' && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                            <div>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                    <span style={{ fontSize: '0.8em', color: '#94a3b8' }}>Fraîcheur des détections</span>
-                                                    <span style={{ fontSize: '0.8em', color: '#f1f5f9' }}>{presenceDecay} tours</span>
-                                                </div>
-                                                <input
-                                                    type="range"
-                                                    min={4}
-                                                    max={20}
-                                                    step={1}
-                                                    value={presenceDecay}
-                                                    onChange={(e) => setPresenceDecay(parseInt(e.target.value, 10))}
-                                                    style={{ width: '100%', cursor: 'pointer' }}
-                                                />
+                                        <div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ fontSize: '0.8em', color: '#94a3b8' }}>Fraîcheur des détections</span>
+                                                <span style={{ fontSize: '0.8em', color: '#f1f5f9' }}>{presenceDecay} tours</span>
                                             </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                <span style={{ fontSize: '0.8em', color: '#94a3b8' }}>Focus commandant</span>
-                                                <select
-                                                    value={presenceFocus ?? ''}
-                                                    onChange={(e) => setPresenceFocus(e.target.value === '' ? null : Number(e.target.value))}
-                                                    style={{
-                                                        background: '#1e2530',
-                                                        color: '#f1f5f9',
-                                                        border: '1px solid #334155',
-                                                        borderRadius: 4,
-                                                        padding: '4px 6px',
-                                                        fontSize: '0.85em'
-                                                    }}
-                                                >
-                                                    <option value="">Tous les commandants</option>
-                                                    {presenceFocusOptions.map(id => (
-                                                        <option key={id} value={id}>{presenceFocusLabel(global, id)}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.85em', cursor: 'pointer' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={presenceMinimapSectors}
-                                                    onChange={(e) => setPresenceMinimapSectors(e.target.checked)}
-                                                />
-                                                Aperçu par secteurs (minimmap)
-                                            </label>
+                                            <input
+                                                type="range"
+                                                min={4}
+                                                max={20}
+                                                step={1}
+                                                value={presenceDecay}
+                                                onChange={(e) => setPresenceDecay(parseInt(e.target.value, 10))}
+                                                style={{ width: '100%', cursor: 'pointer' }}
+                                            />
                                         </div>
                                     )}
                                 </div>

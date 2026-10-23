@@ -16,8 +16,6 @@ export type PresenceInputs = {
 export type PresenceOptions = {
     /** Âge (en tours) auquel le poids d'une détection atteint 0 (défaut 10). */
     decayTurns?: number;
-    /** Si défini, seules les positions de ce commandant sont calculées (mode focus). */
-    focusPlayer?: number;
 };
 
 export type SectorSummary = {
@@ -135,7 +133,6 @@ function axisOffsets(size: number, cutoff: number): { off: number; d: number }[]
  */
 export function computePresence(rapport: PresenceInputs, global: GlobalData | null | undefined, playerId: number, options: PresenceOptions = {}): PresenceData {
     const decayTurns = options.decayTurns ?? D.decayTurns;
-    const focusPlayer = options.focusPlayer;
     const maxX = BOUNDS.maxX;
     const maxY = BOUNDS.maxY;
     const size = maxX * maxY;
@@ -144,7 +141,6 @@ export function computePresence(rapport: PresenceInputs, global: GlobalData | nu
     const byPlayer = new Map<number, { pos: XY; weight: number }[]>();
     const add = (player: number, pos: XY, weight: number): void => {
         if (player === 0 || weight <= 0) return;
-        if (focusPlayer != null && player !== focusPlayer) return;
         let list = byPlayer.get(player);
         if (!list) {
             list = [];
