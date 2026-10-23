@@ -92,8 +92,8 @@ panneau "Filtres", qui garde la même liste complète) :
 * ⇢ : ouvre / replie le tiroir des déplacements de flottes (avec leur nombre en attente)
 * ⚙ : ouvre / ferme le panneau "Filtres" (options avancées, fermé par défaut ; le panneau n'est monté que
   lorsqu'il est ouvert, sans onglet permanent sur la carte) : Commandants, Tags, Afficher
-  systèmes, Carte galactique, Secteurs, Présence (mode présence / Voronoi, opacité, fraîcheur),
-  Minimap, Mode de couleur, Badges (combats /
+  systèmes, Carte galactique, Secteurs, Présence (mode présence / Voronoi, opacité, fraîcheur,
+  afficher commandants), Minimap, Mode de couleur, Badges (combats /
   propriétaires / flottes), Zones manuelles, Portées Radar (systèmes / flottes), Distance Capitale (zones de
   stabilité et choix du système de référence)
 * ? : aide et raccourcis (touche `?`)
@@ -246,10 +246,10 @@ couche « Présence », calculée sur TOUT le tore (pas seulement le viewport) p
   leur contour et leur insigne estompés.
 - Les cases où la carte galactique (data.xml) signale un système jamais observé sont hachurées :
   « le système existe, son propriétaire est inconnu ». L'espace vraiment vide reste noir.
-- En très petit zoom (case ≤ 16 px, minimum de la barre de zoom), chaque blob porte le numéro de son
-  commandant (ex. `#39`) au
-  point de densité locale la plus forte, en blanc à contour sombre ; chaque copie visible du tore
-  est libellée.
+- Chaque blob porte le nom de son commandant et son numéro (ex. `Dergon (#39)`, repli `#39` si le
+  nom est inconnu) au point de densité locale la plus forte, en blanc à contour sombre ; chaque
+  copie visible du tore est libellée. Affichage automatique en très petit zoom (case ≤ 16 px,
+  minimum de la barre de zoom), sinon seulement si le réglage « Afficher commandants » est actif.
 
 ### réglages (panneau Filtres)
 
@@ -258,6 +258,8 @@ couche « Présence », calculée sur TOUT le tore (pas seulement le viewport) p
 - Mode : `Présence` (défaut) / `Voronoi` (ancienne influence au plus proche, inchangée).
 - Opacité : 5–50 %, défaut 18 % (commune aux deux modes).
 - Fraîcheur : fenêtre de décroissance des détections, 4–20 tours, défaut 10.
+- « Afficher commandants » : affiche le nom et le numéro du commandant sur chaque blob
+  (défaut inactif ; l'affichage reste automatique en très petit zoom, case ≤ 16 px).
 - Les réglages sont mémorisés (localStorage, clés `carte_presence_*`).
 
 ## déplacements de flottes (schéma d'ordres)
