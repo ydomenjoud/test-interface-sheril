@@ -71,7 +71,8 @@ conséquence.
 
 Une légende compacte (couleurs de possession moi / alliance / PNA / ennemi / neutre, marqueur flotte, et
 « réparation » = bordure blanche du disque) est affichée en bas à gauche de la carte, au ras du bord, en mode
-de couleur "Par diplo".
+de couleur "Par diplo". Quand la couche présence est active, elle ajoute les entrées « présence »
+(teinte de densité) et « inconnu » (hachures : système de la carte galactique jamais observé).
 
 Les portées radar (systèmes et flottes) sont désactivées par défaut pour ne pas voiler la carte ; elles peuvent
 être activées par les boutons ◎ et ◉ de la barre d'outils (filtres rapides).
@@ -91,7 +92,8 @@ panneau "Filtres", qui garde la même liste complète) :
 * ⇢ : ouvre / replie le tiroir des déplacements de flottes (avec leur nombre en attente)
 * ⚙ : ouvre / ferme le panneau "Filtres" (options avancées, fermé par défaut ; le panneau n'est monté que
   lorsqu'il est ouvert, sans onglet permanent sur la carte) : Commandants, Tags, Afficher
-  systèmes, Carte galactique, Secteurs, Influence (+ opacité), Minimap, Mode de couleur, Badges (combats /
+  systèmes, Carte galactique, Secteurs, Présence (mode présence / Voronoi, opacité, fraîcheur, focus
+  commandant, aperçu secteurs sur la minimap), Minimap, Mode de couleur, Badges (combats /
   propriétaires / flottes), Zones manuelles, Portées Radar (systèmes / flottes), Distance Capitale (zones de
   stabilité et choix du système de référence)
 * ? : aide et raccourcis (touche `?`)
@@ -117,6 +119,9 @@ panneau "Filtres", qui garde la même liste complète) :
   - Un clic sur la mini-carte recadre la carte principale autour du point visé (par offset relatif au centre).
   - L'icône ▣ dans les filtres rapides de la barre d'outils (et une case à cocher dans les Filtres) permet de
     l'afficher/masquer ; elle est affichée par défaut.
+  - Aperçu par secteurs : chaque secteur 10×10 est teinté à la couleur du commandant dominant (voir
+    « Couche présence ») ; au survol d'un secteur, une infobulle donne la composition par commandant,
+    les systèmes neutres et les systèmes jamais observés.
 - Header: un bouton "Capitale" recentre la carte principale sur la capitale du joueur.
 - Panneau d'informations : repliable via un bouton dédié dans la barre d'outils, le raccourci Alt + I ou le bouton de fermeture dans l'en-tête, offrant une vue pleine largeur à la carte (colonne à 0 px ; le ré-ouvre depuis la barre d'outils ou Alt + I, pas de bouton en double sur la carte). L'intérieur est organisé en onglets rapides (Tout / Système / Flottes / Tactique) avec badges de comptage évitant le défilement vertical infini.
 
@@ -211,6 +216,48 @@ une case sans aucun contenu (ni système, ni flotte, ni combat, ni zone) affiche
 - combats sur la case (cartes dépliables avec les détails)
 - zones couvrant la case (éditables)
 - notes de la case (le formulaire d'ajout est replié derrière un bouton)
+
+## Couche présence (« qui est où »)
+
+Objectif : savoir, à l'échelle de toute la galaxie, où est quel commandant, sans se laisser tromper
+par les données inconnues. L'ancienne couche « Influence » (Voronoi dur : chaque case est attribuée
+au système connu le plus proche) est conservée sous le mode « Voronoi » ; le mode par défaut est la
+couche « Présence », calculée sur TOUT le tore (pas seulement le viewport) par
+`src/utils/presence.ts` et mise en cache par rapport/réglage (aucun recalcul par image).
+
+### calcul
+
+- Sources : les systèmes du joueur (poids plein) et les systèmes détectés. Le poids d'une détection
+  décroît avec son âge : plein jusqu'à 3 tours, puis linéairement jusqu'à 0 au tour N (réglage
+  « Fraîcheur », défaut 10). Une détection d'âge inconnu (anciens caches) reçoit un poids fixe de
+  0.25. Les systèmes neutres (propriétaire 0) sont exclus.
+- Chaque système est un « splat » gaussien de bande σ propre au commandant (bornée 3–8, estimée sur
+  l'écart médian entre ses systèmes connus, repli sur l'écartement des systèmes du joueur puis 6),
+  avec contributions négligées au-delà de 2.5σ : un système isolé ne fait qu'un petit nuage, un
+  amas dense fait une région.
+- Le propriétaire d'une case est le commandant à la densité la plus forte, s'il est au-dessus du
+  seuil (2 %) ; sinon la case reste **inconnue** et n'est colorée pour personne — c'est ce qui
+  corrige le « trou avalé par le voisin » du Voronoi.
+- L'opacité de la teinte est proportionnelle à la densité gagnante (plus c'est dense, plus c'est
+  net) et bornée par le réglage « Opacité ».
+- Le mode « focus commandant » ne calcule que les positions du commandant choisi : la carte isole
+  sa présence, et les systèmes des autres commandants sont estompés (×0.35).
+- Les systèmes détectés plus anciens que la moitié de la fenêtre (poids < 0.5) voient leur disque,
+  leur contour et leur insigne estompés.
+- Les cases où la carte galactique (data.xml) signale un système jamais observé sont hachurées :
+  « le système existe, son propriétaire est inconnu ». L'espace vraiment vide reste noir.
+
+### réglages (panneau Filtres)
+
+- « Présence (qui est où) » : active / désactive la couche (mémoïsée ; le réglage « Afficher
+  influence » de l'ancienne version est migré).
+- Mode : `Présence` (défaut) / `Voronoi` (ancienne influence au plus proche, inchangée).
+- Opacité : 5–50 %, défaut 18 % (commune aux deux modes).
+- Fraîcheur : fenêtre de décroissance des détections, 4–20 tours, défaut 10.
+- Focus commandant : liste des commandants observés (systèmes et flottes) ; « Tous les
+  commandants » par défaut.
+- « Aperçu par secteurs (minimmap) » : teinte des secteurs sur la mini-carte (activé par défaut).
+- Les réglages sont mémorisés (localStorage, clés `carte_presence_*`).
 
 ## déplacements de flottes (schéma d'ordres)
 
