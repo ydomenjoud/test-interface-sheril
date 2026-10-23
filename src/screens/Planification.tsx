@@ -1,9 +1,12 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {useReport} from '../context/ReportContext';
 import {SystemeJoueur} from '../types';
 import {formatPlannedItems, formatTechName} from '../utils/global';
 import SearchableSelect from '../components/utils/SearchableSelect';
 import Modal from '../components/utils/Modal';
+import {posToString} from '../utils/position';
+import {detailPdc, gouverneursParPosition, pdcSysteme} from '../utils/pdc';
+import {loadPlanificationRevenu} from '../utils/planificationRevenuStorage';
 
 type PlannedItem = {
     id: string;
@@ -20,6 +23,14 @@ const construireBluePrintSeparator = '%#!%';
 const stockClass = (total: number, final: number) =>
     `stockInfo ${final < 0 ? 'stockOver' : (total > 0 ? 'stockPositive' : 'stockEmpty')}`;
 const spentClass = (final: number) => (final < 0 ? 'stockOver' : 'stockSpent');
+
+// Couleur des valeurs qui diffèrent du rapport (même style que l'écran de revenus)
+const COULEUR_MODIFIE = '#ff9800';
+const pdcStyleModifie: React.CSSProperties = {
+    border: `1px solid ${COULEUR_MODIFIE}`,
+    boxShadow: `0 0 0 1px ${COULEUR_MODIFIE}`,
+    backgroundColor: '#4a3418'
+};
 
 export default function Planification() {
     const { global, rapport } = useReport();
@@ -50,6 +61,40 @@ export default function Planification() {
     }, [highlightedItems]);
 
     const systems = useMemo(() => rapport?.systemesJoueur || [], [rapport]);
+
+    // --- PDC ajustés par la politique / le gouverneur choisis dans l'écran Revenus (lecture seule) ---
+    const tour = rapport?.tour;
+    const numeroJoueur = rapport?.joueur?.numero;
+    const gouverneursDuRapport = useMemo(() => (rapport?.lieutenants ?? []).filter(l => l.type === 1), [rapport]);
+    const gouverneursParPos = useMemo(() => gouverneursParPosition(rapport?.lieutenants ?? []), [rapport]);
+
+    type ChoixConstr = { politique: number | undefined; gouverneur: string | null };
+
+    const etatRapport = useCallback((s: SystemeJoueur): ChoixConstr => ({
+        politique: s.politique,
+        gouverneur: gouverneursParPos[posToString(s.pos)]?.nom ?? null,
+    }), [gouverneursParPos]);
+
+    // Choix de l'écran Revenus (stockage partagé, par tour) : lecture seule
+    const choix = useMemo(() => {
+        if (tour === undefined) return {};
+        const saved = loadPlanificationRevenu<{ politique?: number; gouverneur?: string | null }>(tour) || {};
+        const next: Record<string, ChoixConstr> = {};
+        systems.forEach(s => {
+            const k = posToString(s.pos);
+            const base = etatRapport(s);
+            const c = saved[k];
+            next[k] = {
+                politique: c?.politique !== undefined ? c.politique : base.politique,
+                gouverneur: c?.gouverneur !== undefined ? c.gouverneur : base.gouverneur,
+            };
+        });
+        return next;
+    }, [systems, tour, etatRapport]);
+
+    const stateConstr = (s: SystemeJoueur): ChoixConstr =>
+        choix[posToString(s.pos)] || etatRapport(s);
+    const gouverneurDe = (st: ChoixConstr) => gouverneursDuRapport.find(l => l.nom === st.gouverneur);
 
     const [collapsedSystems, setCollapsedSystems] = useState<Record<string, boolean>>(() => {
         const saved = localStorage.getItem('planification_collapsed');
@@ -452,7 +497,8 @@ export default function Planification() {
     };
 
     const getSystemResources = (s: SystemeJoueur) => {
-        let totalPdc = s.pdc || 0;
+        const st = stateConstr(s);
+        const totalPdc = pdcSysteme(s, numeroJoueur, gouverneurDe(st), st.politique);
         let totalStockMinerai = 0;
         let totalProdMinerai = 0;
         s.planetes.forEach(p => {
@@ -772,6 +818,21 @@ export default function Planification() {
 
                         const hasShortage = finalPc < 0 || finalMinerai < 0 || Object.values(finalMarchandises).some(v => v < 0);
 
+                        const state = stateConstr(s);
+                        const etatRef = etatRapport(s);
+                        const modifPdc = initial.pc !== s.pdc;
+                        const modifChoix = state.politique !== etatRef.politique || state.gouverneur !== etatRef.gouverneur;
+                        const nomPolitique = (c: number | undefined) => (c !== undefined ? global?.politiques[c] ?? String(c) : '?');
+                        const lignesChoix: string[] = [];
+                        if (state.politique !== etatRef.politique) lignesChoix.push(`Politique : ${nomPolitique(state.politique)} (rapport : ${nomPolitique(etatRef.politique)})`);
+                        if (state.gouverneur !== etatRef.gouverneur) lignesChoix.push(`Gouverneur : ${state.gouverneur ?? 'aucun'} (rapport : ${etatRef.gouverneur ?? 'aucun'})`);
+                        const titrePdc = [
+                            modifChoix ? `Modifié dans l'écran Revenus :\n${lignesChoix.join('\n')}` : undefined,
+                            modifPdc
+                                ? `${detailPdc(s, numeroJoueur, gouverneurDe(state), state.politique)}\nRapport : ${s.pdc}`
+                                : 'Points de Construction (total actuel, dépensé par les constructions)',
+                        ].filter(Boolean).join('\n\n');
+
                         const ownedPlanets = s.planetes.filter(p => p.proprietaire === rapport?.joueur?.numero);
                         const isCollapsed = collapsedSystems[key];
 
@@ -791,10 +852,14 @@ export default function Planification() {
                                             <span style={{ fontWeight: 'bold' }} className="hideOnMobile">{s.nom}</span>
                                         </div>
                                     </td>
-                                    <td style={{ padding: 8, textAlign: 'center' }}>
-                                        <span className={stockClass(initial.pc, finalPc)} title="Points de Construction (total actuel, dépensé par les constructions)">
-                                            {initial.pc} {initial.pc - finalPc > 0 && <span className={spentClass(finalPc)}>{`( -${initial.pc - finalPc} )`}</span>}
-                                        </span>
+                                    <td style={{ padding: 8, textAlign: 'center', ...(modifPdc ? pdcStyleModifie : {}) }} title={titrePdc}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                                            <span className={stockClass(initial.pc, finalPc)}>
+                                                {initial.pc} {initial.pc - finalPc > 0 && <span className={spentClass(finalPc)}>{`( -${initial.pc - finalPc} )`}</span>}
+                                            </span>
+                                            {modifPdc && <span style={{ fontSize: '0.75em', color: '#888' }}>(rapport : {s.pdc})</span>}
+                                            {modifChoix && <span title="Différent du rapport (modifié dans l'écran Revenus)" style={{ color: COULEUR_MODIFIE, fontWeight: 'bold', cursor: 'help' }}>●</span>}
+                                        </div>
                                     </td>
                                     <td style={{ padding: 8, textAlign: 'center' }}>
                                         <span className={stockClass(initial.minerai, finalMinerai)} title="Stock (+ Production)">
@@ -879,9 +944,11 @@ export default function Planification() {
                                     </div>
                                 </td>
 
-                                <td style={{ padding: 8, textAlign: 'center' }}>
-                                    <div className={stockClass(initial.pc, finalPc)} title="Points de Construction (total actuel, dépensé par les constructions)">
+                                <td style={{ padding: 8, textAlign: 'center', ...(modifPdc ? pdcStyleModifie : {}) }} title={titrePdc}>
+                                    <div className={stockClass(initial.pc, finalPc)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                                         {initial.pc} {initial.pc - finalPc > 0 && <span className={spentClass(finalPc)}>{`( -${initial.pc - finalPc} )`}</span>}
+                                        {modifPdc && <span style={{ fontSize: '0.8em', color: '#888' }}>(rapport : {s.pdc})</span>}
+                                        {modifChoix && <span title="Différent du rapport (modifié dans l'écran Revenus)" style={{ color: COULEUR_MODIFIE, fontWeight: 'bold', cursor: 'help' }}>●</span>}
                                     </div>
                                 </td>
 
