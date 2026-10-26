@@ -3,6 +3,14 @@ import { XY } from '../types';
 // Séparateur entre ordres d'un schéma de la console d'ordres
 export const SEPARATEUR_SCHEMA = '%#!%';
 
+// Type d'un schéma, écrit en préfixe « type|base64 » pour que la console d'ordres sache quoi importer
+export type TypeSchema = 'plan' | 'revenus' | 'construction' | 'deplacement' | 'recherche';
+
+export const ajouterPrefixeSchema = (type: TypeSchema, schema: string): string => `${type}|${schema}`;
+
+// Enlève le préfixe « type| » éventuel (les schémas sans préfixe restent valides)
+export const retirerPrefixeSchema = (schema: string): string => schema.replace(/^[a-z]+\|/, '').trim();
+
 // Un système est désigné dans les ordres par « 0_x_y »
 export const codePositionOrdre = (pos: XY): string => `0_${pos.x}_${pos.y}`;
 
@@ -15,7 +23,7 @@ export const serialiserSchema = (ordres: string[][]): string => {
 
 // Inverse de serialiserSchema (base64 → UTF-8 → ordres)
 export const deserialiserSchema = (schema: string): string[][] => {
-    const binaire = atob(schema);
+    const binaire = atob(retirerPrefixeSchema(schema));
     const octets = new Uint8Array(binaire.length);
     for (let i = 0; i < binaire.length; i++) {
         octets[i] = binaire.charCodeAt(i);

@@ -4,6 +4,7 @@ import { Lieutenant, SystemeJoueur } from '../types';
 import { useReport } from '../context/ReportContext';
 import { isPos, parsePosString, posToString } from '../utils/position';
 import { loadPlanificationRevenu, savePlanificationRevenu } from '../utils/planificationRevenuStorage';
+import { ajouterPrefixeSchema } from '../utils/ordreSchema';
 
 interface SystemState {
     taxation: number;
@@ -544,7 +545,7 @@ export default function PlanificationRevenu() {
     const schema = useMemo(() => {
         if (ordresServeur.length === 0) return '';
         const octets = new TextEncoder().encode(ordresServeur.map(o => o.join(':')).join(SEPARATEUR_SCHEMA));
-        return btoa(octets.reduce((acc, byte) => acc + String.fromCharCode(byte), ''));
+        return ajouterPrefixeSchema('revenus', btoa(octets.reduce((acc, byte) => acc + String.fromCharCode(byte), '')));
     }, [ordresServeur]);
 
     const copierSchema = () => {

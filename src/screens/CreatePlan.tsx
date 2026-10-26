@@ -4,6 +4,7 @@ import {Technologie} from '../types';
 import SearchableSelect from '../components/utils/SearchableSelect';
 import {useSearchParams} from 'react-router-dom';
 import {encodeBluePrint, toRoman} from "../utils/global";
+import {ajouterPrefixeSchema, retirerPrefixeSchema} from "../utils/ordreSchema";
 
 type Entry = { code: string; qty: number };
 
@@ -72,7 +73,7 @@ export default function CreatePlan() {
                 // Si le blueprint actuel est déjà le même que celui de l'URL, on ne fait rien
                 if (bp === blueprint) return;
 
-                const decoded = atob(bp);
+                const decoded = atob(retirerPrefixeSchema(bp));
                 // Le format attendu est code1:qty1%code2:qty2...
                 const items = decoded.split('%');
                 const newEntries: Entry[] = [];
@@ -99,7 +100,7 @@ export default function CreatePlan() {
     const blueprint = encodeBluePrint(entries);
 
     const copyBluePrint = () => {
-        navigator.clipboard.writeText(blueprint)
+        navigator.clipboard.writeText(ajouterPrefixeSchema('plan', blueprint))
             .catch(err => console.error("Erreur lors de la copie du lien:", err));
     };
 
@@ -629,7 +630,7 @@ export default function CreatePlan() {
             )}</div>
         <textarea
             style={{width: '100%', backgroundColor: 'white', padding: '10px', color: '#000'}}
-            defaultValue={blueprint}
+            defaultValue={ajouterPrefixeSchema('plan', blueprint)}
             readOnly={true}
             onFocus={(e) => e.target.select()}
         ></textarea>

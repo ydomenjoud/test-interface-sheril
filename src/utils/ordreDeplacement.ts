@@ -1,5 +1,5 @@
 import { XY } from '../types';
-import { codePositionOrdre, serialiserSchema } from './ordreSchema';
+import { ajouterPrefixeSchema, codePositionOrdre, serialiserSchema } from './ordreSchema';
 
 // Schéma d'ordres de déplacement (console d'ordres du jeu, table « deplacer_flotte »).
 // Principe repris de la planification de construction : un ordre par enregistrement
@@ -82,4 +82,4 @@ export const ordreDeplacement = (d: DeplacementOrdre): string[] => {
 
 // Schéma déterministe : tri par num de flotte, puis serialisation
 export const schemaDeplacements = (deplacements: DeplacementOrdre[]): string =>
-    serialiserSchema([...deplacements].sort((a, b) => a.fleetNum - b.fleetNum).map(ordreDeplacement));
+    ajouterPrefixeSchema('deplacement', serialiserSchema([...deplacements].sort((a, b) => a.fleetNum - b.fleetNum).map(ordreDeplacement)));

@@ -4,6 +4,7 @@ import {SystemeJoueur} from '../types';
 import {formatPlannedItems, formatTechName} from '../utils/global';
 import SearchableSelect from '../components/utils/SearchableSelect';
 import Modal from '../components/utils/Modal';
+import {ajouterPrefixeSchema, retirerPrefixeSchema} from '../utils/ordreSchema';
 
 type PlannedItem = {
     id: string;
@@ -309,7 +310,7 @@ export default function Planification() {
     const importQueue = (systemKey: string, bp: string) => {
         if (!bp) return;
         try {
-            const binary = atob(bp);
+            const binary = atob(retirerPrefixeSchema(bp));
             const bytes = new Uint8Array(binary.length);
             for (let i = 0; i < binary.length; i++) {
                 bytes[i] = binary.charCodeAt(i);
@@ -387,7 +388,7 @@ export default function Planification() {
         const utf8Bytes = new TextEncoder().encode(schema);
         const binary = utf8Bytes.reduce((acc, byte) => acc + String.fromCharCode(byte), '');
 
-        return btoa(binary);
+        return ajouterPrefixeSchema('construction', btoa(binary));
     }
     const blueprint = buildBluePrint() || '';
 

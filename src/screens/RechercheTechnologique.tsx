@@ -2,6 +2,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useReport} from '../context/ReportContext';
 import SearchableSelect from "../components/utils/SearchableSelect";
 import {formatTechName } from "../utils/global";
+import {ajouterPrefixeSchema} from "../utils/ordreSchema";
 
 type Assign = { code: string; amount: number; percent: number };
 
@@ -180,7 +181,7 @@ export default function RechercheTechnologique() {
         }, {coutRecherche: 0, percent: 0});
     }, [rows]);
 
-    const shareCode = btoa(rows.map(row=> `${row.a.code}:${row.rowPct}`).join('%'));
+    const shareCode = ajouterPrefixeSchema('recherche', btoa(rows.map(row=> `${row.a.code}:${row.rowPct}`).join('%')));
 
     const copyShareCode = () => {
         navigator.clipboard.writeText(shareCode).catch(err => console.error("Erreur lors de la copie du lien:", err));
