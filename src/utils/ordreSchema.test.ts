@@ -115,6 +115,17 @@ describe('schemaDeplacements', () => {
             ['10', '0_6_6', '3', ''],
         ]);
     });
+
+    it('emporte le nom de la stratégie de combat dans le schéma sérialisé (4e champ de l\'ordre)', () => {
+        const deplacements = [
+            {fleetNum: 2, to: {x: 5, y: 5}, directive: 2, strategy: 'Essai'},
+            {fleetNum: 1, to: {x: 7, y: 7}, directive: 1, strategy: ''},
+        ];
+        expect(deserialiserSchema(schemaDeplacements(deplacements))).toEqual([
+            ['1', '0_7_7', '1', ''],
+            ['2', '0_5_5', '2', 'Essai'],
+        ]);
+    });
 });
 
 describe('deplacementOrdersStorage', () => {

@@ -174,6 +174,31 @@ describe('parseRapportXml - conservation des systèmes détectés entre tours', 
   });
 });
 
+describe('parseRapportXml - stratégies de combat', () => {
+  const xml = `
+    <rapport numtour="8">
+      <commandant numero="1" nom="mab">
+        <STRATEGIES>
+          <S nom="Essai" agressivite="3" cible="1"/>
+          <S nom="Defensive" agressivite="2" cible="0"/>
+        </STRATEGIES>
+      </commandant>
+    </rapport>`;
+
+  it("extrait la section STRATEGIES du moteur (nom, agressivite, cible)", () => {
+    const r = parseRapportXml(xml);
+    expect(r.strategies).toEqual([
+      { nom: 'Essai', agressivite: 3, cible: 1 },
+      { nom: 'Defensive', agressivite: 2, cible: 0 },
+    ]);
+  });
+
+  it("la section absente (rapport ancien) donne strategies undefined", () => {
+    const r = parseRapportXml('<rapport numtour="8"><commandant numero="1" nom="mab"/></rapport>');
+    expect(r.strategies).toBeUndefined();
+  });
+});
+
 describe('parseRapportXml - lieutenants', () => {
   const xml = `
     <rapport numtour="8">

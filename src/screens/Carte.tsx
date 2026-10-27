@@ -10,7 +10,7 @@ import {FleetPicker} from '../components/Map/FleetPicker';
 import {isTypingTarget} from '../utils/keyboard';
 import {wrapX, wrapY, posToString} from '../utils/position';
 import Modal from '../components/utils/Modal';
-import {GlobalData, XY, Zone} from '../types';
+import {GlobalData, Strategie, XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
 import {loadDeplacements, saveDeplacements, clearDeplacements} from '../storage/deplacementOrdersStorage';
 import {DeplacementEnAttente, DeplacementOrdre, DIRECTIVE_DEFAUT, OPTIONS_DIRECTIVES, PRECISION_DEFAUT, PRECISION_PLANETE_MAX, PRECISION_PLANETE_MIN, STRATEGIE_DEFAUT, schemaDeplacements} from '../utils/ordreDeplacement';
@@ -40,6 +40,12 @@ import {
 // Libellé du commandant visé par la directive « Attaque flottes cdt » (infobulle du menu)
 const commandantViserLabel = (globalData: GlobalData | undefined, num: number): string =>
     num === PRECISION_DEFAUT ? 'Neutre' : (globalData?.commandants.find(c => c.numero === num)?.nom ?? `cdt ${num}`);
+
+// Stratégies de combat (règle 5.4) : libellés des codes d'agressivité et de cible (codes du moteur)
+const AGRESSIVITES_STRATEGIE = ['Pillage', 'Fuyard', 'Prudent', 'Normal', 'Combatif', 'Rage'];
+const CIBLES_STRATEGIE = ['Aucune', 'Chasseur', 'Bombardier', 'Cargo'];
+const strategieLabel = (s: Strategie): string =>
+    `${s.nom} — agressivité ${AGRESSIVITES_STRATEGIE[s.agressivite] ?? s.agressivite}, cible ${CIBLES_STRATEGIE[s.cible] ?? s.cible}`;
 
 // Durée d'affichage de chaque tour pendant la lecture automatique de l'historique (en secondes, modifiable)
 const DEFAULT_PLAY_STEP_S = 2;
@@ -532,8 +538,8 @@ export default function Carte() {
     if (tour !== undefined) clearDeplacements(tour);
     setDeplacementsExpanded(false);
   };
-  // Modification de la directive (ou de son paramètre n°) d'un déplacement existant (menus du panneau)
-  const majDeplacement = useCallback((num: number, champ: { directive?: number; precision?: number }) => {
+  // Modification de la directive (ou de son paramètre n°) ou de la stratégie d'un déplacement existant (menus du panneau)
+  const majDeplacement = useCallback((num: number, champ: { directive?: number; precision?: number; strategy?: string }) => {
     setDeplacements(d => {
       const actuel = d[num];
       if (!actuel) return d;
@@ -1146,6 +1152,8 @@ par diplo
                         const origine = flotte?.pos;
                         // La directive choisie (détermine le menu de paramètre n° éventuel)
                         const optionDirective = OPTIONS_DIRECTIVES.find(o => o.value === deplacement.directive);
+                        // Stratégie de combat choisie (nom rapporté dans le rapport, ou absente = par défaut)
+                        const strategieCourante = deplacement.strategy ? rapport?.strategies?.find(s => s.nom === deplacement.strategy) : undefined;
                         // Coordonnées d'une case : nom du système s'il existe (coordonnées au survol),
                         // sinon les coordonnées seules
                         const coordSpan = (pos: XY) => {
@@ -1219,6 +1227,33 @@ par diplo
                                 <option value={PRECISION_DEFAUT} title="Neutre (le jeu le considère comme un commandant)">Neutre</option>
                                 {(global?.commandants ?? []).filter(c => typeof c.numero === 'number').map(c => (
                                   <option key={c.numero} value={c.numero} title={`${c.nom ?? '?'} (#${c.numero})`}>{c.nom ?? `#${c.numero}`}</option>
+                                ))}
+                              </select>
+                            )}
+                            {/* Stratégie de combat (règle 5.4) : les stratégies du joueur rapportées dans le rapport
+                                (le nom est l'identifiant transmis à la console ; vide = stratégie par défaut) */}
+                            {rapport?.strategies && rapport.strategies.length > 0 && (
+                              <select
+                                className="carte-select"
+                                title={`Stratégie de combat (règle 5.4) : ${strategieCourante
+                                  ? strategieLabel(strategieCourante)
+                                  : deplacement.strategy ? `${deplacement.strategy} (absente du rapport)` : 'Défaut (du jeu)'}`}
+                                value={deplacement.strategy ?? ''}
+                                onChange={e => majDeplacement(num, { strategy: e.target.value })}
+                                style={{ minWidth: 48, maxWidth: 160, flexShrink: 0 }}
+                              >
+                                <option value="" title="Stratégie par défaut du jeu">Défaut</option>
+                                {rapport.strategies.map(s => (
+                                  <option
+                                    key={s.nom}
+                                    value={s.nom}
+                                    title={s.nom.includes(':') || s.nom.includes('%#!%')
+                                      ? 'Nom incompatible avec le schéma d\'ordres (contient « : » ou « %#!% »)'
+                                      : strategieLabel(s)}
+                                    disabled={s.nom.includes(':') || s.nom.includes('%#!%')}
+                                  >
+                                    {s.nom}
+                                  </option>
                                 ))}
                               </select>
                             )}
