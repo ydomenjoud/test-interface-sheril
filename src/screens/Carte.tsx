@@ -1196,14 +1196,14 @@ par diplo
                             {optionDirective?.precision === 'planete' && (
                               <select
                                 className="carte-select"
-                                title={`Planète visée (n°, 0-19) : ${deplacement.precision ?? PRECISION_DEFAUT}`}
+                                title={`Planète visée (n°, 1-20) : ${(deplacement.precision ?? PRECISION_DEFAUT) + 1}`}
                                 value={deplacement.precision ?? PRECISION_DEFAUT}
                                 onChange={e => majDeplacement(num, { precision: Number(e.target.value) })}
                                 style={{ width: 48, flexShrink: 0 }}
                               >
                                 {Array.from({length: PRECISION_PLANETE_MAX - PRECISION_PLANETE_MIN + 1}, (_, n) => {
                                   const numero = PRECISION_PLANETE_MIN + n;
-                                  return <option key={numero} value={numero}>{numero}</option>;
+                                  return <option key={numero} value={numero}>{numero + 1}</option>;
                                 })}
                               </select>
                             )}
@@ -1214,11 +1214,11 @@ par diplo
                                 title={`Commandant visé (0 = neutre) : ${commandantViserLabel(global, deplacement.precision ?? PRECISION_DEFAUT)}`}
                                 value={deplacement.precision ?? PRECISION_DEFAUT}
                                 onChange={e => majDeplacement(num, { precision: Number(e.target.value) })}
-                                style={{ width: 48, flexShrink: 0 }}
+                                style={{ minWidth: 48, maxWidth: 160, flexShrink: 0 }}
                               >
-                                <option value={PRECISION_DEFAUT} title="Neutre (le jeu le considère comme un commandant)">0</option>
+                                <option value={PRECISION_DEFAUT} title="Neutre (le jeu le considère comme un commandant)">Neutre</option>
                                 {(global?.commandants ?? []).filter(c => typeof c.numero === 'number').map(c => (
-                                  <option key={c.numero} value={c.numero} title={`${c.nom ?? '?'} (#${c.numero})`}>{c.numero}</option>
+                                  <option key={c.numero} value={c.numero} title={`${c.nom ?? '?'} (#${c.numero})`}>{c.nom ?? `#${c.numero}`}</option>
                                 ))}
                               </select>
                             )}
