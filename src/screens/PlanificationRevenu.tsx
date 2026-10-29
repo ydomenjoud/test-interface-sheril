@@ -425,8 +425,10 @@ export default function PlanificationRevenu() {
                 const growthBonus = (state.terraformation ? 3 : 0) + bonusPopPolitique + bonusPopAlimentaire + bonusPopMedicaments;
                 let pGrowth = 0;
                 let pMax = 0;
+                const tauxRaces: string[] = [];
                 (p.populations ?? []).forEach(pop => {
                     const rate = (pop.growth || 0) + growthBonus;
+                    tauxRaces.push(`+${rate} %`);
                     const nb = pop.nb || 0;
                     pGrowth += Math.min(Math.floor(nb * rate / 100), Math.max(0, (pop.max || 0) - nb));
                     pMax += pop.max || 0;
@@ -449,17 +451,17 @@ export default function PlanificationRevenu() {
                 population_variation += pGrowth;
                 revenuPlanetes += revenuPlanete;
                 revenuPlanetesTech += revenuPlaneteTech;
-                detailPop.push([`planète ${p.num ?? ''}`, `${pPop}`, `${pMax}`, `+${(p.terraformation ?? 0) * 3} % (niv. ${p.terraformation ?? 0})`, `+${pGrowth}`, Math.max(0, pMax - pPop), revenuPlanete.toFixed(1), taxPlanete]);
+                detailPop.push([`planète ${p.num ?? ''}`, `${pPop}`, `${pMax}`, tauxRaces.join(' ; ') || '-', `+${pGrowth}`, Math.max(0, pMax - pPop), revenuPlanete.toFixed(1), taxPlanete]);
 
             });
 
             const detailPopulation = `Population totale des planètes du joueur : ${population} / pop max ${populationMax}`;
             const detailVariationPop: DetailTableau = {
                 intro: `Croissance par tour (par race et par planète, arrondie à l'inférieur, minimum ${CROISSANCE_MIN_PLANETE} par planète, limitée par la pop max)`,
-                colonnes: ['Planète', 'Pop', 'Pop max', 'Terra. déjà dans le taux', 'Croissance', 'Marge', 'Revenu', 'Taxation'],
+                colonnes: ['Planète', 'Pop', 'Pop max', 'Taux', 'Croissance', 'Marge', 'Revenu', 'Taxation'],
                 lignes: detailPop,
                 notes: [
-                    `Bonus ajoutés au taux du rapport (qui inclut déjà 3 % × niveau de terraformation) : terraformation de ce tour ${state.terraformation ? '+3' : '0'} %, politique ${signe(bonusPopPolitique)} %, produits alimentaires ${signe(bonusPopAlimentaire)} %, médicaments ${signe(bonusPopMedicaments)} %`,
+                    `Bonus ajoutés : terraformation de ce tour ${state.terraformation ? '+3' : '0'} %, politique ${signe(bonusPopPolitique)} %, produits alimentaires ${signe(bonusPopAlimentaire)} %, médicaments ${signe(bonusPopMedicaments)} %`,
                     `Total : +${population_variation}`,
                 ],
             };
