@@ -9,13 +9,13 @@ import { ajouterPrefixeSchema, codePositionOrdre, serialiserSchema } from './ord
 // Forme d'un ordre : [num de la flotte, 0_x_y, directive, stratégie]
 // - directive = code du jeu + 100 × paramètre (n° de planète ou de commandant visé) :
 //   ex. 308 = 8 + 100×3 = « attaque des flottes du commandant 3 », 705 = 5 + 100×7 = « attaque de la planète 7 » ;
-// - stratégie = identifiant de la table z_strategies du jeu (valeurs à confirmer avec la
-//   console — vide par défaut) ; champ libre sans « : » ni « %#!% » (l'import côté console
-//   rejoint la queue de l'enregistrement si besoin) ;
+// - stratégie = nom de la stratégie de combat du joueur (règle 5.4, section STRATEGIES du
+//   rapport) ; chaîne vide = la stratégie par défaut du jeu (le moteur retombe dessus aussi si
+//   le nom est inconnu) ; le nom ne doit pas contenir « : » ni « %#!% » (séparateurs du schéma) ;
 // - un seul déplacement par flotte ; num = numéro de flotte du rapport (0-based).
 
 export const DIRECTIVE_DEFAUT = 1;  // « Attaque système » (choix arbitraire : à confirmer avec le jeu)
-export const STRATEGIE_DEFAUT = ''; // aucune stratégie par défaut (valeurs de z_strategies à confirmer)
+export const STRATEGIE_DEFAUT = ''; // '' = la stratégie par défaut du jeu
 export const PRECISION_DEFAUT = 0;  // 0 = le neutre pour les commandants ; planète 0 sinon
 
 // Directives de rencontre — codes réels du jeu (Const.java / Messages.DIRECTIVES du serveur,
@@ -55,7 +55,7 @@ export interface DeplacementOrdre {
     fleetNum: number;  // num de la flotte (identité rapport, 0-based — l'interface affiche « #num+1 »)
     to: XY;            // destination commandée
     directive: number; // directive commandée (code du jeu 0..8)
-    strategy: string;  // stratégie commandée (z_strategies — valeurs à confirmer)
+    strategy: string;  // nom de la stratégie de combat commandée (vide = par défaut)
     precision?: number; // paramètre n° de la directive (commandant visé ou planète)
 }
 

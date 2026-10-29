@@ -1,4 +1,4 @@
-import {Alliance, FlotteDetectee, FlotteJoueur, Rapport, SystemeDetecte, SystemeJoueur, PlanVaisseau, MarchandiseData, Lieutenant} from '../types';
+import {Alliance, FlotteDetectee, FlotteJoueur, Rapport, Strategie, SystemeDetecte, SystemeJoueur, PlanVaisseau, MarchandiseData, Lieutenant} from '../types';
 import {isPos, parsePosString} from '../utils/position';
 import {parseCombatMessages, RawMessage} from './parseCombatMessages';
 
@@ -486,6 +486,14 @@ export function parseRapportXml(text: string): Rapport {
     }));
     const combats = parseCombatMessages(rawMessages);
 
+    // Stratégies de combat du joueur (section STRATEGIES sous commandant, majuscules côté moteur)
+    const strategies: Strategie[] = qAll(joueurNode, ['strategies > s']).map(s => ({
+        nom: getAttr(s, ['nom']) || '',
+        agressivite: getAttrNum(s, ['agressivite']),
+        cible: getAttrNum(s, ['cible']),
+    })).filter(st => st.nom);
+    console.log(strategies);
+
     const rapport: Rapport = {
         tour,
         technologiesAtteignables,
@@ -493,6 +501,7 @@ export function parseRapportXml(text: string): Rapport {
         budgetTechnologique,
         lieutenants,
         combats,
+        strategies: strategies.length ? strategies : undefined,
     };
 
     return rapport;

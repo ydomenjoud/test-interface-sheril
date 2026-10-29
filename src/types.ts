@@ -186,6 +186,14 @@ export interface FlotteDetectee extends FlotteBase {
     puiss: 'faible' | 'moyenne' | 'grande' | string;
 }
 
+// Stratégie de combat du joueur (règle 5.4) : le nom est l'identifiant utilisé
+// dans l'ordre de déplacement (champ stratégie)
+export interface Strategie {
+    nom: string;
+    agressivite: number;  // 0=Pillage 1=Fuyard 2=Prudent 3=Normal 4=Combatif 5=Rage
+    cible: number;        // 0=aucune 1=chasseur 2=bombardier 3=cargo
+}
+
 export interface Alliance {
     createur: number;
     dirigeant: number;
@@ -239,6 +247,7 @@ export type Rapport = {
     budgetTechnologique: number;
     lieutenants: Lieutenant[];
     combats: CombatEvent[];
+    strategies?: Strategie[]; // stratégies de combat du joueur (section STRATEGIES du rapport)
 };
 export type SystemData = {
     nom: string;
