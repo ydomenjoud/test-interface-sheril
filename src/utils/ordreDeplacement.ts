@@ -14,7 +14,7 @@ import { ajouterPrefixeSchema, codePositionOrdre, serialiserSchema } from './ord
 //   le nom est inconnu) ; le nom ne doit pas contenir « : » ni « %#!% » (séparateurs du schéma) ;
 // - un seul déplacement par flotte ; num = numéro de flotte du rapport (0-based).
 
-export const DIRECTIVE_DEFAUT = 1;  // « Attaque système » (choix arbitraire : à confirmer avec le jeu)
+export const DIRECTIVE_DEFAUT = 0;  // « Attaque système » (choix arbitraire : à confirmer avec le jeu)
 export const STRATEGIE_DEFAUT = ''; // '' = la stratégie par défaut du jeu
 export const PRECISION_DEFAUT = 0;  // 0 = le neutre pour les commandants ; planète 0 sinon
 
