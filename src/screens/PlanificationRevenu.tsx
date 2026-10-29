@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Lieutenant, SystemeJoueur } from '../types';
 import { useReport } from '../context/ReportContext';
@@ -125,11 +126,75 @@ const descriptionGouverneur = (l: Lieutenant | undefined, noms: Record<number, s
         + (l.competences.length ? `\n${l.competences.map(c => `${noms[c.comp] ?? `compétence ${c.comp}`} : ${c.val}`).join('\n')}` : '')
     : undefined;
 
+// Détail tabulaire : une intro, un tableau (une ligne par planète) et des notes
+type DetailTableau = { intro: string; colonnes: string[]; lignes: (string | number)[][]; notes: string[] };
+type Detail = string | DetailTableau;
+
+// Bulle de détail affichée au survol d'une valeur (remplace l'infobulle native `title`, trop petite et non mise en forme)
+function BulleDetail({ detail, avant, ancre }: { detail?: Detail; avant?: string; ancre: DOMRect }) {
+    const largeur = Math.min(typeof detail === 'object' ? 900 : 640, window.innerWidth - 24);
+    const left = Math.max(12, Math.min(ancre.left, window.innerWidth - largeur - 12));
+    const enDessous = ancre.bottom + 320 < window.innerHeight || ancre.top < 320;
+    const position: React.CSSProperties = enDessous
+        ? { top: ancre.bottom, maxHeight: window.innerHeight - ancre.bottom - 12 }
+        : { bottom: window.innerHeight - ancre.top, maxHeight: ancre.top - 12 };
+    const lignes = typeof detail === 'string' ? detail.split('\n').filter(l => l.trim() !== '') : [];
+    return createPortal(
+        <div
+            role="tooltip"
+            style={{
+                position: 'fixed', left, width: largeur, overflowY: 'auto', zIndex: 10000,
+                background: '#1b1f27', color: '#e8eaed', border: '1px solid #4a5568', borderRadius: 8, padding: '12px 16px',
+                boxShadow: '0 8px 24px rgba(0,0,0,.6)', fontSize: 14, lineHeight: 1.4, textAlign: 'left', fontWeight: 'normal',
+                ...position,
+            }}
+        >
+            {typeof detail === 'object' && (
+                <>
+                    <div style={{ marginBottom: 8 }}>{detail.intro}</div>
+                    <table style={{ borderCollapse: 'collapse', width: '100%', fontVariantNumeric: 'tabular-nums' }}>
+                        <thead>
+                            <tr>{detail.colonnes.map((c, i) => (
+                                <th key={c} style={{ textAlign: i === 0 ? 'left' : 'right', color: '#ffd54f', padding: '2px 8px', borderBottom: '1px solid #4a5568', position: 'sticky', top: -12, background: '#1b1f27', whiteSpace: 'nowrap' }}>{c}</th>
+                            ))}</tr>
+                        </thead>
+                        <tbody>
+                            {detail.lignes.map((l, r) => (
+                                <tr key={r} style={{ background: r % 2 ? '#212631' : undefined }}>
+                                    {l.map((v, i) => <td key={i} style={{ textAlign: i === 0 ? 'left' : 'right', padding: '2px 8px', whiteSpace: 'nowrap' }}>{v}</td>)}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {detail.notes.map((n, i) => <div key={i} style={{ marginTop: 6, color: '#b0b8c4' }}>{n}</div>)}
+                </>
+            )}
+            {lignes.map((ligne, idx) => {
+                const sep = ligne.indexOf(' : ');
+                const estLigneDeDonnee = sep > 0 && sep < 40;
+                return (
+                    <div key={idx} style={{ padding: '2px 0', borderTop: idx > 0 ? '1px solid #2d3340' : undefined, whiteSpace: 'pre-wrap' }}>
+                        {estLigneDeDonnee
+                            ? <><b style={{ color: '#ffd54f' }}>{ligne.slice(0, sep)}</b> : {ligne.slice(sep + 3)}</>
+                            : ligne}
+                    </div>
+                );
+            })}
+            {avant && (
+                <div style={{ marginTop: 10, paddingTop: 8, borderTop: '2px solid #4a5568', color: '#ffab91', fontWeight: 'bold' }}>{avant}</div>
+            )}
+        </div>,
+        document.body,
+    );
+}
+
 // Met en évidence (surlignage qui s'estompe) une valeur affichée qui vient de changer.
-// L'infobulle donne le détail du calcul et, si la valeur diffère de celle calculée avec les infos du rapport, cette valeur de référence.
-function Change({ children, style, detail, rapport }: { children: string; style?: React.CSSProperties; detail?: string; rapport?: string }) {
+// La bulle au survol donne le détail du calcul et, si la valeur diffère de celle calculée avec les infos du rapport, cette valeur de référence.
+function Change({ children, style, detail, rapport }: { children: string; style?: React.CSSProperties; detail?: Detail; rapport?: string }) {
     const precedent = useRef(children);
     const [flash, setFlash] = useState(0);
+    const [ancre, setAncre] = useState<DOMRect | null>(null);
+    const ref = useRef<HTMLSpanElement>(null);
     useEffect(() => {
         if (precedent.current !== children) {
             precedent.current = children;
@@ -137,13 +202,16 @@ function Change({ children, style, detail, rapport }: { children: string; style?
         }
     }, [children]);
     const avant = rapport !== undefined && rapport !== children ? `Avant (rapport) : ${rapport}` : undefined;
-    const titre = [detail, avant].filter(Boolean).join('\n\n') || undefined;
+    const aBulle = !!(detail || avant);
+    const ouvre = () => { if (aBulle && ref.current) setAncre(ref.current.getBoundingClientRect()); };
     return (
         <span
             key={flash}
-            title={titre}
-            style={{ ...style, borderRadius: 3, ...(titre ? { cursor: 'help', ...SOULIGNE_INFOBULLE } : {}), ...(flash ? { animation: 'revenuChange 2.5s ease-out' } : {}) }}
-        >{children}</span>
+            ref={ref}
+            onMouseEnter={ouvre}
+            onMouseLeave={() => setAncre(null)}
+            style={{ ...style, borderRadius: 3, ...(aBulle ? { cursor: 'help', ...SOULIGNE_INFOBULLE } : {}), ...(flash ? { animation: 'revenuChange 2.5s ease-out' } : {}) }}
+        >{children}{ancre && <BulleDetail detail={detail} avant={avant} ancre={ancre} />}</span>
     );
 }
 
@@ -342,7 +410,7 @@ export default function PlanificationRevenu() {
             const bonusPopMedicaments = stockImportant(MARCH_MEDICAMENTS) ? BONUS_POP_MEDICAMENTS : 0;
             let population = 0;
             let population_variation = 0;
-            const detailPop: string[] = [];
+            const detailPop: (string | number)[][] = [];
 
             let populationMax = 0;
             let revenuPlanetes = 0;
@@ -381,12 +449,20 @@ export default function PlanificationRevenu() {
                 population_variation += pGrowth;
                 revenuPlanetes += revenuPlanete;
                 revenuPlanetesTech += revenuPlaneteTech;
-                detailPop.push(`planète ${p.num ?? ''} : pop ${pPop}/${pMax}, croissance +${pGrowth} (marge avant pop max : ${Math.max(0, pMax - pPop)}), revenu ${revenuPlanete.toFixed(1)} (taxation ${taxPlanete})`);
+                detailPop.push([`planète ${p.num ?? ''}`, `${pPop}`, `${pMax}`, `+${(p.terraformation ?? 0) * 3} % (niv. ${p.terraformation ?? 0})`, `+${pGrowth}`, Math.max(0, pMax - pPop), revenuPlanete.toFixed(1), taxPlanete]);
 
             });
 
             const detailPopulation = `Population totale des planètes du joueur : ${population} / pop max ${populationMax}`;
-            const detailVariationPop = `Croissance par tour (par race et par planète, arrondie à l'inférieur, minimum ${CROISSANCE_MIN_PLANETE} par planète, limitée par la pop max) :\n${detailPop.join('\n')}\nBonus appliqués au taux : terraformation ${state.terraformation ? '+3' : '0'} %, politique ${signe(bonusPopPolitique)} %, produits alimentaires ${signe(bonusPopAlimentaire)} %, médicaments ${signe(bonusPopMedicaments)} %\n= +${population_variation}`;
+            const detailVariationPop: DetailTableau = {
+                intro: `Croissance par tour (par race et par planète, arrondie à l'inférieur, minimum ${CROISSANCE_MIN_PLANETE} par planète, limitée par la pop max)`,
+                colonnes: ['Planète', 'Pop', 'Pop max', 'Terra. déjà dans le taux', 'Croissance', 'Marge', 'Revenu', 'Taxation'],
+                lignes: detailPop,
+                notes: [
+                    `Bonus ajoutés au taux du rapport (qui inclut déjà 3 % × niveau de terraformation) : terraformation de ce tour ${state.terraformation ? '+3' : '0'} %, politique ${signe(bonusPopPolitique)} %, produits alimentaires ${signe(bonusPopAlimentaire)} %, médicaments ${signe(bonusPopMedicaments)} %`,
+                    `Total : +${population_variation}`,
+                ],
+            };
 
             // Bonus gouverneur (finance) puis modificateur de politique (impôts / loisir) : base du revenu technologique
             const revenuTechBase = revenuPlanetesTech

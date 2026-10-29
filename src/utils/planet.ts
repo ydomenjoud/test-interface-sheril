@@ -3,12 +3,12 @@
 import { Planete, Race } from "../types";
 
 export const Atmospheres = [
-    [3, 2, 2, 2, 2],
-    [2, 2, 1, 1, 0],
-    [0, 0, 0, 1, 2],
-    [2, 2, 1, 2, 2],
-    [-1, 0, 2, -1, -1],
-    [-1, 0, 2, -1, -1]
+    [15, 12, 10, 8, 5],
+    [5, 15, 12, 10, 8],
+    [8, 5, 15, 12, 10],
+    [10, 8, 5, 15, 12],
+    [12, 10, 8, 5, 15],
+    [5, 5, 5, 5, 5]
 ]
 export const atmospheresNameList = [
     'idéale',
@@ -54,7 +54,7 @@ export function maxPopulationByRace({id, graviteSupporte, radiationSupporte, tem
 					/ (Math.pow(graviteSupporte.min - graviteSupporte.max, 2));
 
 
-    const maxPop = Math.floor((( (Math.floor(radiationFactor) + Math.floor(temperatureFactor) + Math.floor(gravityFactor)) * 2 * size + Atmospheres[id][atmosphere] * 100 * size) * 9 / 10));
+    const maxPop = Math.floor((( (Math.floor(radiationFactor) + Math.floor(temperatureFactor) + Math.floor(gravityFactor)) * size + Atmospheres[id][atmosphere] * 100 * size) * 4 / 10));
     return Math.max(
         maxPop, 10
     );
