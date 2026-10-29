@@ -131,6 +131,7 @@ export default function Planification() {
     const [multiChoice, setMultiChoice] = useState('');
     const [multiMax, setMultiMax] = useState(''); // plafond ajouté par système (vide = pas de limite)
     const [multiOnlyMissing, setMultiOnlyMissing] = useState(false); // ignore les systèmes qui ont déjà cette construction
+    const [multiOnlyShipyard, setMultiOnlyShipyard] = useState(false); // ignore les systèmes sans chantier naval du joueur
     const [multiIgnoreLimits, setMultiIgnoreLimits] = useState(false); // ignore les ressources des systèmes (le maximum saisi devient la quantité)
     // Sans limite de ressources, une quantité est obligatoire
     const canAddMulti = !!multiChoice && (!multiIgnoreLimits || parseInt(multiMax, 10) > 0);
@@ -285,7 +286,7 @@ export default function Planification() {
     };
 
     // Ajoute (ou augmente) le maximum possible de la construction choisie dans chaque système
-    const addMaxToConstructingSystems = (choice: string, limit: number | undefined, onlyMissing: boolean, ignoreLimits: boolean) => {
+    const addMaxToConstructingSystems = (choice: string, limit: number | undefined, onlyMissing: boolean, onlyShipyard: boolean, ignoreLimits: boolean) => {
         const [type, ...rest] = choice.split(':');
         const code = rest.join(':');
         if (!code || (type !== 'building' && type !== 'ship')) return;
@@ -299,6 +300,10 @@ export default function Planification() {
                 const existing = queue.findIndex(i => i.type === type && i.code === code);
                 if (onlyMissing && type === 'building' && system.planetes.some(pl =>
                     pl.proprietaire === rapport?.joueur?.numero && pl.batiments?.some(b => b.techCode === code && b.count > 0)
+                )) return;
+
+                if (onlyShipyard && !system.planetes.some(pl =>
+                    pl.proprietaire === rapport?.joueur?.numero && pl.batiments?.some(b => b.techCode === 'chantierI' && b.count > 0)
                 )) return;
 
                 const initial = getSystemResources(system);
@@ -1294,6 +1299,14 @@ export default function Planification() {
                         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <input
                                 type="checkbox"
+                                checked={multiOnlyShipyard}
+                                onChange={(e) => setMultiOnlyShipyard(e.target.checked)}
+                            />
+                            Uniquement sur les systèmes avec chantier naval
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <input
+                                type="checkbox"
                                 checked={multiIgnoreLimits}
                                 onChange={(e) => setMultiIgnoreLimits(e.target.checked)}
                             />
@@ -1308,7 +1321,7 @@ export default function Planification() {
                             Fermer
                         </button>
                         <button
-                            onClick={() => addMaxToConstructingSystems(multiChoice, multiMax ? Math.max(0, parseInt(multiMax, 10) || 0) : undefined, multiOnlyMissing, multiIgnoreLimits)}
+                            onClick={() => addMaxToConstructingSystems(multiChoice, multiMax ? Math.max(0, parseInt(multiMax, 10) || 0) : undefined, multiOnlyMissing, multiOnlyShipyard, multiIgnoreLimits)}
                             disabled={!canAddMulti}
                             style={{
                                 padding: '8px 16px',
