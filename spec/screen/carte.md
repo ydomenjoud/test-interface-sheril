@@ -262,6 +262,20 @@ couche « Présence », calculée sur TOUT le tore (pas seulement le viewport) p
   (défaut inactif ; l'affichage reste automatique en très petit zoom, case ≤ 16 px).
 - Les réglages sont mémorisés (localStorage, clés `carte_presence_*`).
 
+### filtres de flottes (panneau Filtres)
+
+- Bandes de taille issues des termes de puissance du jeu : `Fbl` (insignifiante → faible), `Pte`,
+  `Moy`, `Grd` (assez grande → grande), `TG+` (très grande → inimaginable). Les flottes de puissance
+  inconnue (`?`) restent toujours incluses — il n'y a pas de contrôle dédié.
+- « Mes flottes » et « Flottes neutres » (propriétaire 0) contrôlent séparément la visibilité des
+  flottes correspondantes, en combinaison avec les bandes de taille. Les autres commandants ne sont
+  pas assimilés aux neutres en raison de leur couleur ou de leur race.
+- Actifs par défaut, tous les réglages sont mémorisés (clés `carte_fleet_size_bands`,
+  `carte_show_own_fleets`, `carte_show_neutral_fleets`). Les anciens choix de tailles sont migrés.
+- Le compteur « visibles / total du rapport » est dans le panneau Filtres, pas dans la barre d'outils.
+- Ces filtres n'affectent que l'affichage (marqueurs, flèches d'ordres, inspection au clic) : les
+  données du rapport et les ordres préparés restent intacts et réapparaissent si le filtre change.
+
 ## déplacements de flottes (schéma d'ordres)
 
 La carte permet de préparer des ordres de déplacement de ses flottes par glisser-déposer : le résultat est un

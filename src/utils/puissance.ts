@@ -33,7 +33,7 @@ export function getDescriptionPuissance(p: number) {
             return desc[i];
         }
     }
-    return "??????";
+    return desc[desc.length - 1];
 }
 
 export function getPuissanceFromString(p: string){
