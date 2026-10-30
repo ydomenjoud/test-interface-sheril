@@ -10,6 +10,7 @@ import {Alliance, GlobalData, XY, Zone} from '../../types';
 import {lightenHexColor, getColorForPlayer} from "../../utils/global";
 import {detectionWeight, PresenceData} from '../../utils/presence';
 import {isTypingTarget} from '../../utils/keyboard';
+import {ALL_FLEET_SIZE_BANDS, DEFAULT_FLEET_OWNER_VISIBILITY, FleetOwnerVisibility, FleetSizeBand, isFleetVisible} from '../../utils/fleetModel';
 
 const OWNER_BADGE_COLORS: Record<number, string> = {
     1: '#0066CC',
@@ -98,6 +99,10 @@ type Props = {
     showCombatBadges: boolean;
     showOwnerBadges: boolean;
     showFleetBadges: boolean;
+    // Filtres de flottes (bandes de taille + nos flottes / flottes neutres) : seul le
+    // sous-ensemble visible est dessiné (marqueurs et flèches d'ordres) ; le rapport reste intact.
+    fleetSizeBands?: readonly FleetSizeBand[];
+    fleetVisibility?: FleetOwnerVisibility;
     showSystemRadar: boolean;
     showFleetRadar: boolean;
     alliedScanners?: { pos: XY; scan: number }[]; // portées radar importées des alliés (tour affiché)
@@ -162,7 +167,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#ef4444';
 }
 
-export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, alliedScanners = [], showSectors, showZones = true, showInfluence, colorMode = 'status', mapTheme = 'sombre', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
+export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, fleetSizeBands = ALL_FLEET_SIZE_BANDS, fleetVisibility = DEFAULT_FLEET_OWNER_VISIBILITY, showSystemRadar, showFleetRadar, alliedScanners = [], showSectors, showZones = true, showInfluence, colorMode = 'status', mapTheme = 'sombre', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
                         presenceMode = 'voronoi', presenceData = null, presenceDecay = 10, presenceLabels = false,
                         deplacements, dragFleet, highlightPos, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort, onFleetDragOver, onFleetDragLeave, onFleetDrop}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
@@ -268,6 +273,12 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             ...f, owner: f.proprio || 0,
         })),];
     }, [rapport, currentPlayerId]);
+
+    // Sous-ensemble dessiné : flottes restantes après filtres (bandes de taille, nos flottes,
+    // flottes neutres). N'affecte que l'affichage — le rapport et les ordres restent intacts.
+    const visibleFleets = useMemo(
+        () => fleets.filter(fleet => isFleetVisible(fleet, fleetSizeBands, fleetVisibility)),
+        [fleets, fleetSizeBands, fleetVisibility]);
 
     const combats = useMemo(() => {
         const fromRapport = rapport?.combats ?? [];
@@ -1301,7 +1312,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         // flottes : un seul marqueur par case, étiqueté au nombre total de flottes sur la case
         if (showFleetBadges) {
             const fleetCells = new Map<string, any[]>();
-            fleets.forEach(f => {
+            visibleFleets.forEach(f => {
                 const k = `${f.pos.x}_${f.pos.y}`;
                 const arr = fleetCells.get(k);
                 if (arr) arr.push(f); else fleetCells.set(k, [f]);
@@ -1574,7 +1585,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         // marqueurs de combat, cadre de sélection) pour que la cible commandée ne soit jamais
         // masquée. (L'anneau ambre de la case reste dessiné avec le marqueur.)
         if (deplacements) {
-            for (const f of fleets) {
+            for (const f of visibleFleets) {
                 if (f.type !== 'joueur') continue;
                 const t = deplacements[f.num];
                 if (!t || (t.x === f.pos.x && t.y === f.pos.y)) continue;
@@ -1800,7 +1811,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         // Le survol dépend de la géométrie (centre, taille de case) : on resynchronise l'overlay après chaque dessin
         redrawHoverOverlay();
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, alliedScanners, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, presenceMode, presenceData, presenceDecay, presenceLabels, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos, theme]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, fleetSizeBands, fleetVisibility, showSystemRadar, showFleetRadar, alliedScanners, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, presenceMode, presenceData, presenceDecay, presenceLabels, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos, theme]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
@@ -1889,7 +1900,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         // et détection d'une case contenant au moins une flotte du joueur (=> FleetPicker)
         onAnyCanvasMouseDown?.();
         const mdCell = cellAt(evt.clientX, evt.clientY);
-        const isFleetCell = !!mdCell && fleets.some(f => f.type === 'joueur' && f.pos.x === mdCell.x && f.pos.y === mdCell.y);
+        const isFleetCell = !!mdCell && visibleFleets.some(f => f.type === 'joueur' && f.pos.x === mdCell.x && f.pos.y === mdCell.y);
         // Alt est réservé au tracé de zone : le sélecteur de flotte ne s'ouvre pas en Alt+clic
         if (isFleetCell && mdCell && !evt.altKey) {
             onFleetCellMouseDown?.(mdCell, evt.clientX, evt.clientY);
@@ -2007,7 +2018,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
-    }, [cellSize, setCenter, cellAt, onCreateZone, onSelect, hideTooltip, fleets, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort]);
+    }, [cellSize, setCenter, cellAt, onCreateZone, onSelect, hideTooltip, visibleFleets, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort]);
 
     const handleWheel = useCallback((evt: React.WheelEvent<HTMLCanvasElement>) => {
         const zoomSpeed = 0.1;
