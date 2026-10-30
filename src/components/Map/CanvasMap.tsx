@@ -2,11 +2,12 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
 import {BOUNDS, CENTER, getTorusDistance, torusDelta, wrapX, wrapY} from '../../utils/position';
 import {capaciteReparation} from '../../utils/reparation';
-import {getSectorNumber, isSectorLabelCell, sectorBackgroundColor, sectorLabelColor} from '../../utils/sectors';
+import {getSectorNumber, isSectorLabelCell, sectorLabelColor} from '../../utils/sectors';
 import {countCombatsByKind} from '../../parsers/parseCombatMessages';
 import {drawCombatMarkers} from '../../utils/combatMarkers';
 import {Alliance, GlobalData, XY, Zone} from '../../types';
 import {lightenHexColor, getColorForPlayer} from "../../utils/global";
+import {detectionWeight, PresenceData} from '../../utils/presence';
 import {isTypingTarget} from '../../utils/keyboard';
 
 const OWNER_BADGE_COLORS: Record<number, string> = {
@@ -105,6 +106,11 @@ type Props = {
     showStabilityZones: boolean;
     stabilitySystemPos?: string;
     influenceOpacity?: number;
+    // ---- Couche présence (qui est où) ----
+    presenceMode?: 'presence' | 'voronoi'; // 'voronoi' = ancienne influence au plus proche
+    presenceData?: PresenceData | null; // grille précalculée sur toute la galaxie (mode présence)
+    presenceDecay?: number; // fenêtre de fraîcheur (tours) des détections
+    presenceLabels?: boolean; // n° du commandant par blob (automatique à case ≤ 16 px)
     // ---- Ordres de déplacement (drag & drop de flottes) ----
     deplacements?: Record<number, XY>; // flotteNum → cible commandée
     dragFleet?: { from: XY; vitesse: number; cursor: XY } | null; // drag en cours : anneau de vitesse + ligne + distance
@@ -154,7 +160,8 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
 }
 
 export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
-                       deplacements, dragFleet, highlightPos, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort, onFleetDragOver, onFleetDragLeave, onFleetDrop}: Props) {
+                        presenceMode = 'voronoi', presenceData = null, presenceDecay = 10, presenceLabels = false,
+                        deplacements, dragFleet, highlightPos, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort, onFleetDragOver, onFleetDragLeave, onFleetDrop}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     // Case survolée : dessinée sur un canvas séparé pour ne pas redessiner toute la carte à chaque mouvement de souris
@@ -481,9 +488,15 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         const topX = wrapX(currentCenter.x - halfRows);
         const leftY = wrapY(currentCenter.y - halfCols);
 
-        // Préparation des influenceurs pour la couche d'influence
+        // Couche présence/influence : le mode « présence » échantillonne une grille précalculée sur
+        // TOUTE la galaxie (computePresence) ; le mode « voronoi » garde l'ancienne influence
+        // attribuée au système connu le plus proche (calculée ici, sur le viewport seulement).
+        const usePresenceGrid = showInfluence && presenceMode === 'presence' && !!presenceData;
+        const useVoronoi = showInfluence && !usePresenceGrid;
+
+        // Préparation des influenceurs pour la couche d'influence (mode voronoi uniquement)
         const influencers: { owner: number, pos: XY }[] = [];
-        if (showInfluence) {
+        if (useVoronoi) {
             // On ne prend QUE les systèmes des joueurs (pas les flottes, pas les systèmes neutres)
             const influencerMap = new Map<number, XY[]>();
             systems.forEach(s => {
@@ -544,7 +557,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
         }
 
-        // fond des secteurs 10×10
+        // cases de la carte (couche présence / influence, libellés de secteurs)
         for (let r = 0; r < rows; r++) {
             const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
             for (let c = 0; c < cols; c++) {
@@ -553,14 +566,28 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 // Ne pas dessiner le contenu dans les en-têtes (ligne 0 et colonne 0 du canvas)
                 if (r === 0 || c === 0) continue;
 
-                const sectorBg = showSectors ? sectorBackgroundColor(xCoord, yCoord) : null;
-                if (sectorBg) {
-                    ctx.fillStyle = sectorBg;
-                    ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
-                }
-
-                // Couche Influence - dessinée après le damier pour plus de clarté
-                if (showInfluence && influenceGrid[r] && influenceGrid[r][c] !== -1) {
+                // Couche présence / influence
+                const presenceIdx = presenceData ? (xCoord - 1) * presenceData.maxY + (yCoord - 1) : -1;
+                if (usePresenceGrid && presenceData) {
+                    const winner = presenceData.winner[presenceIdx];
+                    if (winner >= 0) {
+                        const baseColor = colorMode === 'race' ? (ownerRaceColor(winner) || getColorForPlayer(winner)) : getColorForPlayer(winner);
+                        // Opacité proportionnelle à la densité : plus c'est dense, plus c'est net
+                        const conf = Math.min(1, presenceData.density[presenceIdx] / presenceData.densityMax);
+                        ctx.fillStyle = withOpacity(baseColor, influenceOpacity * Math.max(0.08, conf));
+                        ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+                    } else if (presenceData.unknownCells.has(`${xCoord}_${yCoord}`)) {
+                        // Système de la carte galactique jamais observé : il existe, propriétaire inconnu
+                        ctx.strokeStyle = 'rgba(148, 163, 184, 0.3)';
+                        ctx.lineWidth = 0.6;
+                        ctx.beginPath();
+                        ctx.moveTo(c * cellSize + cellSize * 0.22, r * cellSize + cellSize * 0.78);
+                        ctx.lineTo(c * cellSize + cellSize * 0.78, r * cellSize + cellSize * 0.22);
+                        ctx.moveTo(c * cellSize + 0.45 * cellSize, r * cellSize + cellSize * 0.92);
+                        ctx.lineTo(c * cellSize + cellSize * 0.92, r * cellSize + 0.45 * cellSize);
+                        ctx.stroke();
+                    }
+                } else if (useVoronoi && influenceGrid[r] && influenceGrid[r][c] !== -1) {
                     const closestOwner = influenceGrid[r][c];
                     const baseColor = colorMode === 'race' ? (ownerRaceColor(closestOwner) || getColorForPlayer(closestOwner)) : colorMode === 'player' ? getColorForPlayer(closestOwner) : getColorForPlayer(closestOwner);
                     // Rend la couleur semi-transparente (couleurs HSL des joueurs ou hexa des races)
@@ -570,8 +597,36 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
                 const influenceBorderWidth = 0.6;
 
-                // Bordures d'influence
-                if (showInfluence && influenceGrid[r]) {
+                // Bordures d'influence / de présence (voisins calculés par coordonnées enroulées, pas par index)
+                if (usePresenceGrid && presenceData) {
+                    const currentOwner = presenceData.winner[presenceIdx];
+                    const rightIdx = (xCoord - 1) * presenceData.maxY + (yCoord >= presenceData.maxY ? 0 : yCoord);
+                    const bottomIdx = (xCoord >= presenceData.maxX ? 0 : xCoord) * presenceData.maxY + (yCoord - 1);
+                    // Bordure droite
+                    if (c < cols) {
+                        const rightOwner = presenceData.winner[rightIdx];
+                        if (currentOwner >= 0 && rightOwner >= 0 && currentOwner !== rightOwner) {
+                            ctx.lineWidth = influenceBorderWidth;
+                            ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                            ctx.beginPath();
+                            ctx.moveTo((c + 1) * cellSize, r * cellSize);
+                            ctx.lineTo((c + 1) * cellSize, (r + 1) * cellSize);
+                            ctx.stroke();
+                        }
+                    }
+                    // Bordure basse
+                    if (r < rows) {
+                        const bottomOwner = presenceData.winner[bottomIdx];
+                        if (currentOwner >= 0 && bottomOwner >= 0 && currentOwner !== bottomOwner) {
+                            ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+                            ctx.lineWidth = influenceBorderWidth;
+                            ctx.beginPath();
+                            ctx.moveTo(c * cellSize, (r + 1) * cellSize);
+                            ctx.lineTo((c + 1) * cellSize, (r + 1) * cellSize);
+                            ctx.stroke();
+                        }
+                    }
+                } else if (useVoronoi && influenceGrid[r]) {
                     const currentOwner = influenceGrid[r][c];
                     ctx.lineWidth = 0.3;
 
@@ -1018,8 +1073,15 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             const cx = px + cellSize / 2;
             const cy = py + cellSize / 2;
 
+            // Couche présence : on estompe les détections anciennes (disque, contour et insigne).
+            let presenceDim = 1;
+            if (presenceMode === 'presence') {
+                if (s.tour != null && detectionWeight(rapport?.tour ?? 0, s.tour, presenceDecay) < 0.5) presenceDim *= 0.5;
+            }
+
             const c2d = ctx as CanvasRenderingContext2D;
             c2d.save();
+            if (presenceDim < 1) c2d.globalAlpha *= presenceDim;
             if (!isSystemSelected(owners)) {
                 // éléments non sélectionnés en niveaux de gris
                 c2d.filter = 'opacity(0.15)';
@@ -1076,6 +1138,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 const ringColor = lightenHexColor(col || '#000000', 100);
                 const cRing = ctx as CanvasRenderingContext2D;
                 cRing.save();
+                if (presenceDim < 1) cRing.globalAlpha *= presenceDim;
                 cRing.strokeStyle = ringColor;
                 cRing.lineWidth = 1.5;
                 cRing.beginPath();
@@ -1087,8 +1150,10 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             // Capacité de réparation > 0 : petit insigne « + » en haut-gauche de la case.
             // (Avant : anneau blanc épais autour du disque — visuellement dominant, il
             // rivalisait avec la sélection et lavait le contraste des systèmes voisins.)
+            // Masqué en très petit zoom (case ≤ 16 px, minimum de la barre de zoom) : à cette
+            // échelle l'insigne ne se lit plus.
             const reparation = reparationByPos.get(`${s.pos.x}_${s.pos.y}`) ?? 0;
-            if (reparation > 0 && isSystemSelected(owners)) {
+            if (reparation > 0 && isSystemSelected(owners) && cellSize > 16) {
                 const chip = Math.max(10, Math.round(cellSize * 0.42));
                 const pad = Math.max(2, Math.round(cellSize * 0.06));
                 const bx = px + pad;
@@ -1096,6 +1161,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 const cr = Math.max(2, chip * 0.25);
                 const cRep = ctx as CanvasRenderingContext2D;
                 cRep.save();
+                if (presenceDim < 1) cRep.globalAlpha *= presenceDim;
                 cRep.beginPath();
                 cRep.moveTo(bx + cr, by);
                 cRep.arcTo(bx + chip, by, bx + chip, by + chip, cr);
@@ -1506,6 +1572,77 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
         }
 
+        // Libellé par « blob » de présence — le nom du commandant et son numéro au point de densité
+        // locale la plus forte du blob (ex. « Dergon (#39) », repli « #39 » si le nom est inconnu),
+        // blanc à contour sombre pour rester lisible sur n'importe quelle teinte. Automatique en
+        // très petit zoom (case ≤ 16 px, minimum de la barre de zoom), sinon seulement si le
+        // réglage « Afficher commandants » est actif. Le maximum local est précalculé sur le
+        // tore complet (une seule passe), puis chaque copie visible du tore est libellée au dessin.
+        if (usePresenceGrid && presenceData && (cellSize <= 16 || presenceLabels)) {
+            const pMaxX = presenceData.maxX;
+            const pMaxY = presenceData.maxY;
+            const isBlobAnchor = new Uint8Array(pMaxX * pMaxY);
+            for (let x = 1; x <= pMaxX; x++) {
+                for (let y = 1; y <= pMaxY; y++) {
+                    const i = (x - 1) * pMaxY + (y - 1);
+                    const w = presenceData.winner[i];
+                    if (w < 0) continue;
+                    const d = presenceData.density[i];
+                    let anchor = true;
+                    for (let dx = -2; dx <= 2 && anchor; dx++) {
+                        for (let dy = -2; dy <= 2; dy++) {
+                            if (dx === 0 && dy === 0) continue;
+                            const nx = wrapX(x + dx);
+                            const ny = wrapY(y + dy);
+                            const ni = (nx - 1) * pMaxY + (ny - 1);
+                            if (presenceData.winner[ni] !== w) continue;
+                            const dn = presenceData.density[ni];
+                            // Égalité tranchée par les coordonnées : un blob plat ne sort qu'un libellé
+                            if (dn > d || (dn === d && (nx < x || (nx === x && ny < y)))) {
+                                anchor = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (anchor) isBlobAnchor[i] = 1;
+                }
+            }
+            // « Nom (#numéro) » par commandant, mis en cache pendant le passage de dessin
+            const blobLabelCache = new Map<number, string>();
+            const blobLabel = (w: number): string => {
+                let t = blobLabelCache.get(w);
+                if (t === undefined) {
+                    const nom = global?.commandants?.find(c => c.numero === w)?.nom;
+                    t = nom ? `${nom} (#${w})` : `#${w}`;
+                    blobLabelCache.set(w, t);
+                }
+                return t;
+            };
+            const pCtx = ctx as CanvasRenderingContext2D;
+            const pFont = Math.max(8, Math.min(10, Math.round(cellSize * 0.63)));
+            pCtx.save();
+            pCtx.font = `700 ${pFont}px sans-serif`;
+            pCtx.textAlign = 'center';
+            pCtx.textBaseline = 'middle';
+            pCtx.lineWidth = Math.max(1, Math.round(pFont / 5));
+            pCtx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+            pCtx.fillStyle = '#ffffff';
+            for (let r = 1; r < rows; r++) {
+                const xCoord = torusDelta(currentCenter.x, r - halfRows, BOUNDS.maxX);
+                for (let c = 1; c < cols; c++) {
+                    const yCoord = torusDelta(currentCenter.y, c - halfCols, BOUNDS.maxY);
+                    const i = (xCoord - 1) * pMaxY + (yCoord - 1);
+                    if (!isBlobAnchor[i]) continue;
+                    const px = c * cellSize + cellSize / 2;
+                    const py = r * cellSize + cellSize / 2;
+                    const txt = blobLabel(presenceData.winner[i]);
+                    pCtx.strokeText(txt, px, py);
+                    pCtx.fillText(txt, px, py);
+                }
+            }
+            pCtx.restore();
+        }
+
         // SURBRILLANCE DE CASE (survol d'une flotte dans le panneau info) : même style que la case
         // sélectionnée (équerres blanches), par-dessus les flèches, sous le drag en cours
         if (highlightPos) {
@@ -1622,7 +1759,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         // Le survol dépend de la géométrie (centre, taille de case) : on resynchronise l'overlay après chaque dessin
         redrawHoverOverlay();
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, presenceMode, presenceData, presenceDecay, presenceLabels, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
