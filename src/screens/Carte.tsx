@@ -7,9 +7,11 @@ import ZoneDialog from '../components/Map/ZoneDialog';
 import MapHelp from '../components/Map/MapHelp';
 import GotoDialog from '../components/Map/GotoDialog';
 import {FleetPicker} from '../components/Map/FleetPicker';
+import FleetFilters from '../components/Map/fleets/FleetFilters';
 import {isTypingTarget} from '../utils/keyboard';
 import {wrapX, wrapY, posToString} from '../utils/position';
 import {computePresence, PresenceData} from '../utils/presence';
+import {FleetOwnerVisibility, FleetSizeBand, isFleetVisible, MapFleet, restoreFleetSizeBands} from '../utils/fleetModel';
 import Modal from '../components/utils/Modal';
 import {GlobalData, Strategie, XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
@@ -104,6 +106,26 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_fleet_badges');
     return saved !== null ? JSON.parse(saved) : true;
   });
+  // Filtres de flottes : bandes issues des termes de puissance du jeu + visibilité par propriétaire
+  const [fleetSizeBands, setFleetSizeBands] = useState<FleetSizeBand[]>(() =>
+    restoreFleetSizeBands(localStorage.getItem('carte_fleet_size_bands')));
+  const [showOwnFleets, setShowOwnFleets] = useState(() => localStorage.getItem('carte_show_own_fleets') !== 'false');
+  const [showNeutralFleets, setShowNeutralFleets] = useState(() => localStorage.getItem('carte_show_neutral_fleets') !== 'false');
+  const fleetVisibility = useMemo<FleetOwnerVisibility>(
+    () => ({showOwn: showOwnFleets, showNeutral: showNeutralFleets}),
+    [showOwnFleets, showNeutralFleets]);
+  // Compteur « visibles / total » : même liste de flottes que la carte (nôtres + détectées)
+  const fleetCounts = useMemo(() => {
+    if (!rapport) return {visible: 0, total: 0};
+    const all: MapFleet[] = [
+      ...rapport.flottesJoueur.map(f => ({...f, owner: rapport.joueur.numero})),
+      ...rapport.flottesDetectees.map(f => ({...f, owner: f.proprio || 0})),
+    ];
+    return {
+      total: all.length,
+      visible: all.filter(f => isFleetVisible(f, fleetSizeBands, fleetVisibility)).length,
+    };
+  }, [rapport, fleetSizeBands, fleetVisibility]);
   // Portées radar : désactivées par défaut (voile bleu sur la carte) ; à activer dans les Filtres si besoin
   const [showSystemRadar, setShowSystemRadar] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_show_system_radar');
@@ -225,6 +247,18 @@ export default function Carte() {
   useEffect(() => {
     localStorage.setItem('carte_show_fleet_badges', JSON.stringify(showFleetBadges));
   }, [showFleetBadges]);
+
+  useEffect(() => {
+    localStorage.setItem('carte_fleet_size_bands', JSON.stringify(fleetSizeBands));
+  }, [fleetSizeBands]);
+
+  useEffect(() => {
+    localStorage.setItem('carte_show_own_fleets', JSON.stringify(showOwnFleets));
+  }, [showOwnFleets]);
+
+  useEffect(() => {
+    localStorage.setItem('carte_show_neutral_fleets', JSON.stringify(showNeutralFleets));
+  }, [showNeutralFleets]);
 
   useEffect(() => {
     localStorage.setItem('carte_show_system_radar', JSON.stringify(showSystemRadar));
@@ -797,6 +831,8 @@ export default function Carte() {
             showCombatBadges={showCombatBadges}
             showOwnerBadges={showOwnerBadges}
             showFleetBadges={showFleetBadges}
+            fleetSizeBands={fleetSizeBands}
+            fleetVisibility={fleetVisibility}
             showSystemRadar={showSystemRadar}
             showFleetRadar={showFleetRadar}
             showSectors={showSectors}
@@ -1129,6 +1165,16 @@ par diplo
                             Badges flottes
                           </label>
                       </div>
+                      <FleetFilters
+                        enabled={showFleetBadges} bands={fleetSizeBands}
+                        visibility={fleetVisibility}
+                        visibleCount={fleetCounts.visible} totalCount={fleetCounts.total}
+                        onBandsChange={setFleetSizeBands}
+                        onVisibilityChange={visibility => {
+                          setShowOwnFleets(visibility.showOwn);
+                          setShowNeutralFleets(visibility.showNeutral);
+                        }}
+                      />
 
                       {zones.length > 0 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid #334155', paddingTop: 8 }}>
