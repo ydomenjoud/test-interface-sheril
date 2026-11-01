@@ -2,7 +2,8 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useReport} from '../../context/ReportContext';
 import {BOUNDS, CENTER, getTorusDistance, torusDelta, wrapX, wrapY} from '../../utils/position';
 import {capaciteReparation} from '../../utils/reparation';
-import {getSectorNumber, isSectorLabelCell, sectorLabelColor} from '../../utils/sectors';
+import {getSectorNumber, isSectorLabelCell} from '../../utils/sectors';
+import {adaptColorToTheme, MAP_THEMES, MapThemeName} from '../../utils/mapTheme';
 import {countCombatsByKind} from '../../parsers/parseCombatMessages';
 import {drawCombatMarkers} from '../../utils/combatMarkers';
 import {Alliance, GlobalData, XY, Zone} from '../../types';
@@ -103,6 +104,7 @@ type Props = {
     showZones?: boolean; // zones manuelles (toutes)
     showInfluence: boolean;
     colorMode?: 'status' | 'race' | 'player';
+    mapTheme?: MapThemeName; // fond sombre (défaut) ou clair
     showStabilityZones: boolean;
     stabilitySystemPos?: string;
     influenceOpacity?: number;
@@ -159,10 +161,11 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#ef4444';
 }
 
-export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
+export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', mapTheme = 'sombre', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
                         presenceMode = 'voronoi', presenceData = null, presenceDecay = 10, presenceLabels = false,
                         deplacements, dragFleet, highlightPos, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort, onFleetDragOver, onFleetDragLeave, onFleetDrop}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
+    const theme = MAP_THEMES[mapTheme] ?? MAP_THEMES.sombre;
     const canvasRef = useRef<HTMLCanvasElement>(null);
     // Case survolée : dessinée sur un canvas séparé pour ne pas redessiner toute la carte à chaque mouvement de souris
     const hoverCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -320,7 +323,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         // Même enroulement tore que pour le dessin des systèmes
         let dx = ((cell.y - leftY + BOUNDS.maxY) % BOUNDS.maxY);
         let dyBase = ((cell.x - topX + BOUNDS.maxX) % BOUNDS.maxX);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.strokeStyle = theme.hoverStroke;
         ctx.lineWidth = 2;
         while (dx < cols) {
             if (dx === 0) { dx += BOUNDS.maxY; continue; }
@@ -334,7 +337,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             }
             dx += BOUNDS.maxY;
         }
-    }, [cellSize]);
+    }, [cellSize, theme.hoverStroke]);
 
     // Tooltip : récapitulatif d'une case, sans avoir à cliquer.
     // Deux ancrages : sous le curseur pendant le survol, ou sur la case sélectionnée
@@ -474,7 +477,9 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         ctx.scale(dpr, dpr);
 
         // fond
-        ctx.fillStyle = '#000';
+        ctx.fillStyle = theme.background;
+        // Couleur d'un propriétaire, adaptée au fond (teintes pâles assombries sur fond clair)
+        const tc = (color: string | undefined) => adaptColorToTheme(color, theme);
         ctx.fillRect(0, 0, cvs.clientWidth, cvs.clientHeight);
 
         // dimensions
@@ -574,11 +579,11 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                         const baseColor = colorMode === 'race' ? (ownerRaceColor(winner) || getColorForPlayer(winner)) : getColorForPlayer(winner);
                         // Opacité proportionnelle à la densité : plus c'est dense, plus c'est net
                         const conf = Math.min(1, presenceData.density[presenceIdx] / presenceData.densityMax);
-                        ctx.fillStyle = withOpacity(baseColor, influenceOpacity * Math.max(0.08, conf));
+                        ctx.fillStyle = withOpacity(tc(baseColor)!, Math.min(1, influenceOpacity * theme.influenceBoost) * Math.max(0.08, conf));
                         ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
                     } else if (presenceData.unknownCells.has(`${xCoord}_${yCoord}`)) {
                         // Système de la carte galactique jamais observé : il existe, propriétaire inconnu
-                        ctx.strokeStyle = 'rgba(148, 163, 184, 0.3)';
+                        ctx.strokeStyle = theme.unknownCell;
                         ctx.lineWidth = 0.6;
                         ctx.beginPath();
                         ctx.moveTo(c * cellSize + cellSize * 0.22, r * cellSize + cellSize * 0.78);
@@ -591,7 +596,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     const closestOwner = influenceGrid[r][c];
                     const baseColor = colorMode === 'race' ? (ownerRaceColor(closestOwner) || getColorForPlayer(closestOwner)) : colorMode === 'player' ? getColorForPlayer(closestOwner) : getColorForPlayer(closestOwner);
                     // Rend la couleur semi-transparente (couleurs HSL des joueurs ou hexa des races)
-                    ctx.fillStyle = withOpacity(baseColor, influenceOpacity);
+                    ctx.fillStyle = withOpacity(tc(baseColor)!, Math.min(1, influenceOpacity * theme.influenceBoost));
                     ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
                 }
 
@@ -607,7 +612,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                         const rightOwner = presenceData.winner[rightIdx];
                         if (currentOwner >= 0 && rightOwner >= 0 && currentOwner !== rightOwner) {
                             ctx.lineWidth = influenceBorderWidth;
-                            ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                            ctx.strokeStyle = theme.influenceBorder;
                             ctx.beginPath();
                             ctx.moveTo((c + 1) * cellSize, r * cellSize);
                             ctx.lineTo((c + 1) * cellSize, (r + 1) * cellSize);
@@ -618,7 +623,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     if (r < rows) {
                         const bottomOwner = presenceData.winner[bottomIdx];
                         if (currentOwner >= 0 && bottomOwner >= 0 && currentOwner !== bottomOwner) {
-                            ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+                            ctx.strokeStyle = theme.influenceBorder;
                             ctx.lineWidth = influenceBorderWidth;
                             ctx.beginPath();
                             ctx.moveTo(c * cellSize, (r + 1) * cellSize);
@@ -635,7 +640,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                         const rightOwner = influenceGrid[r][c+1];
                         if (currentOwner !== rightOwner) {
                             ctx.lineWidth = influenceBorderWidth;
-                            ctx.strokeStyle = '#FFFF';
+                            ctx.strokeStyle = theme.influenceBorder;
                             ctx.beginPath();
                             ctx.moveTo((c + 1) * cellSize, r * cellSize);
                             ctx.lineTo((c + 1) * cellSize, (r + 1) * cellSize);
@@ -647,7 +652,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     if (r < rows) {
                         const bottomOwner = influenceGrid[r+1][c];
                         if (currentOwner !== bottomOwner) {
-                            ctx.strokeStyle = "#FFF";
+                            ctx.strokeStyle = theme.influenceBorder;
                             ctx.lineWidth = influenceBorderWidth;
                             ctx.beginPath();
                             ctx.moveTo(c * cellSize, (r + 1) * cellSize);
@@ -658,7 +663,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 }
                 if (showSectors && isSectorLabelCell(xCoord, yCoord)) {
                     const labelSize = Math.max(12, Math.floor(cellSize * 1.4));
-                    ctx.fillStyle = sectorLabelColor();
+                    ctx.fillStyle = theme.sectorLabel;
                     ctx.font = `600 ${labelSize}px sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
@@ -684,9 +689,9 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             const isMajor5 = (xCoord - 1) % 5 === 0;
             if (showMinorGrid || isMajor5 || isMajor20) {
                 ctx.lineWidth = isMajor20 ? 1.2 : 1;
-                if (isMajor20) ctx.strokeStyle = '#274058';
-                else if (isMajor5) ctx.strokeStyle = '#1e2a38';
-                else ctx.strokeStyle = 'rgba(30, 41, 59, 0.55)';
+                if (isMajor20) ctx.strokeStyle = theme.gridMajor20;
+                else if (isMajor5) ctx.strokeStyle = theme.gridMajor5;
+                else ctx.strokeStyle = theme.gridMinor;
                 ctx.beginPath();
                 ctx.moveTo(0, yPos);
                 ctx.lineTo(cols * cellSize, yPos);
@@ -696,19 +701,19 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
             // Fond opaque pour l'en-tête de ligne (surligné si c'est la ligne de la case sélectionnée)
             const rowSelected = r > 0 && selected?.x === xCoord;
-            ctx.fillStyle = rowSelected ? '#38bdf8' : '#141c28';
+            ctx.fillStyle = rowSelected ? theme.headerSelectedBg : theme.headerBg;
             ctx.fillRect(0, yPos, cellSize, cellSize);
 
             // Chiffres tous les 5 (sinon coches discrètes) : le chrome ne doit pas
             // crier plus fort que le contenu (compteurs de flottes, marqueurs).
             if (showHeaderLabels && (rowSelected || xCoord % headerLabelEvery === 0)) {
-                ctx.fillStyle = rowSelected ? '#0b0f17' : '#7d8ba0';
+                ctx.fillStyle = rowSelected ? theme.headerSelectedText : theme.headerText;
                 ctx.font = '600 10px system-ui, sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(String(xCoord), cellSize / 2, yPos + cellSize / 2);
             } else {
-                ctx.fillStyle = '#3b475a';
+                ctx.fillStyle = theme.headerTick;
                 ctx.fillRect(cellSize / 2 - 1, yPos + cellSize / 2 - 1, 2, 2);
             }
         }
@@ -720,9 +725,9 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             const isMajor5 = (yCoord - 1) % 5 === 0;
             if (showMinorGrid || isMajor5 || isMajor20) {
                 ctx.lineWidth = isMajor20 ? 1.2 : 1;
-                if (isMajor20) ctx.strokeStyle = '#274058';
-                else if (isMajor5) ctx.strokeStyle = '#1e2a38';
-                else ctx.strokeStyle = 'rgba(30, 41, 59, 0.55)';
+                if (isMajor20) ctx.strokeStyle = theme.gridMajor20;
+                else if (isMajor5) ctx.strokeStyle = theme.gridMajor5;
+                else ctx.strokeStyle = theme.gridMinor;
                 ctx.beginPath();
                 ctx.moveTo(xPos, 0);
                 ctx.lineTo(xPos, rows * cellSize);
@@ -732,23 +737,23 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
             // Fond opaque pour l'en-tête de colonne (surligné si c'est la colonne de la case sélectionnée)
             const colSelected = c > 0 && selected?.y === yCoord;
-            ctx.fillStyle = colSelected ? '#38bdf8' : '#141c28';
+            ctx.fillStyle = colSelected ? theme.headerSelectedBg : theme.headerBg;
             ctx.fillRect(xPos, 0, cellSize, cellSize);
 
             if (showHeaderLabels && (colSelected || yCoord % headerLabelEvery === 0)) {
-                ctx.fillStyle = colSelected ? '#0b0f17' : '#7d8ba0';
+                ctx.fillStyle = colSelected ? theme.headerSelectedText : theme.headerText;
                 ctx.font = '600 10px system-ui, sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(String(yCoord), xPos + cellSize / 2, cellSize / 2);
             } else {
-                ctx.fillStyle = '#3b475a';
+                ctx.fillStyle = theme.headerTick;
                 ctx.fillRect(xPos + cellSize / 2 - 1, cellSize / 2 - 1, 2, 2);
             }
         }
 
         // Repère d'axes dans la case d'angle (x = lignes ↓, y = colonnes →)
-        ctx.fillStyle = '#5b6b80';
+        ctx.fillStyle = theme.axisLabel;
         ctx.font = '600 9px system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -811,14 +816,14 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             const py = (halfRows + offX) * cellSize;
             const w = r.width * cellSize;
             const h = r.height * cellSize;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.fillStyle = theme.zoneDraftFill;
             ctx.fillRect(px, py, w, h);
-            ctx.strokeStyle = '#fff';
+            ctx.strokeStyle = theme.zoneDraftStroke;
             ctx.lineWidth = 2;
             ctx.setLineDash([6, 4]);
             ctx.strokeRect(px, py, w, h);
             ctx.setLineDash([]);
-            ctx.fillStyle = '#fff';
+            ctx.fillStyle = theme.zoneDraftStroke;
             ctx.font = 'bold 12px sans-serif';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
@@ -880,7 +885,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         const cScan = ctx as CanvasRenderingContext2D;
         cScan.save();
         cScan.globalAlpha = 1.0;
-        cScan.fillStyle = 'rgba(56, 150, 255, 0.07)';
+        cScan.fillStyle = theme.scanFill;
         detected.forEach(key => {
             const [ixStr, iyStr] = key.split(',');
             const ix = Number(ixStr);
@@ -888,7 +893,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             cScan.fillRect(ix * cellSize, iy * cellSize, cellSize, cellSize);
         });
         // Liseré : trait sur chaque arête dont le voisin n'est pas détecté
-        cScan.strokeStyle = 'rgba(56, 150, 255, 0.35)';
+        cScan.strokeStyle = theme.scanStroke;
         cScan.lineWidth = 1;
         cScan.beginPath();
         detected.forEach(key => {
@@ -973,7 +978,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 } else if (mod.modif < 0) {
                     ctx.strokeStyle = `rgba(255, 0, 0, ${0.3 + (Math.abs(mod.modif) / 10)})`;
                 } else {
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.strokeStyle = theme.stabilityNeutral;
                 }
 
                 while (dx < cols) {
@@ -1058,8 +1063,8 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             // Couleur(s) en fonction de la possession
             const owners = s.owners as number[] | undefined;
             const isGlobalOnly = s.isGlobalOnly;
-            let col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global);
-            if (isGlobalOnly) col = '#333'; // Plus sombre pour les systèmes non détectés
+            let col = tc(colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global));
+            if (isGlobalOnly) col = theme.globalOnlySystem; // Plus sombre pour les systèmes non détectés
 
             // Taille du disque en fonction du nombre de planètes:
             // 10 planètes => 50% de la case, 20 planètes => 100% de la case
@@ -1110,7 +1115,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 }
                 const total = weights.reduce((a, b) => a + b, 0);
                 // Préparer les couleurs par propriétaire
-                const colors = multiOwners.map(o => colorForOwnership(currentPlayerId, [o], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global));
+                const colors = multiOwners.map(o => tc(colorForOwnership(currentPlayerId, [o], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global)));
 
                 // Dessiner les parts: une par owner, angle proportionnel au poids
                 let angle = -Math.PI / 2; // démarrage en haut, pour stabilité visuelle
@@ -1135,7 +1140,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
             // Contour fin autour du disque (remplace l'ancien halo lumineux, plus lisible et plus léger)
             if (isSystemSelected(owners)) {
-                const ringColor = lightenHexColor(col || '#000000', 100);
+                const ringColor = lightenHexColor(col || '#000000', theme.systemRingLighten);
                 const cRing = ctx as CanvasRenderingContext2D;
                 cRing.save();
                 if (presenceDim < 1) cRing.globalAlpha *= presenceDim;
@@ -1307,11 +1312,15 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 c2d.filter = 'grayscale(1)';
             }
 
-            const ownerColor = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global) || '#000000';
+            const ownerColor = tc(colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global)) || '#000000';
             c2d.fillStyle = '#ffffff';
             c2d.beginPath();
             c2d.arc(cx, cy, diameter / 2, 0, Math.PI * 2);
             c2d.fill();
+            // Sur fond clair, liseré sombre sous la couleur du propriétaire pour détacher le disque blanc
+            c2d.strokeStyle = theme.fleetOutline;
+            c2d.lineWidth = Math.max(1, Math.floor(cellSize * 0.06)) + 2;
+            c2d.stroke();
 
             c2d.strokeStyle = ownerColor;
             c2d.lineWidth = Math.max(1, Math.floor(cellSize * 0.06));
@@ -1356,7 +1365,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
             // Contour fin si la flotte correspond au filtre (remplace l'ancien halo lumineux)
             if (isSelected) {
-                const col = colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global);
+                const col = tc(colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global));
                 const cRing = ctx as CanvasRenderingContext2D;
                 cRing.save();
                 cRing.strokeStyle = col || '#000000';
@@ -1465,7 +1474,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             const m = Math.max(3, Math.round(cellSize * 0.15));
             const l = Math.max(5, Math.round(cellSize * 0.35));
             c2d.lineWidth = 2;
-            c2d.strokeStyle = '#ffffff';
+            c2d.strokeStyle = theme.cellCorner;
             c2d.beginPath();
             // haut-gauche
             c2d.moveTo(px - m, py - m + l); c2d.lineTo(px - m, py - m); c2d.lineTo(px - m + l, py - m);
@@ -1516,7 +1525,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     cSel.strokeStyle = 'rgba(0, 0, 0, 0.8)';
                     cSel.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
                     cSel.lineWidth = 2;
-                    cSel.strokeStyle = '#38bdf8';
+                    cSel.strokeStyle = theme.selectionStroke;
                     cSel.strokeRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
 
                     // Coins en équerre débordant de la case
@@ -1759,7 +1768,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         // Le survol dépend de la géométrie (centre, taille de case) : on resynchronise l'overlay après chaque dessin
         redrawHoverOverlay();
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, presenceMode, presenceData, presenceDecay, presenceLabels, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, presenceMode, presenceData, presenceDecay, presenceLabels, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos, theme]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {

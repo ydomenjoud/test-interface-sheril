@@ -4,11 +4,13 @@ import {BOUNDS, CENTER, wrapX, wrapY} from '../../utils/position';
 import {colorForOwnership} from "./CanvasMap";
 import {getSectorGridCoords} from '../../utils/sectors';
 import {PresenceData, SectorSummary} from '../../utils/presence';
+import {adaptColorToTheme, MAP_THEMES, MapThemeName} from '../../utils/mapTheme';
 
 type Props = {
   onCenter: (x: number, y: number) => void;
   colorMode?: 'status' | 'race' | 'player';
   sectorData?: PresenceData | null; // aperçu par secteurs (couche présence)
+  mapTheme?: MapThemeName;
 };
 
 function torusDelta(a: number, b: number, max: number): number {
@@ -20,7 +22,7 @@ function torusDelta(a: number, b: number, max: number): number {
   return d;
 }
 
-export default function MiniMap({ onCenter, colorMode = 'status', sectorData = null }: Props) {
+export default function MiniMap({ onCenter, colorMode = 'status', sectorData = null, mapTheme = 'sombre' }: Props) {
   const { rapport, center, viewportCols, viewportRows, global } = useReport();
   const currentCenter = useMemo(() => center || CENTER, [center]);
   const ref = useRef<HTMLCanvasElement>(null);
@@ -39,7 +41,8 @@ export default function MiniMap({ onCenter, colorMode = 'status', sectorData = n
     if (!ctx) return;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
-    ctx.fillStyle = '#0b0f17';
+    const theme = MAP_THEMES[mapTheme] ?? MAP_THEMES.sombre;
+    ctx.fillStyle = theme.miniMapBackground;
     ctx.fillRect(0, 0, cvs.clientWidth, cvs.clientHeight);
 
     // Si on a un centre, on centre la minimap dessus
@@ -73,7 +76,7 @@ export default function MiniMap({ onCenter, colorMode = 'status', sectorData = n
           if (owner < 0 || count <= 0) continue;
           const { px, py } = cellCenter(x, y);
           ctx.globalAlpha = 0.10 + 0.30 * Math.min(1, count / maxCount);
-          ctx.fillStyle = colorForOwnership(playerId, [owner], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global);
+          ctx.fillStyle = adaptColorToTheme(colorForOwnership(playerId, [owner], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global), theme)!;
           ctx.fillRect(px - cellW / 2, py - cellH / 2, cellW, cellH);
         }
       }
@@ -82,7 +85,7 @@ export default function MiniMap({ onCenter, colorMode = 'status', sectorData = n
 
     const drawPointRel = (x: number, y: number, color: string) => {
       const { px, py } = cellCenter(x, y);
-      ctx.fillStyle = color;
+      ctx.fillStyle = adaptColorToTheme(color, theme)!;
       ctx.fillRect(px, py, 2, 2);
     };
 
@@ -103,11 +106,11 @@ export default function MiniMap({ onCenter, colorMode = 'status', sectorData = n
     if (viewportCols > 0 && viewportRows > 0) {
       const rectW = Math.min(1, viewportCols / BOUNDS.maxY) * cvs.clientWidth;
       const rectH = Math.min(1, viewportRows / BOUNDS.maxX) * cvs.clientHeight;
-      ctx.strokeStyle = '#38bdf8';
+      ctx.strokeStyle = theme.selectionStroke;
       ctx.lineWidth = 2;
       ctx.strokeRect(midX - rectW / 2, midY - rectH / 2, rectW, rectH);
     }
-  }, [rapport, playerId, currentCenter, viewportCols, viewportRows, colorMode, global, sectorData]);
+  }, [rapport, playerId, currentCenter, viewportCols, viewportRows, colorMode, global, sectorData, mapTheme]);
 
   // Secteur sous le curseur (même math que le clic, sans arrondi) -> infobulle de composition
   const sectorAtCursor = (e: React.MouseEvent<HTMLCanvasElement>): { key: string; summary: SectorSummary } | null => {

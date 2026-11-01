@@ -22,6 +22,16 @@ const baseProps = (size: number, color?: string, strokeWidth = 2): React.SVGProp
   focusable: 'false',
 });
 
+/** Demi-disque plein : bascule fond clair / fond sombre */
+export function IconContrast({ size = 16, className, style, color, strokeWidth = 2 }: IconProps) {
+  return (
+    <svg {...baseProps(size, color, strokeWidth)} className={className} style={style}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3a9 9 0 0 1 0 18z" fill={color || 'currentColor'} />
+    </svg>
+  );
+}
+
 /** Star representing galactic systems */
 export function IconSystem({ size = 16, className, style, color, strokeWidth = 2 }: IconProps) {
   return (

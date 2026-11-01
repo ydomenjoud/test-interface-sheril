@@ -10,6 +10,7 @@ import {FleetPicker} from '../components/Map/FleetPicker';
 import {isTypingTarget} from '../utils/keyboard';
 import {wrapX, wrapY, posToString} from '../utils/position';
 import {computePresence, PresenceData} from '../utils/presence';
+import {adaptColorToTheme, MAP_THEMES, MapThemeName} from '../utils/mapTheme';
 import Modal from '../components/utils/Modal';
 import {GlobalData, Strategie, XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
@@ -21,6 +22,7 @@ import {
   IconRadarSystem,
   IconRadarFleet,
   IconMiniMap,
+  IconContrast,
   IconHelp,
   IconSliders,
   IconFleetMove,
@@ -161,6 +163,12 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_color_mode');
     return saved !== null ? (saved as 'status' | 'race' | 'player') : 'status';
   });
+  // Fond de la carte : sombre (défaut) ou clair
+  const [mapTheme, setMapTheme] = useState<MapThemeName>(() =>
+    localStorage.getItem('carte_theme') === 'clair' ? 'clair' : 'sombre');
+  useEffect(() => {
+    localStorage.setItem('carte_theme', mapTheme);
+  }, [mapTheme]);
   const [showStabilityZones, setShowStabilityZones] = useState(() => {
     const saved = localStorage.getItem('carte_show_stability_zones');
     return saved !== null ? JSON.parse(saved) : false;
@@ -667,6 +675,16 @@ export default function Carte() {
           </button>
           <button
             type="button"
+            className={mapTheme === 'clair' ? 'carte-icon-btn active' : 'carte-icon-btn'}
+            title={mapTheme === 'clair' ? 'Fond clair (cliquer pour le fond sombre)' : 'Fond sombre (cliquer pour le fond clair)'}
+            aria-label="Fond clair ou sombre"
+            aria-pressed={mapTheme === 'clair'}
+            onClick={() => setMapTheme(t => t === 'clair' ? 'sombre' : 'clair')}
+          >
+            <IconContrast size={15} />
+          </button>
+          <button
+            type="button"
             className={deplacementsExpanded ? 'carte-icon-btn active' : 'carte-icon-btn'}
             title={`Déplacements de flottes (${nbDeplacements}) (⇢) — Alt+Y`}
             aria-label="Déplacements de flottes"
@@ -807,6 +825,7 @@ export default function Carte() {
             presenceLabels={presenceLabels}
             influenceOpacity={influenceOpacity}
             colorMode={colorMode}
+            mapTheme={mapTheme}
             showStabilityZones={showStabilityZones}
             stabilitySystemPos={stabilitySystemPos}
             deplacements={ciblesDeplacements}
@@ -825,16 +844,17 @@ export default function Carte() {
               onCenter={(x, y) => setCenter({ x, y })}
               colorMode={colorMode}
               sectorData={presence}
+              mapTheme={mapTheme}
             />
           )}
           {/* Légende des couleurs — la carte se suffit à elle-même au coup d'œil */}
           {colorMode === 'status' && (
             <div className="map-legend" title="Couleurs de possession des systèmes et des flottes">
-              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#10b981' }} /> moi</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: adaptColorToTheme('#10b981', MAP_THEMES[mapTheme]) }} /> moi</span>
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#3b82f6' }} /> alliance</span>
-              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#fde047' }} /> PNA</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: adaptColorToTheme('#fde047', MAP_THEMES[mapTheme]) }} /> PNA</span>
               <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#ef4444' }} /> ennemi</span>
-              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: '#94a3b8' }} /> neutre</span>
+              <span className="map-legend-item"><span className="map-legend-dot" style={{ background: adaptColorToTheme('#94a3b8', MAP_THEMES[mapTheme]) }} /> neutre</span>
               <span className="map-legend-item" title="Système avec une capacité de réparation (insigne « + » en haut-gauche de la case)"><span className="map-legend-dot" style={{ background: '#0f172a', border: '1.5px solid #cbd5e1', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>+</span> réparation</span>
                 {presenceLegendItems}
             </div>
