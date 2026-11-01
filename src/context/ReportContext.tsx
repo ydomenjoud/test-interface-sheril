@@ -4,7 +4,8 @@ import React, {createContext, useContext, useEffect, useMemo, useRef, useState, 
 import {GlobalData, Rapport, XY, SystemeDetecte, Note, CombatEvent, Zone} from '../types';
 import {parseRapportXml, addManualDetectedSystems, getCachedDetectedSystems} from '../parsers/parseRapport';
 import {parsePublicCombatsHtml} from '../parsers/parsePublicCombats';
-import {parseManualDetectedSystems} from '../parsers/parseManualSystems';
+import {parseManualDetectedSystems, RadarAllie} from '../parsers/parseManualSystems';
+import {fusionnerRadarsAllies, loadRadarsAllies, saveRadarsAllies} from '../storage/radarsAlliesStorage';
 import {parseDataXml} from '../parsers/parseData';
 import {CENTER, appliquerBornesDepuisPositions, etendreBornesDepuisPositions, positionsDuRapport} from '../utils/position';
 import {FleetSnapshot, SystemSnapshot, fleetSnapshotOf, getFleetSnapshots, getLatestRapport, getRapport, getRapportsUpTo, getSystemSnapshots, listTours, saveRapport, systemSnapshotOf} from '../storage/rapportStore';
@@ -24,7 +25,9 @@ type ReportContextType = {
     selectTour: (tour: number) => Promise<void>; // affiche la carte telle qu'elle était à ce tour
     fleetSnapshots: FleetSnapshot[]; // flottes détectées et zones observées, par tour stocké
     systemSnapshots: SystemSnapshot[]; // systèmes détectés, par tour stocké
-    addDetectedSystemsFromText: (text: string) => { added: number; errors: { line: number; message: string }[] };
+    addDetectedSystemsFromText: (text: string) => { added: number; radars: number; errors: { line: number; message: string }[] };
+    radarsAllies: RadarAllie[]; // portées radar des alliés importées
+    clearRadarsAllies: () => void;
     ready: boolean;
     cellSize: number;
     setCellSize: (n: number) => void;
@@ -67,6 +70,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
     // l'objet rapport (donc pas les effets qui en dépendent) mais vide les stockages par tour
     const [importCount, setImportCount] = useState(0);
     const [global, setGlobal] = useState<GlobalData | undefined>(undefined);
+    const [radarsAllies, setRadarsAllies] = useState<RadarAllie[]>(() => loadRadarsAllies());
     const [cellSize, setCellSize] = useState<number>(32);
     // Centre de la galaxie par défaut (sans rapport) ; remplacé par la capitale au chargement d'un rapport
     const [center, setCenter] = useState<XY | undefined>(CENTER);
@@ -281,10 +285,20 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
     const getRapportForTour = useCallback((tour: number) => getRapport(tour).catch(() => undefined), []);
 
     const addDetectedSystemsFromText = useCallback((text: string) => {
-        const { systems, errors } = parseManualDetectedSystems(text);
+        const { systems, radars, errors } = parseManualDetectedSystems(text);
+        if (radars.length > 0) {
+            // Datés du tour indiqué, sinon du tour du rapport chargé
+            const dates = radars.map(r => ({...r, tour: r.tour ?? rapport?.tour}));
+            setRadarsAllies(prev => {
+                const fusion = fusionnerRadarsAllies(prev, dates);
+                saveRadarsAllies(fusion);
+                return fusion;
+            });
+        }
         if (systems.length > 0) {
-            // Saisie manuelle : on considère l'information comme datant du tour du rapport chargé
-            addManualDetectedSystems(systems.map(s => ({...s, tour: rapport?.tour})));
+            // Saisie manuelle : l'information date du tour indiqué dans le texte (export d'un allié),
+            // sinon du tour du rapport chargé
+            addManualDetectedSystems(systems.map(s => ({...s, tour: s.tour ?? rapport?.tour})));
             setRapport(prev => {
                 if (!prev) return prev;
                 // Mettre à jour la liste des systèmes détectés depuis le cache
@@ -293,8 +307,13 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
                 return updated;
             });
         }
-        return { added: systems.length, errors };
+        return { added: systems.length, radars: radars.length, errors };
     }, [mergeDetectedWithOwned, rapport?.tour, synchroniserBornesGalaxie]);
+
+    const clearRadarsAllies = useCallback(() => {
+        setRadarsAllies([]);
+        saveRadarsAllies([]);
+    }, []);
 
     const refreshStats = useCallback(async () => {
         try {
@@ -491,6 +510,8 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         importCount,
         loadRapportFile,
         addDetectedSystemsFromText,
+        radarsAllies,
+        clearRadarsAllies,
         ready: Boolean(global),
         tours,
         getRapportForTour,
@@ -517,7 +538,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         addZone,
         deleteZone,
         updateZone,
-    }), [rapport, global, tours, getRapportForTour, selectTour, fleetSnapshots, systemSnapshots, publicCombats, refreshStats, loadRapportFile, addDetectedSystemsFromText, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, allTags, selectedTags, addNote, deleteNote, zones, zoneLabels, hiddenZoneLabels, addZone, deleteZone, updateZone, importCount]);
+    }), [rapport, global, tours, getRapportForTour, selectTour, fleetSnapshots, systemSnapshots, publicCombats, refreshStats, loadRapportFile, addDetectedSystemsFromText, radarsAllies, clearRadarsAllies, cellSize, center, viewportCols, viewportRows, setViewportDims, notes, allTags, selectedTags, addNote, deleteNote, zones, zoneLabels, hiddenZoneLabels, addZone, deleteZone, updateZone, importCount]);
 
     return <ReportContext.Provider value={value}>{children}</ReportContext.Provider>;
 }
