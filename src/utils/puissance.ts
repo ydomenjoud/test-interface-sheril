@@ -47,3 +47,15 @@ export function getPuissanceFromString(p: string){
 
     return `${seuil[index-1]}-${seuil[index]}`;
 }
+
+/**
+ * Puissance numérique estimée d'une flotte détectée à partir de sa catégorie (« petite »,
+ * « moyenne »…) : moyenne géométrique des bornes de la tranche. null si la catégorie est inconnue.
+ */
+export function getPuissanceEstimee(p: string): number | null {
+    const index = desc.indexOf((p || '').toLowerCase());
+    if (index < 0) return null;
+    if (index === 0) return seuil[0] / 2;
+    if (index >= seuil.length) return seuil[seuil.length - 1] * 1.5;
+    return Math.sqrt(seuil[index - 1] * seuil[index]);
+}
