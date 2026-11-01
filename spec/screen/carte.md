@@ -263,10 +263,12 @@ couche « Présence », calculée sur TOUT le tore (pas seulement le viewport) p
 - « Pondérer par la force » (défaut inactif) : le poids d'un système suit sa population
   (racine carrée, 2 000 habitants pèsent 1, borné à 0,3–4 ; dans un système du joueur, la population
   de chaque commandant sur ses planètes ; dans un système détecté, la population partagée à parts
-  égales entre ses propriétaires), chaque flotte compte selon sa puissance (AS + AP/2, ou le milieu
-  de sa catégorie pour une flotte détectée ; 500 pèse 1), et la distance du noyau est celle du jeu
-  (Tchebychev, comme les déplacements, le radar et la distance à la capitale) : les zones prennent
-  une forme carrée.
+  égales entre ses propriétaires), et chaque flotte compte selon sa puissance (AS + AP/2, ou le milieu
+  de sa catégorie pour une flotte détectée ; 500 pèse 1).
+- « Distance du jeu (zones carrées) » (défaut inactif, indépendant de la pondération) : la distance
+  du noyau est celle du jeu (Tchebychev, comme les déplacements, le radar et la distance à la
+  capitale) au lieu de la distance à vol d'oiseau : les zones prennent une forme carrée. Le mode
+  Voronoi utilise déjà cette distance.
 - Les réglages sont mémorisés (localStorage, clés `carte_presence_*`).
 
 ## déplacements de flottes (schéma d'ordres)

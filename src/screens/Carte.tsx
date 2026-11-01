@@ -133,11 +133,16 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_presence_decay');
     return saved !== null ? Math.max(4, Math.min(20, Number(JSON.parse(saved)) || 10)) : 10;
   });
-  // Pondération « force » de la présence : population, flottes, distance du jeu
+  // Pondération « force » de la présence : population, flottes
   const [presenceForce, setPresenceForce] = useState<boolean>(() => localStorage.getItem('carte_presence_force') === 'true');
   useEffect(() => {
     localStorage.setItem('carte_presence_force', JSON.stringify(presenceForce));
   }, [presenceForce]);
+  // Distance du jeu (Tchebychev) pour la présence : zones carrées
+  const [presenceDistanceJeu, setPresenceDistanceJeu] = useState<boolean>(() => localStorage.getItem('carte_presence_distance_jeu') === 'true');
+  useEffect(() => {
+    localStorage.setItem('carte_presence_distance_jeu', JSON.stringify(presenceDistanceJeu));
+  }, [presenceDistanceJeu]);
   // Libellé n° de commandant par blob de présence (automatique en très petit zoom, case ≤ 16 px)
   const [presenceLabels, setPresenceLabels] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_presence_labels');
@@ -185,10 +190,11 @@ export default function Carte() {
     return computePresence(rapport, global, playerId, {
       decayTurns: presenceDecay,
       force: presenceForce,
+      distanceJeu: presenceDistanceJeu,
     });
     // BOUNDS est mutée in place lors des chargements, toujours accompagnée d'un nouvel objet rapport
     // (voir ReportContext) : la dépendance `rapport` suffit à re-calculer.
-  }, [rapport, global, playerId, presenceOn, presenceDecay, presenceForce]);
+  }, [rapport, global, playerId, presenceOn, presenceDecay, presenceForce, presenceDistanceJeu]);
 
   const [filtersExpanded, setFiltersExpanded] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_filters_expanded');
@@ -1049,7 +1055,7 @@ checked={presenceOn}
                                             </label>
                                             <label
                                                 style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.85em', cursor: 'pointer' }}
-                                                title="Chaque système pèse selon sa population, chaque flotte selon sa puissance, et la distance est celle du jeu (en carré, comme les déplacements et le radar). Sans cette option, chaque système connu pèse autant."
+                                                title="Chaque système pèse selon sa population et chaque flotte selon sa puissance. Sans cette option, chaque système connu pèse autant."
                                             >
                                                 <input
                                                     type="checkbox"
@@ -1057,6 +1063,17 @@ checked={presenceOn}
                                                     onChange={(e) => setPresenceForce(e.target.checked)}
                                                 />
                                                 Pondérer par la force (population, flottes)
+                                            </label>
+                                            <label
+                                                style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f1f5f9', fontSize: '0.85em', cursor: 'pointer' }}
+                                                title="Distance comptée comme dans le jeu : une case en diagonale vaut une case en ligne droite (déplacements, radar, distance à la capitale). Les zones prennent une forme carrée. Sans cette option, distance à vol d'oiseau : zones arrondies."
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={presenceDistanceJeu}
+                                                    onChange={(e) => setPresenceDistanceJeu(e.target.checked)}
+                                                />
+                                                Distance du jeu (zones carrées)
                                             </label>
                                         </div>
                                     )}

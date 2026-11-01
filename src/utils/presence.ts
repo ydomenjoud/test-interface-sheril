@@ -26,11 +26,15 @@ export type PresenceOptions = {
     /** Âge (en tours) auquel le poids d'une détection atteint 0 (défaut 10). */
     decayTurns?: number;
     /**
-     * Pondération « force » : chaque système pèse selon sa population, les flottes comptent selon
-     * leur puissance, et la distance est celle du jeu (Tchebychev : déplacements, radar, stabilité),
-     * ce qui donne des zones en carré plutôt qu'en disque. Sinon chaque système connu pèse 1.
+     * Pondération « force » : chaque système pèse selon sa population et les flottes comptent selon
+     * leur puissance. Sinon chaque système connu pèse 1.
      */
     force?: boolean;
+    /**
+     * Distance du jeu (Tchebychev : déplacements, radar, stabilité) au lieu de la distance à vol
+     * d'oiseau : les zones prennent une forme carrée plutôt qu'un disque.
+     */
+    distanceJeu?: boolean;
 };
 
 export type SectorSummary = {
@@ -173,6 +177,7 @@ function axisOffsets(size: number, cutoff: number): { off: number; d: number }[]
 export function computePresence(rapport: PresenceInputs, global: GlobalData | null | undefined, playerId: number, options: PresenceOptions = {}): PresenceData {
     const decayTurns = options.decayTurns ?? D.decayTurns;
     const force = !!options.force;
+    const distanceJeu = !!options.distanceJeu;
     const maxX = BOUNDS.maxX;
     const maxY = BOUNDS.maxY;
     const size = maxX * maxY;
@@ -245,7 +250,7 @@ export function computePresence(rapport: PresenceInputs, global: GlobalData | nu
                 const cx = wrapCoord(a.pos.x + ox.off, maxX);
                 offsY.forEach(oy => {
                     const dc = Math.max(ox.d, oy.d);
-                    const d2 = force ? dc * dc : ox.d * ox.d + oy.d * oy.d;
+                    const d2 = distanceJeu ? dc * dc : ox.d * ox.d + oy.d * oy.d;
                     if (d2 > cutoff2) return;
                     const cy = wrapCoord(a.pos.y + oy.off, maxY);
                     grid[(cx - 1) * maxY + (cy - 1)] += a.weight * Math.exp(-d2 * inv2s2);

@@ -238,8 +238,11 @@ describe('computePresence — pondération « force »', () => {
     test('distance du jeu (Tchebychev) : une case en diagonale pèse comme une case en ligne', () => {
         reinitialiserBornesGalaxie();
         const rapport = {tour: 100, systemesJoueur: [{pos: {x: 30, y: 30}, proprietaires: [1]}], systemesDetectes: []};
+        const jeu = computePresence(rapport, null, 1, {distanceJeu: true});
+        expect(jeu.density[idx(36, 36)]).toBeCloseTo(jeu.density[idx(36, 30)]);
+        // indépendante de la pondération : sans l'option, distance à vol d'oiseau, même avec la force
         const force = computePresence(rapport, null, 1, {force: true});
-        expect(force.density[idx(36, 36)]).toBeCloseTo(force.density[idx(36, 30)]);
+        expect(force.density[idx(36, 36)]).toBeLessThan(force.density[idx(36, 30)]);
         const normal = computePresence(rapport, null, 1);
         expect(normal.density[idx(36, 36)]).toBeLessThan(normal.density[idx(36, 30)]);
     });
