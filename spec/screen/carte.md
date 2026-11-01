@@ -240,6 +240,9 @@ couche « Présence », calculée sur TOUT le tore (pas seulement le viewport) p
 - Le propriétaire d'une case est le commandant à la densité la plus forte, s'il est au-dessus du
   seuil (2 %) ; sinon la case reste **inconnue** et n'est colorée pour personne — c'est ce qui
   corrige le « trou avalé par le voisin » du Voronoi.
+- La teinte d'une case est la couleur des systèmes de son commandant dans le mode de couleur choisi
+  (« Par diplo » : vert pour soi, bleu alliance, jaune PNA, rouge ennemi ; « Par race » ; « Par joueur »),
+  pour les deux modes Présence et Voronoi. Deux voisins de même teinte restent séparés par la frontière.
 - L'opacité de la teinte est proportionnelle à la densité gagnante (plus c'est dense, plus c'est
   net) et bornée par le réglage « Opacité ».
 - Les systèmes détectés plus anciens que la moitié de la fenêtre (poids < 0.5) voient leur disque,

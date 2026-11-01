@@ -492,6 +492,10 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         // TOUTE la galaxie (computePresence) ; le mode « voronoi » garde l'ancienne influence
         // attribuée au système connu le plus proche (calculée ici, sur le viewport seulement).
         const usePresenceGrid = showInfluence && presenceMode === 'presence' && !!presenceData;
+        // Couleur d'une zone d'influence : celle des systèmes du commandant dans le mode de couleur choisi
+        // (par diplo : moi / alliance / PNA / ennemi ; par race ; par joueur)
+        const influenceColor = (owner: number) =>
+            colorForOwnership(currentPlayerId, [owner], rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global) || getColorForPlayer(owner);
         const useVoronoi = showInfluence && !usePresenceGrid;
 
         // Préparation des influenceurs pour la couche d'influence (mode voronoi uniquement)
@@ -571,7 +575,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 if (usePresenceGrid && presenceData) {
                     const winner = presenceData.winner[presenceIdx];
                     if (winner >= 0) {
-                        const baseColor = colorMode === 'race' ? (ownerRaceColor(winner) || getColorForPlayer(winner)) : getColorForPlayer(winner);
+                        const baseColor = influenceColor(winner);
                         // Opacité proportionnelle à la densité : plus c'est dense, plus c'est net
                         const conf = Math.min(1, presenceData.density[presenceIdx] / presenceData.densityMax);
                         ctx.fillStyle = withOpacity(baseColor, influenceOpacity * Math.max(0.08, conf));
@@ -589,7 +593,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                     }
                 } else if (useVoronoi && influenceGrid[r] && influenceGrid[r][c] !== -1) {
                     const closestOwner = influenceGrid[r][c];
-                    const baseColor = colorMode === 'race' ? (ownerRaceColor(closestOwner) || getColorForPlayer(closestOwner)) : colorMode === 'player' ? getColorForPlayer(closestOwner) : getColorForPlayer(closestOwner);
+                    const baseColor = influenceColor(closestOwner);
                     // Rend la couleur semi-transparente (couleurs HSL des joueurs ou hexa des races)
                     ctx.fillStyle = withOpacity(baseColor, influenceOpacity);
                     ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
