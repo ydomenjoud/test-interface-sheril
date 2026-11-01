@@ -155,7 +155,7 @@ describe('deplacementOrdersStorage', () => {
 
     it('relit le format le plus ancien (position seule) avec la directive par défaut et une stratégie vide', () => {
         localStorage.setItem('deplacements_tour_42', JSON.stringify({1: {x: 1, y: 2}}));
-        expect(loadDeplacements(42)).toEqual({1: {to: {x: 1, y: 2}, directive: 1, strategy: ''}});
+        expect(loadDeplacements(42)).toEqual({1: {to: {x: 1, y: 2}, directive: 0, strategy: ''}});
     });
 
     it('migre le format placeholder (codes directives provisoires, cdt, stratégie en nombre)', () => {

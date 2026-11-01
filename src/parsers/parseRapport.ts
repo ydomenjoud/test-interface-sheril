@@ -486,13 +486,12 @@ export function parseRapportXml(text: string): Rapport {
     }));
     const combats = parseCombatMessages(rawMessages);
 
-    // Stratégies de combat du joueur (section STRATEGIES sous commandant, majuscules côté moteur)
+    // Stratégies de combat du joueur (section strategies sous commandant, en minuscules dans rapport.xml)
     const strategies: Strategie[] = qAll(joueurNode, ['strategies > s']).map(s => ({
         nom: getAttr(s, ['nom']) || '',
         agressivite: getAttrNum(s, ['agressivite']),
         cible: getAttrNum(s, ['cible']),
     })).filter(st => st.nom);
-    console.log(strategies);
 
     const rapport: Rapport = {
         tour,
