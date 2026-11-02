@@ -1,6 +1,7 @@
 import {GlobalData, XY} from '../types';
 import {BOUNDS} from './position';
 import {getSectorGridCoords} from './sectors';
+import {getPuissanceEstimee} from './puissance';
 
 // Couche « présence » : qui est où, calculée sur TOUTE la galaxie (pas seulement le viewport),
 // à partir des systèmes connus (propre rapport + détections) avec un poids qui décroît avec l'âge
@@ -9,13 +10,31 @@ import {getSectorGridCoords} from './sectors';
 
 export type PresenceInputs = {
     tour: number;
-    systemesJoueur?: { pos: XY; proprietaires?: number[] }[];
-    systemesDetectes?: { pos: XY; proprietaires?: number[]; tour?: number }[];
+    systemesJoueur?: {
+        pos: XY;
+        proprietaires?: number[];
+        pop?: number;
+        planetes?: { proprietaire?: number; populations?: { nb: number }[] }[];
+    }[];
+    systemesDetectes?: { pos: XY; proprietaires?: number[]; tour?: number; pop?: number }[];
+    /** Flottes (pondération « force » uniquement) */
+    flottesJoueur?: { pos: XY; proprio?: number; as?: number; ap?: number }[];
+    flottesDetectees?: { pos: XY; proprio?: number; puiss?: string }[];
 };
 
 export type PresenceOptions = {
     /** Âge (en tours) auquel le poids d'une détection atteint 0 (défaut 10). */
     decayTurns?: number;
+    /**
+     * Pondération « force » : chaque système pèse selon sa population et les flottes comptent selon
+     * leur puissance. Sinon chaque système connu pèse 1.
+     */
+    force?: boolean;
+    /**
+     * Distance du jeu (Tchebychev : déplacements, radar, stabilité) au lieu de la distance à vol
+     * d'oiseau : les zones prennent une forme carrée plutôt qu'un disque.
+     */
+    distanceJeu?: boolean;
 };
 
 export type SectorSummary = {
@@ -59,9 +78,33 @@ export const PRESENCE_DEFAULTS = {
     cutoffSigma: 2.5,
     /** Densité minimale pour qu'une case soit attribuée à un commandant. */
     minDensity: 0.02,
+    /** Pondération « force » : population d'un système qui pèse 1 (le poids suit la racine carrée). */
+    forcePopRef: 2000,
+    /** Pondération « force » : puissance (AS + AP/2) d'une flotte qui pèse 1 (racine carrée). */
+    forcePuissanceRef: 500,
+    /** Pondération « force » : bornes du poids d'un système ou d'une flotte. */
+    forceWeightMin: 0.3,
+    forceWeightMax: 4,
 };
 
 const D = PRESENCE_DEFAULTS;
+
+/** Poids « force » : racine carrée de la grandeur rapportée à sa référence, bornée. */
+export function forceWeight(value: number, ref: number): number {
+    if (!(value > 0)) return D.forceWeightMin;
+    return Math.max(D.forceWeightMin, Math.min(D.forceWeightMax, Math.sqrt(value / ref)));
+}
+
+/** Population de chaque commandant dans un système du joueur (planètes détaillées). */
+function popParProprietaire(planetes: { proprietaire?: number; populations?: { nb: number }[] }[]): Map<number, number> {
+    const out = new Map<number, number>();
+    planetes.forEach(p => {
+        if (p.proprietaire == null) return;
+        const pop = (p.populations || []).reduce((a, x) => a + (Number(x.nb) || 0), 0);
+        out.set(p.proprietaire, (out.get(p.proprietaire) || 0) + pop);
+    });
+    return out;
+}
 
 /**
  * Poids d'une détection selon son âge : 1 jusqu'à `fullWeightAge` tours,
@@ -133,6 +176,8 @@ function axisOffsets(size: number, cutoff: number): { off: number; d: number }[]
  */
 export function computePresence(rapport: PresenceInputs, global: GlobalData | null | undefined, playerId: number, options: PresenceOptions = {}): PresenceData {
     const decayTurns = options.decayTurns ?? D.decayTurns;
+    const force = !!options.force;
+    const distanceJeu = !!options.distanceJeu;
     const maxX = BOUNDS.maxX;
     const maxY = BOUNDS.maxY;
     const size = maxX * maxY;
@@ -151,13 +196,36 @@ export function computePresence(rapport: PresenceInputs, global: GlobalData | nu
 
     rapport.systemesJoueur?.forEach(s => {
         const owners = (s.proprietaires || []).filter(o => o !== 0);
-        (owners.length ? owners : [playerId]).forEach(o => add(o, s.pos, 1));
+        const liste = owners.length ? owners : [playerId];
+        if (!force) {
+            liste.forEach(o => add(o, s.pos, 1));
+            return;
+        }
+        // Population exacte de chaque commandant sur ses planètes du système ; repli : part égale
+        const pops = s.planetes && s.planetes.length ? popParProprietaire(s.planetes) : null;
+        liste.forEach(o => {
+            const pop = pops ? (pops.get(o) || 0) : (s.pop || 0) / liste.length;
+            add(o, s.pos, forceWeight(pop, D.forcePopRef));
+        });
     });
     rapport.systemesDetectes?.forEach(s => {
         const w = detectionWeight(rapport.tour, s.tour, decayTurns);
         if (w <= 0) return;
-        (s.proprietaires || []).forEach(o => add(o, s.pos, w));
+        const owners = (s.proprietaires || []).filter(o => o !== 0);
+        // Population connue pour tout le système : partagée à parts égales entre ses propriétaires
+        const poids = force && s.pop != null ? forceWeight(s.pop / Math.max(1, owners.length), D.forcePopRef) : 1;
+        owners.forEach(o => add(o, s.pos, w * poids));
     });
+    if (force) {
+        rapport.flottesJoueur?.forEach(f => {
+            const puissance = (Number(f.as) || 0) + (Number(f.ap) || 0) / 2;
+            if (puissance > 0) add(f.proprio || playerId, f.pos, forceWeight(puissance, D.forcePuissanceRef));
+        });
+        rapport.flottesDetectees?.forEach(f => {
+            const puissance = getPuissanceEstimee(f.puiss || '');
+            if (puissance && f.proprio) add(f.proprio, f.pos, forceWeight(puissance, D.forcePuissanceRef));
+        });
+    }
 
     // ---- 2. Sigma par commandant (repli : écart de ses propres systèmes, puis défaut) --
     const ownSigma = sigmaForPositions((rapport.systemesJoueur || []).map(s => s.pos));
@@ -181,7 +249,8 @@ export function computePresence(rapport: PresenceInputs, global: GlobalData | nu
             offsX.forEach(ox => {
                 const cx = wrapCoord(a.pos.x + ox.off, maxX);
                 offsY.forEach(oy => {
-                    const d2 = ox.d * ox.d + oy.d * oy.d;
+                    const dc = Math.max(ox.d, oy.d);
+                    const d2 = distanceJeu ? dc * dc : ox.d * ox.d + oy.d * oy.d;
                     if (d2 > cutoff2) return;
                     const cy = wrapCoord(a.pos.y + oy.off, maxY);
                     grid[(cx - 1) * maxY + (cy - 1)] += a.weight * Math.exp(-d2 * inv2s2);

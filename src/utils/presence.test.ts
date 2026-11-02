@@ -2,6 +2,7 @@ import {BOUNDS, reinitialiserBornesGalaxie} from './position';
 import {
     PRESENCE_DEFAULTS,
     computePresence,
+    forceWeight,
     detectionWeight,
     sigmaForPositions,
     torusEuclidean,
@@ -205,5 +206,78 @@ describe('computePresence', () => {
         });
         const data = computePresence(rapport, null, 1);
         expect(data.sectors.get('0_0')!.counts.get(2)).toBe(1);
+    });
+});
+describe('computePresence — pondération « force »', () => {
+    afterEach(reinitialiserBornesGalaxie);
+
+    const idx = (x: number, y: number) => (x - 1) * BOUNDS.maxY + (y - 1);
+
+    // Deux voisins à égale distance de x=30, y=30 : un système peuplé (cdt 2) et un avant-poste (cdt 3)
+    const duel = {
+        tour: 100,
+        systemesJoueur: [],
+        systemesDetectes: [
+            {pos: {x: 30, y: 20}, proprietaires: [2], tour: 100, pop: 20000},
+            {pos: {x: 30, y: 40}, proprietaires: [3], tour: 100, pop: 500},
+        ],
+    };
+
+    test('sans pondération, la case la plus proche de l’avant-poste lui revient', () => {
+        reinitialiserBornesGalaxie();
+        expect(computePresence(duel, null, 1).winner[idx(30, 31)]).toBe(3);
+    });
+
+    test('avec pondération, le système peuplé repousse la frontière vers l’avant-poste', () => {
+        reinitialiserBornesGalaxie();
+        const data = computePresence(duel, null, 1, {force: true});
+        expect(data.winner[idx(30, 31)]).toBe(2);
+        expect(data.winner[idx(30, 40)]).toBe(3); // l’avant-poste garde sa propre case
+    });
+
+    test('distance du jeu (Tchebychev) : une case en diagonale pèse comme une case en ligne', () => {
+        reinitialiserBornesGalaxie();
+        const rapport = {tour: 100, systemesJoueur: [{pos: {x: 30, y: 30}, proprietaires: [1]}], systemesDetectes: []};
+        const jeu = computePresence(rapport, null, 1, {distanceJeu: true});
+        expect(jeu.density[idx(36, 36)]).toBeCloseTo(jeu.density[idx(36, 30)]);
+        // indépendante de la pondération : sans l'option, distance à vol d'oiseau, même avec la force
+        const force = computePresence(rapport, null, 1, {force: true});
+        expect(force.density[idx(36, 36)]).toBeLessThan(force.density[idx(36, 30)]);
+        const normal = computePresence(rapport, null, 1);
+        expect(normal.density[idx(36, 36)]).toBeLessThan(normal.density[idx(36, 30)]);
+    });
+
+    test('une flotte compte seulement avec la pondération', () => {
+        reinitialiserBornesGalaxie();
+        const rapport = {
+            tour: 100, systemesJoueur: [], systemesDetectes: [],
+            flottesDetectees: [{pos: {x: 10, y: 10}, proprio: 5, puiss: 'grande'}],
+        };
+        expect(computePresence(rapport, null, 1).winner[idx(10, 10)]).toBe(-1);
+        expect(computePresence(rapport, null, 1, {force: true}).winner[idx(10, 10)]).toBe(5);
+    });
+
+    test('dans un système du joueur partagé, chacun pèse selon la population de ses planètes', () => {
+        reinitialiserBornesGalaxie();
+        const rapport = {
+            tour: 100, systemesDetectes: [],
+            systemesJoueur: [{
+                pos: {x: 30, y: 30}, proprietaires: [1, 4],
+                planetes: [
+                    {proprietaire: 1, populations: [{nb: 300}]},
+                    {proprietaire: 4, populations: [{nb: 8000}, {nb: 4000}]},
+                ],
+            }],
+        };
+        expect(computePresence(rapport, null, 1, {force: true}).winner[idx(30, 30)]).toBe(4);
+    });
+});
+
+describe('forceWeight', () => {
+    test('racine carrée de la grandeur rapportée à la référence, bornée', () => {
+        expect(forceWeight(2000, 2000)).toBe(1);
+        expect(forceWeight(8000, 2000)).toBe(2);
+        expect(forceWeight(0, 2000)).toBe(PRESENCE_DEFAULTS.forceWeightMin);
+        expect(forceWeight(1e9, 2000)).toBe(PRESENCE_DEFAULTS.forceWeightMax);
     });
 });
