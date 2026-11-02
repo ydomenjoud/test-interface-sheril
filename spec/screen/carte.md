@@ -77,6 +77,12 @@ de couleur "Par diplo". Quand la couche présence est active, elle ajoute les en
 Les portées radar (systèmes et flottes) sont désactivées par défaut pour ne pas voiler la carte ; elles peuvent
 être activées par les boutons ◎ et ◉ de la barre d'outils (filtres rapides).
 
+Fond de la carte : sombre par défaut, ou clair (bouton ◐ de la barre d'outils, mémorisé dans
+`carte_theme`). Seuls le canvas et la mini-carte changent ; les panneaux gardent le thème de
+l'application. La palette est regroupée dans `src/utils/mapTheme.ts`. Sur fond clair, les couleurs
+pâles des propriétaires (PNA, neutre, commandants à luminosité 65 %) sont assombries pour rester
+lisibles, et l'aplat d'influence est renforcé (×1,8).
+
 #### barre d'outils
 
 La barre d'outils (en haut de l'écran) est regroupée : vue (taille des cases, position), filtres rapides,
