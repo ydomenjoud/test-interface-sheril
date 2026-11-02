@@ -178,14 +178,14 @@ describe('parseRapportXml - stratégies de combat', () => {
   const xml = `
     <rapport numtour="8">
       <commandant numero="1" nom="mab">
-        <STRATEGIES>
-          <S nom="Essai" agressivite="3" cible="1"/>
-          <S nom="Defensive" agressivite="2" cible="0"/>
-        </STRATEGIES>
+        <strategies>
+          <s nom="Essai" agressivite="3" cible="1"/>
+          <s nom="Defensive" agressivite="2" cible="0"/>
+        </strategies>
       </commandant>
     </rapport>`;
 
-  it("extrait la section STRATEGIES du moteur (nom, agressivite, cible)", () => {
+  it("extrait la section strategies du rapport (nom, agressivite, cible)", () => {
     const r = parseRapportXml(xml);
     expect(r.strategies).toEqual([
       { nom: 'Essai', agressivite: 3, cible: 1 },
