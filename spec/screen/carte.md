@@ -104,6 +104,29 @@ panneau "Filtres", qui garde la même liste complète) :
   stabilité et choix du système de référence)
 * ? : aide et raccourcis (touche `?`)
 
+Actions de droite : « Importer systèmes » ajoute des systèmes détectés collés un par ligne
+(`nbpla=…; nom=…; pop=…; popMax=…; pos=0_x_y; typeEtoile=…; proprios=a,b`, avec `tour=…` facultatif,
+les lignes commençant par `#` étant ignorées). « Exporter systèmes » produit ce même texte pour les
+systèmes du joueur (propriétaires sans le neutre, population, tour du rapport), précédé d'un en-tête
+`#` : un allié le colle dans son « Importer systèmes », puisque les systèmes possédés ne sont pas
+partagés automatiquement par l'alliance, contrairement aux détections. Bouton « Copier » vers le
+presse-papiers. Un système importé garde le tour indiqué dans le texte (fraîcheur de la couche
+présence), à défaut le tour du rapport chargé.
+
+L'export ajoute aussi une ligne par système ou flotte du joueur équipé d'un radar
+(`radar=4; pos=0_10_20; cdt=7; tour=5`, position au tour du rapport). À l'import, ces portées sont
+gardées comme « radars alliés » (localStorage `carte_radars_allies`) ; un nouvel import d'un
+commandant remplace tous ses radars précédents. Elles s'affichent dans « Portées Radar » → « Alliés »
+(affiché par défaut, `carte_show_ally_radar`), en violet avec un liseré en pointillés, sous le radar
+du joueur (bleu), et seulement pour le tour affiché : les flottes ont bougé depuis. Le libellé donne
+le nombre de radars et les commandants ; un bouton efface tous les radars alliés (avec confirmation).
+La fenêtre d'export a deux cases (mémorisées : `carte_export_systemes`, `carte_export_radars`, cochées
+par défaut) : « Mes systèmes » et « Mes portées radar ». Le texte et son en-tête suivent ; sans aucune
+case cochée, le texte est vide et « Copier » est désactivé.
+Le texte est modifiable avant la copie (retirer un système, ajouter un commentaire `#`…) ; « Copier »
+copie le texte modifié. Un avertissement signale un texte modifié à la main ; « Rétablir le texte
+généré » annule les modifications, et changer une case régénère le texte.
+
 #### interaction
 
 - Clic: lorsqu'on clique sur une position de la carte, la carte affiche les informations de la position cliquée dans la

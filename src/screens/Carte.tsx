@@ -17,6 +17,7 @@ import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
 import {loadDeplacements, saveDeplacements, clearDeplacements} from '../storage/deplacementOrdersStorage';
 import {DeplacementEnAttente, DeplacementOrdre, DIRECTIVE_DEFAUT, OPTIONS_DIRECTIVES, PRECISION_DEFAUT, PRECISION_PLANETE_MAX, PRECISION_PLANETE_MIN, STRATEGIE_DEFAUT, schemaDeplacements} from '../utils/ordreDeplacement';
 import {copierSchema} from '../utils/ordreSchema';
+import {exportSystemesJoueur} from '../parsers/parseManualSystems';
 import {
   IconSystem,
   IconRadarSystem,
@@ -74,7 +75,7 @@ const styleBoutonDeplacement: React.CSSProperties = {
 };
 
 export default function Carte() {
-  const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText, allTags, selectedTags, setSelectedTags, zones, zoneLabels, hiddenZoneLabels, setHiddenZoneLabels, tours, selectTour, importCount } = useReport();
+  const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText, radarsAllies, clearRadarsAllies, allTags, selectedTags, setSelectedTags, zones, zoneLabels, hiddenZoneLabels, setHiddenZoneLabels, tours, selectTour, importCount } = useReport();
   const [zoneDialogRect, setZoneDialogRect] = useState<ZoneRect | undefined>(undefined);
   const [zonePreview, setZonePreview] = useState<Omit<Zone, 'id'> | undefined>(undefined);
   const closeZoneDialog = useCallback(() => {
@@ -111,6 +112,11 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_system_radar');
     return saved !== null ? JSON.parse(saved) : false;
   });
+  // Portées radar importées des alliés (« Importer systèmes ») : affichées par défaut
+  const [showAllyRadar, setShowAllyRadar] = useState<boolean>(() => localStorage.getItem('carte_show_ally_radar') !== 'false');
+  useEffect(() => {
+    localStorage.setItem('carte_show_ally_radar', JSON.stringify(showAllyRadar));
+  }, [showAllyRadar]);
   const [showFleetRadar, setShowFleetRadar] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_show_fleet_radar');
     return saved !== null ? JSON.parse(saved) : false;
@@ -188,6 +194,35 @@ export default function Carte() {
     return saved !== null ? saved : undefined;
   });
   const [showPaste, setShowPaste] = useState(false);
+  // Export des systèmes du joueur, à transmettre à un allié
+  const [showExport, setShowExport] = useState(false);
+  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
+  // Contenu de l'export (mémorisé) : systèmes, radars
+  const [exportSystemes, setExportSystemes] = useState<boolean>(() => localStorage.getItem('carte_export_systemes') !== 'false');
+  const [exportRadars, setExportRadars] = useState<boolean>(() => localStorage.getItem('carte_export_radars') !== 'false');
+  useEffect(() => {
+    localStorage.setItem('carte_export_systemes', JSON.stringify(exportSystemes));
+    localStorage.setItem('carte_export_radars', JSON.stringify(exportRadars));
+  }, [exportSystemes, exportRadars]);
+  const exportText = useMemo(
+    () => (rapport ? exportSystemesJoueur(rapport, {systemes: exportSystemes, radars: exportRadars}) : ''),
+    [rapport, exportSystemes, exportRadars],
+  );
+  // Texte affiché, modifiable avant copie ; régénéré quand le texte généré change (cases, rapport)
+  const [exportTexteEdite, setExportTexteEdite] = useState('');
+  useEffect(() => {
+    setExportTexteEdite(exportText);
+  }, [exportText]);
+  // Radars alliés du tour affiché (les flottes bougent : un radar d'un autre tour n'est plus valable),
+  // sans les siens propres
+  const radarsAlliesDuTour = useMemo(
+    () => radarsAllies.filter(r => r.cdt !== rapport?.joueur.numero && (r.tour == null || r.tour === rapport?.tour)),
+    [radarsAllies, rapport?.tour, rapport?.joueur.numero],
+  );
+  const commandantsRadars = useMemo(
+    () => Array.from(new Set(radarsAlliesDuTour.map(r => r.cdt))).sort((a, b) => a - b).join(', '),
+    [radarsAlliesDuTour],
+  );
   const [pasteText, setPasteText] = useState('');
   const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
 
@@ -796,6 +831,14 @@ export default function Carte() {
           <button onClick={() => setShowPaste(true)} className="carte-btn">
             Importer systèmes
           </button>
+          <button
+            onClick={() => { setExportFeedback(null); setExportTexteEdite(exportText); setShowExport(true); }}
+            className="carte-btn"
+            disabled={!rapport}
+            title="Texte de vos systèmes à transmettre à un allié, qui le colle dans « Importer systèmes »"
+          >
+            Exporter systèmes
+          </button>
         </div>
       </div>
       {noRapportMessage}
@@ -829,6 +872,7 @@ export default function Carte() {
             showFleetBadges={showFleetBadges}
             showSystemRadar={showSystemRadar}
             showFleetRadar={showFleetRadar}
+            alliedScanners={showAllyRadar ? radarsAlliesDuTour : undefined}
             showSectors={showSectors}
             showZones={showZones && !playing}
             showInfluence={presenceOn}
@@ -1232,6 +1276,27 @@ par diplo
                             />
                             Flottes
                           </label>
+                          <label
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, color: radarsAllies.length ? '#f1f5f9' : '#64748b', fontSize: '0.9em', cursor: 'pointer' }}
+                            title="Portées radar importées des alliés (« Importer systèmes »), pour le tour affiché. Violet, liseré en pointillés."
+                          >
+                            <input
+                              type="checkbox"
+                              checked={showAllyRadar}
+                              onChange={(e) => setShowAllyRadar(e.target.checked)}
+                            />
+                            Alliés ({radarsAlliesDuTour.length} radar{radarsAlliesDuTour.length > 1 ? 's' : ''} au tour {rapport?.tour ?? '?'}{commandantsRadars ? ` : n°${commandantsRadars}` : ''})
+                          </label>
+                          {radarsAllies.length > 0 && (
+                            <button
+                              type="button"
+                              className="carte-btn"
+                              style={{ alignSelf: 'flex-start', fontSize: '0.8em' }}
+                              onClick={() => { if (window.confirm('Effacer toutes les portées radar importées des alliés ?')) clearRadarsAllies(); }}
+                            >
+                              Effacer les radars alliés ({radarsAllies.length})
+                            </button>
+                          )}
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #334155', paddingTop: 8 }}>
@@ -1545,12 +1610,68 @@ par diplo
 
       {zoneDialogRect && <ZoneDialog rect={zoneDialogRect} onClose={closeZoneDialog} onPreview={setZonePreview} />}
 
+      {showExport && (
+        <Modal title="Exporter mes systèmes" onClose={() => setShowExport(false)} panelStyle={{ minWidth: 600, maxWidth: '80%' }}>
+          <p style={{ marginTop: 0 }}>
+            Transmettez ce texte à un allié (Discord, mail, Drive…) : il le colle dans « Importer systèmes ».
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={exportSystemes} onChange={(e) => { setExportSystemes(e.target.checked); setExportFeedback(null); }} />
+              Mes systèmes (propriétaires, population, date du tour)
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={exportRadars} onChange={(e) => { setExportRadars(e.target.checked); setExportFeedback(null); }} />
+              Mes portées radar (systèmes et flottes, position à ce tour)
+            </label>
+          </div>
+          <textarea
+            value={exportTexteEdite}
+            onChange={(e) => { setExportTexteEdite(e.target.value); setExportFeedback(null); }}
+            placeholder="Cochez au moins un contenu à exporter"
+            title="Texte modifiable avant de le copier (retirer un système, ajouter un commentaire « # »…). Changer une case régénère le texte."
+            style={{ width: '100%', height: 180, fontFamily: 'monospace', fontSize: '0.85em' }}
+          />
+          {exportTexteEdite !== exportText && (
+            <div style={{ marginTop: 4, fontSize: '0.85em', color: '#fbbf24' }}>
+              Texte modifié à la main : changer une case le régénère et efface vos modifications.
+            </div>
+          )}
+          {exportFeedback && (
+            <div style={{ marginTop: 8, color: exportFeedback.startsWith('Copié') ? '#4ade80' : '#f87171' }}>{exportFeedback}</div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+            <button type="button" onClick={() => setShowExport(false)}>Fermer</button>
+            <button
+              type="button"
+              disabled={exportTexteEdite === exportText}
+              onClick={() => { setExportTexteEdite(exportText); setExportFeedback(null); }}
+            >
+              Rétablir le texte généré
+            </button>
+            <button
+              type="button"
+              style={{ fontWeight: 'bold' }}
+              disabled={!exportTexteEdite.trim()}
+              onClick={async () => {
+                const ok = await copierSchema(exportTexteEdite);
+                setExportFeedback(ok ? 'Copié dans le presse-papiers.' : 'Copie impossible : sélectionnez le texte et copiez-le à la main (Ctrl + C).');
+              }}
+            >
+              Copier
+            </button>
+          </div>
+        </Modal>
+      )}
+
       {showPaste && (
         <Modal title="Ajouter des systèmes détectés" onClose={() => setShowPaste(false)} panelStyle={{ minWidth: 600, maxWidth: '80%' }}>
           <p style={{ marginTop: 0 }}>
             Collez un système par ligne, au format:
             <br/>
             <code>nbpla=16; nom=Nb 9C; pop=3475; popMax=43547; pos=0_1_26; typeEtoile=1; proprios=4,1</code>
+            <br/>
+            ou le texte produit par « Exporter systèmes » chez un allié (les lignes commençant par # sont ignorées).
           </p>
           <textarea
             value={pasteText}
@@ -1569,6 +1690,7 @@ par diplo
                 const res = addDetectedSystemsFromText(pasteText);
                 const msgParts = [] as string[];
                 if (res.added > 0) msgParts.push(`${res.added} ajouté(s)`);
+                if (res.radars > 0) msgParts.push(`${res.radars} radar(s)`);
                 if (res.errors.length > 0) msgParts.push(`${res.errors.length} erreur(s)`);
                 setPasteFeedback(msgParts.join(' · ') || 'Aucune modification');
                 if (res.errors.length === 0) {

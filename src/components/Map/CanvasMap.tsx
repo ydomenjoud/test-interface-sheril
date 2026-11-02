@@ -100,6 +100,7 @@ type Props = {
     showFleetBadges: boolean;
     showSystemRadar: boolean;
     showFleetRadar: boolean;
+    alliedScanners?: { pos: XY; scan: number }[]; // portées radar importées des alliés (tour affiché)
     showSectors: boolean;
     showZones?: boolean; // zones manuelles (toutes)
     showInfluence: boolean;
@@ -161,7 +162,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#ef4444';
 }
 
-export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showZones = true, showInfluence, colorMode = 'status', mapTheme = 'sombre', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
+export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, alliedScanners = [], showSectors, showZones = true, showInfluence, colorMode = 'status', mapTheme = 'sombre', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
                         presenceMode = 'voronoi', presenceData = null, presenceDecay = 10, presenceLabels = false,
                         deplacements, dragFleet, highlightPos, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort, onFleetDragOver, onFleetDragLeave, onFleetDrop}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
@@ -853,8 +854,9 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         }
 
         // Déduplication des cases détectées (distance de Tchebyshev)
+        const couverture = (sources: { pos: XY; scan: number }[]): Set<string> => {
         const detected = new Set<string>();
-        scanners.forEach(src => {
+        sources.forEach(src => {
             const r = Math.max(0, Math.floor(src.scan));
             for (let dxCell = -r; dxCell <= r; dxCell++) {
                 for (let dyCell = -r; dyCell <= r; dyCell++) {
@@ -883,13 +885,16 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
                 }
             }
         });
+        return detected;
+        };
 
         // Dessin unique des cases détectées : aplat très léger + liseré périphérique.
-        // L'œil lit la frontière de la zone sans que le bleu n'écrase le contenu.
+        // L'œil lit la frontière de la zone sans que la couleur n'écrase le contenu.
         const cScan = ctx as CanvasRenderingContext2D;
         cScan.save();
         cScan.globalAlpha = 1.0;
-        cScan.fillStyle = theme.scanFill;
+        const dessinerCouverture = (detected: Set<string>, fill: string, stroke: string, dash: number[] = []) => {
+        cScan.fillStyle = fill;
         detected.forEach(key => {
             const [ixStr, iyStr] = key.split(',');
             const ix = Number(ixStr);
@@ -897,8 +902,9 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             cScan.fillRect(ix * cellSize, iy * cellSize, cellSize, cellSize);
         });
         // Liseré : trait sur chaque arête dont le voisin n'est pas détecté
-        cScan.strokeStyle = theme.scanStroke;
+        cScan.strokeStyle = stroke;
         cScan.lineWidth = 1;
+        cScan.setLineDash(dash);
         cScan.beginPath();
         detected.forEach(key => {
             const [ix, iy] = key.split(',').map(Number);
@@ -910,6 +916,13 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             if (!detected.has(`${ix + 1},${iy}`)) { cScan.moveTo(px + cellSize, py); cScan.lineTo(px + cellSize, py + cellSize); }
         });
         cScan.stroke();
+        cScan.setLineDash([]);
+        };
+        // Radars des alliés (violet, liseré en pointillés) sous le radar du joueur (bleu)
+        if (alliedScanners.length > 0) {
+            dessinerCouverture(couverture(alliedScanners), 'rgba(168, 85, 247, 0.07)', 'rgba(192, 132, 252, 0.55)', [4, 3]);
+        }
+        dessinerCouverture(couverture(scanners), theme.scanFill, theme.scanStroke);
 
         // INDICATEURS DE NOTES
         Object.keys(notes).forEach(noteKey => {
@@ -1772,7 +1785,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         // Le survol dépend de la géométrie (centre, taille de case) : on resynchronise l'overlay après chaque dessin
         redrawHoverOverlay();
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, presenceMode, presenceData, presenceDecay, presenceLabels, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos, theme]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, showSystemRadar, showFleetRadar, alliedScanners, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, presenceMode, presenceData, presenceDecay, presenceLabels, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos, theme]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
