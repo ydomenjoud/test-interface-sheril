@@ -407,6 +407,19 @@ a:hover {
     max-height: 38px;
 }
 
+/* Liste des déplacements : conteneur de requête (sur la liste, pas sur le tiroir — le tiroir replié
+   est en width:auto, qu'une containment inline-size écraserait). Tiroir étroit : on masque la case
+   de départ pour que le n° et le nom de flotte restent visibles. */
+.carte-deplacements-liste {
+    container-type: inline-size;
+}
+
+@container (max-width: 600px) {
+    .carte-deplacements-liste .deplacement-origine {
+        display: none !important;
+    }
+}
+
 @media (max-width: 1200px) {
     .carte-deplacements-drawer {
         width: calc(100% - 16px);

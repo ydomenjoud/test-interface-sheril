@@ -1267,19 +1267,34 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             c.beginPath();
             c.rect(cellSize, cellSize, cols * cellSize, rows * cellSize);
             c.clip();
-            c.strokeStyle = color;
-            c.fillStyle = color;
-            c.lineWidth = 2;
+            // Contour noir fin (0,75 px) sur toute la flèche : reste lisible quand elle passe sur un
+            // système coloré. Trait : un trait noir plus large dessous, le trait coloré par-dessus ;
+            // il s'arrête à la base de la pointe pour que le contour ne déborde pas près de l'extrémité.
+            const outline = '#000000';
+            const outlineWidth = 0.75;
+            const baseLen = headLen * Math.cos(Math.PI / 6);
+            const sx = x2 - baseLen * Math.cos(angle);
+            const sy = y2 - baseLen * Math.sin(angle);
             c.beginPath();
             c.moveTo(x1, y1);
-            c.lineTo(x2, y2);
+            c.lineTo(sx, sy);
+            c.strokeStyle = outline;
+            c.lineWidth = 2 + 2 * outlineWidth;
             c.stroke();
+            c.strokeStyle = color;
+            c.lineWidth = 2;
+            c.stroke();
+            c.fillStyle = color;
             c.beginPath();
             c.moveTo(x2, y2);
             c.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
             c.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
             c.closePath();
             c.fill();
+            c.strokeStyle = outline;
+            c.lineWidth = outlineWidth;
+            c.lineJoin = 'round';
+            c.stroke();
             c.restore();
         };
 

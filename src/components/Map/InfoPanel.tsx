@@ -28,6 +28,8 @@ type Props = {
   onClose?: () => void;
   // Alternative clavier au glisser-déposer : déplacer la flotte vers la case sélectionnée
   onMoveFleet?: (fleetNum: number) => void;
+  // Numéros des flottes ayant déjà un ordre de déplacement en mémoire (lignes en bleu)
+  fleetsWithOrder?: ReadonlySet<number>;
   colorMode?: 'status' | 'race' | 'player';
 };
 
@@ -47,7 +49,7 @@ const StaleIcon = () => (
 
 
 
-export default function InfoPanel({ selected, onFleetHover, onMoveFleet, colorMode = 'status' }: Props) {
+export default function InfoPanel({ selected, onFleetHover, onMoveFleet, fleetsWithOrder, colorMode = 'status' }: Props) {
   const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats, zones, zoneLabels, fleetSnapshots, systemSnapshots } = useReport();
 
   // Zones affichées : celles qui couvrent la case, plus celles déjà listées pour cette sélection
@@ -381,8 +383,11 @@ export default function InfoPanel({ selected, onFleetHover, onMoveFleet, colorMo
             <tbody>
             {atPos.playerFleets.map((f: any, i: number) => {
               const isHere = f.pos.x === selected.x && f.pos.y === selected.y;
-              // Hors de portée ce tour : ligne orangée et estompée
-              const rowStyle = !f.reachable && !isHere ? { opacity: 0.5, color: '#f59e0b' } : {};
+              // Hors de portée ce tour : ligne orangée et estompée ; à portée : bleu si un ordre de
+              // déplacement est déjà en mémoire, vert sinon
+              const rowStyle: React.CSSProperties = !f.reachable && !isHere
+                ? { opacity: 0.5, color: '#f59e0b' }
+                : { color: fleetsWithOrder?.has(f.num) ? '#38bdf8' : '#4ade80' };
               return (
                 <tr key={`player-flt-${i}`} style={rowStyle} onMouseEnter={showFleetHover(f)} onMouseLeave={hideFleetHover}>
                   <td style={{ textAlign: 'right' }}>{f.num + 1}</td>
@@ -423,7 +428,7 @@ export default function InfoPanel({ selected, onFleetHover, onMoveFleet, colorMo
             })}
             </tbody>
           </table>
-          <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 6 }}>orange estompé = hors de portée ce tour · → = déplacer vers la case sélectionnée</div>
+          <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 6 }}>vert = à portée · bleu = à portée, ordre de déplacement déjà donné · orange estompé = hors de portée ce tour · → = déplacer vers la case sélectionnée</div>
         </div>
       )}
       {cellCombats.length > 0 && (

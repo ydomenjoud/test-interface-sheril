@@ -461,6 +461,9 @@ export default function Carte() {
   const [picker, setPicker] = useState<{ cell: XY; anchor: { x: number; y: number } } | null>(null);
   // Flotte en cours de glisser-déposer ; le curseur est suivi pendant le drag pour le rendu en direct
   const [dragState, setDragState] = useState<{ num: number; from: XY; vitesse: number } | null>(null);
+  // Tiroir Déplacements replié visuellement pendant le drag d'une flotte (voir la carte dessous) ;
+  // l'état mémorisé n'est pas touché : il revient tel quel à la fin (un dépos l'ouvre, comme avant)
+  const tiroirDeplacementsOuvert = deplacementsExpanded && !dragState;
   const [dragCursor, setDragCursor] = useState<XY | null>(null);
   // Feedback de la copie du schéma : le libellé du bouton revient à la normale au bout de 2 s
   const [copieSchema, setCopieSchema] = useState<'ok' | 'ko' | null>(null);
@@ -604,6 +607,8 @@ export default function Carte() {
     for (const [num, deplacement] of Object.entries(deplacements)) cibles[Number(num)] = deplacement.to;
     return cibles;
   }, [deplacements]);
+  // Flottes ayant déjà un ordre de déplacement : colorées en bleu dans « Mes flottes » du panneau info
+  const flottesAvecOrdre = useMemo(() => new Set(Object.keys(deplacements).map(Number)), [deplacements]);
   // Nom du système par position (priorité : systèmes du joueur > détectés > carte galactique,
   // premier trouvé) : les lignes du panneau Déplacements affichent le nom quand la case en porte un
   const nomSystemeByPos = useMemo(() => {
@@ -1341,18 +1346,18 @@ par diplo
           )}
 
           {/* Déplacements en attente : tiroir de commandes tactique repliable au bas de la carte */}
-          <div className={`carte-deplacements-drawer ${deplacementsExpanded ? 'expanded' : 'collapsed'}`}>
+          <div className={`carte-deplacements-drawer ${tiroirDeplacementsOuvert ? 'expanded' : 'collapsed'}`}>
             <button
               type="button"
-              aria-expanded={deplacementsExpanded}
-              aria-label={deplacementsExpanded ? 'Replier le panneau des déplacements' : 'Déplier le panneau des déplacements'}
-              onClick={() => setDeplacementsExpanded(!deplacementsExpanded)}
+              aria-expanded={tiroirDeplacementsOuvert}
+              aria-label={tiroirDeplacementsOuvert ? 'Replier le panneau des déplacements' : 'Déplier le panneau des déplacements'}
+              onClick={() => setDeplacementsExpanded(!tiroirDeplacementsOuvert)}
               style={{
                 width: '100%',
                 padding: '8px 14px',
                 backgroundColor: '#1e2530',
                 border: 'none',
-                borderBottom: deplacementsExpanded ? '1px solid #334155' : 'none',
+                borderBottom: tiroirDeplacementsOuvert ? '1px solid #334155' : 'none',
                 borderRadius: '8px 8px 0 0',
                 cursor: 'pointer',
                 display: 'flex',
@@ -1373,14 +1378,14 @@ par diplo
                 Déplacements ({nbDeplacements})
               </span>
               <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, color: '#94a3b8' }}>
-                {deplacementsExpanded ? <IconChevronDown size={15} /> : <IconChevronUp size={15} />}
+                {tiroirDeplacementsOuvert ? <IconChevronDown size={15} /> : <IconChevronUp size={15} />}
               </span>
             </button>
-            {deplacementsExpanded && (
+            {tiroirDeplacementsOuvert && (
               <>
                 {/* minHeight:0 : sans ça la liste ne peut pas se rétrécir sous sa taille de contenu
                     et dépasse le tiroir (pied Copier/Réinitialiser inaccessible, pas de scroll) */}
-                <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', minHeight: 0 }}>
+                <div className="carte-deplacements-liste" style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', minHeight: 0 }}>
                   {nbDeplacements === 0 ? (
                     <div style={{ color: '#94a3b8', fontSize: '0.85rem', padding: '4px 0' }}>
                       Aucun déplacement — cliquez sur une case occupée par vos flottes, puis glissez une
@@ -1419,7 +1424,10 @@ par diplo
                                 : <strong>Flotte #{num + 1}</strong>}
                             </div>
                             <div style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#cbd5e1', flexShrink: 0, display: 'inline-flex', alignItems: 'center' }}>
-                              {origine ? coordSpan(origine) : '—'}
+                              {/* Case de départ masquée quand le tiroir est étroit (CSS) : laisse la place au n° de flotte */}
+                              <span className="deplacement-origine" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                {origine ? coordSpan(origine) : '—'}
+                              </span>
                               <IconArrowRight size={11} style={{ margin: '0 4px', color: '#64748b' }} />
                               {coordSpan(to)}
                             </div>
@@ -1597,6 +1605,7 @@ par diplo
           onFleetHover={setHoverFleetPos}
           onClose={() => setInfoPanelCollapsed(true)}
           onMoveFleet={onMoveFleetToSelected}
+          fleetsWithOrder={flottesAvecOrdre}
           colorMode={colorMode}
         />
       </div>

@@ -25,6 +25,38 @@ function clampPanelPos(left: number, top: number, w: number, h: number) {
     };
 }
 
+// Petite cible (cercle + réticule) servant d'image de drag : le tracé de déplacement sur la carte
+// reste lisible sous le pointeur
+const TAILLE_CIBLE_DRAG = 22;
+function creerCibleDrag(): HTMLCanvasElement {
+    const taille = TAILLE_CIBLE_DRAG;
+    const ratio = window.devicePixelRatio || 1;
+    const canvas = document.createElement('canvas');
+    // Buffer agrandi pour un rendu net en HiDPI, taille CSS inchangée
+    canvas.width = taille * ratio;
+    canvas.height = taille * ratio;
+    canvas.style.cssText = `position:fixed;top:-100px;left:-100px;width:${taille}px;height:${taille}px;pointer-events:none;`;
+    const c = canvas.getContext('2d');
+    if (c) {
+        c.scale(ratio, ratio);
+        const m = taille / 2;
+        const dessiner = (couleur: string, largeur: number) => {
+            c.strokeStyle = couleur;
+            c.lineWidth = largeur;
+            c.beginPath();
+            c.arc(m, m, 6, 0, Math.PI * 2);
+            c.moveTo(m, 1); c.lineTo(m, m - 3);
+            c.moveTo(m, m + 3); c.lineTo(m, taille - 1);
+            c.moveTo(1, m); c.lineTo(m - 3, m);
+            c.moveTo(m + 3, m); c.lineTo(taille - 1, m);
+            c.stroke();
+        };
+        dessiner('rgba(0, 0, 0, 0.8)', 3.5); // halo sombre : lisible sur fond clair comme sombre
+        dessiner('#38bdf8', 1.5);
+    }
+    return canvas;
+}
+
 export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, onClose}: FleetPickerProps) {
     const isSingle = fleets.length === 1;
     const panelWidth = isSingle ? 240 : 280;
@@ -117,6 +149,10 @@ export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, 
                 color: '#e2e8f0',
                 fontSize: '0.85rem',
                 overflow: 'hidden',
+                // Pendant le drag d'une flotte : panneau invisible pour voir la carte dessous. Il reste
+                // MONTÉ et rendu (opacity, pas display:none) : retirer la source du drag l'annulerait.
+                // pointer-events:none laisse le dragover/drop atteindre la carte sous le panneau.
+                ...(dragNum !== undefined ? {opacity: 0, pointerEvents: 'none' as const} : {}),
             }}
         >
             {/* En-tête : compact pour 1 flotte, complet pour plusieurs */}
@@ -186,11 +222,14 @@ export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, 
                             onDragStart={e => {
                                 e.dataTransfer.setData('application/x-fleet-num', String(fleet.num));
                                 e.dataTransfer.effectAllowed = 'move';
-                                // Remplacement du ghost par un pixel transparent pour garder le tracé net
-                                const fantome = document.createElement('canvas');
-                                fantome.width = 1;
-                                fantome.height = 1;
-                                e.dataTransfer.setDragImage(fantome, 0, 0);
+                                // Fantôme du drag : petite cible centrée sur le pointeur au lieu de la carte
+                                // de la flotte, qui masquait la carte. Chrome n'utilise l'élément que s'il est
+                                // rendu dans le DOM au moment du dragstart (un canvas détaché retombe sur le
+                                // fantôme par défaut) : on l'insère hors écran et on le retire au tick suivant.
+                                const fantome = creerCibleDrag();
+                                document.body.appendChild(fantome);
+                                e.dataTransfer.setDragImage(fantome, TAILLE_CIBLE_DRAG / 2, TAILLE_CIBLE_DRAG / 2);
+                                setTimeout(() => fantome.remove(), 0);
                                 onSelectFleet(fleet.num);
                             }}
                             onDragEnd={onDragEnd}
