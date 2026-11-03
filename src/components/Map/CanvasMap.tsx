@@ -10,7 +10,7 @@ import {Alliance, GlobalData, XY, Zone} from '../../types';
 import {lightenHexColor, getColorForPlayer} from "../../utils/global";
 import {detectionWeight, PresenceData} from '../../utils/presence';
 import {isTypingTarget} from '../../utils/keyboard';
-import {ALL_FLEET_SIZE_BANDS, DEFAULT_FLEET_OWNER_VISIBILITY, FleetOwnerVisibility, FleetSizeBand, isFleetVisible} from '../../utils/fleetModel';
+import {DEFAULT_FLEET_OWNER_VISIBILITY, DEFAULT_FLEET_POWER_RANGE, FleetOwnerVisibility, FleetPowerRange, isFleetVisible} from '../../utils/fleetModel';
 
 const OWNER_BADGE_COLORS: Record<number, string> = {
     1: '#0066CC',
@@ -99,9 +99,9 @@ type Props = {
     showCombatBadges: boolean;
     showOwnerBadges: boolean;
     showFleetBadges: boolean;
-    // Filtres de flottes (bandes de taille + nos flottes / flottes neutres) : seul le
+    // Filtres de flottes (plage de puissance + nos flottes / flottes neutres) : seul le
     // sous-ensemble visible est dessiné (marqueurs et flèches d'ordres) ; le rapport reste intact.
-    fleetSizeBands?: readonly FleetSizeBand[];
+    fleetPowerRange?: FleetPowerRange;
     fleetVisibility?: FleetOwnerVisibility;
     showSystemRadar: boolean;
     showFleetRadar: boolean;
@@ -167,7 +167,7 @@ export function colorForOwnership(currentPlayerId?: number, owners?: number[], a
     return '#ef4444';
 }
 
-export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, fleetSizeBands = ALL_FLEET_SIZE_BANDS, fleetVisibility = DEFAULT_FLEET_OWNER_VISIBILITY, showSystemRadar, showFleetRadar, alliedScanners = [], showSectors, showZones = true, showInfluence, colorMode = 'status', mapTheme = 'sombre', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
+export default function CanvasMap({onSelect, onCreateZone, previewZone, selected, showFleetsFor, showSystems, showGlobalSystems = true, selectedOwners, showCombatBadges, showOwnerBadges, showFleetBadges, fleetPowerRange = DEFAULT_FLEET_POWER_RANGE, fleetVisibility = DEFAULT_FLEET_OWNER_VISIBILITY, showSystemRadar, showFleetRadar, alliedScanners = [], showSectors, showZones = true, showInfluence, colorMode = 'status', mapTheme = 'sombre', showStabilityZones, stabilitySystemPos, influenceOpacity = 0.18,
                         presenceMode = 'voronoi', presenceData = null, presenceDecay = 10, presenceLabels = false,
                         deplacements, dragFleet, highlightPos, onAnyCanvasMouseDown, onFleetCellMouseDown, onFleetCellGestureAbort, onFleetDragOver, onFleetDragLeave, onFleetDrop}: Props) {
     const {rapport, global, cellSize, setCellSize, center, setCenter, setViewportDims, notes, selectedTags, publicCombats, zones, hiddenZoneLabels} = useReport();
@@ -274,11 +274,11 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
         })),];
     }, [rapport, currentPlayerId]);
 
-    // Sous-ensemble dessiné : flottes restantes après filtres (bandes de taille, nos flottes,
+    // Sous-ensemble dessiné : flottes restantes après filtres (plage de puissance, nos flottes,
     // flottes neutres). N'affecte que l'affichage — le rapport et les ordres restent intacts.
     const visibleFleets = useMemo(
-        () => fleets.filter(fleet => isFleetVisible(fleet, fleetSizeBands, fleetVisibility)),
-        [fleets, fleetSizeBands, fleetVisibility]);
+        () => fleets.filter(fleet => isFleetVisible(fleet, fleetPowerRange, fleetVisibility)),
+        [fleets, fleetPowerRange, fleetVisibility]);
 
     const combats = useMemo(() => {
         const fromRapport = rapport?.combats ?? [];
@@ -1811,7 +1811,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
 
         // Le survol dépend de la géométrie (centre, taille de case) : on resynchronise l'overlay après chaque dessin
         redrawHoverOverlay();
-    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, fleetSizeBands, fleetVisibility, showSystemRadar, showFleetRadar, alliedScanners, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, presenceMode, presenceData, presenceDecay, presenceLabels, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos, theme]);
+    }, [rapport, global, systems, fleets, combats, cellSize, center, currentPlayerId, setViewportDims, canvasSizeVersion, selectedOwners, notes, selectedTags, ownerRaceColor, showCombatBadges, showOwnerBadges, showFleetBadges, fleetPowerRange, fleetVisibility, showSystemRadar, showFleetRadar, alliedScanners, showSectors, showInfluence, selected, showFleetsFor, showStabilityZones, stabilitySystemPos, showSystems, colorMode, influenceOpacity, presenceMode, presenceData, presenceDecay, presenceLabels, zones, showZones, hiddenZoneLabels, zoneDraft, previewZone, redrawHoverOverlay, deplacements, dragFleet, highlightPos, reparationByPos, theme]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {

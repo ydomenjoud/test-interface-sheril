@@ -1,54 +1,56 @@
-import React, {useState} from 'react';
-import {render, screen} from '@testing-library/react';
+import React from 'react';
+import {fireEvent, render, screen} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import FleetFilters from './FleetFilters';
-import {ALL_FLEET_SIZE_BANDS, FleetOwnerVisibility, FleetSizeBand} from '../../../utils/fleetModel';
+import {FleetOwnerVisibility, FleetPowerRange, MAX_POWER_LEVEL} from '../../../utils/fleetModel';
 
 const base = {
-    enabled: true, bands: ALL_FLEET_SIZE_BANDS, visibility: {showOwn: true, showNeutral: true},
-    visibleCount: 47, totalCount: 188, onBandsChange: jest.fn(), onVisibilityChange: jest.fn(),
+    enabled: true, range: {min: 0, max: MAX_POWER_LEVEL}, visibility: {showOwn: true, showNeutral: true},
+    visibleCount: 47, totalCount: 188, onRangeChange: jest.fn(), onVisibilityChange: jest.fn(),
 };
-function Controlled() {
-    const [bands, setBands] = useState<FleetSizeBand[]>([...ALL_FLEET_SIZE_BANDS]);
-    const [visibility, setVisibility] = useState<FleetOwnerVisibility>({showOwn: true, showNeutral: true});
-    return <FleetFilters {...base} bands={bands} visibility={visibility} onBandsChange={setBands} onVisibilityChange={setVisibility} />;
-}
 
 describe('simplified fleet filters', () => {
-    it('contains the count, two ownership toggles and no unknown controls', () => {
+    it('shows the count, the two ownership toggles and a dual power slider', () => {
         render(<FleetFilters {...base} />);
         expect(screen.getByRole('group', {name: 'Filtres des flottes'})).toContainElement(screen.getByRole('status'));
         expect(screen.getByRole('status')).toHaveTextContent('47/188 visibles');
         expect(screen.getByRole('checkbox', {name: 'Mes flottes'})).toBeChecked();
         expect(screen.getByRole('checkbox', {name: 'Flottes neutres'})).toBeChecked();
+        expect(screen.getByRole('slider', {name: 'Puissance minimale'})).toBeInTheDocument();
+        expect(screen.getByRole('slider', {name: 'Puissance maximale'})).toBeInTheDocument();
         expect(screen.queryByRole('checkbox', {name: /inconnue/i})).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', {name: /Inconnues seules/i})).not.toBeInTheDocument();
     });
-    it('changes ownership independently of the strength bands', () => {
-        render(<Controlled />);
-        const own = screen.getByRole('checkbox', {name: 'Mes flottes'});
-        const neutral = screen.getByRole('checkbox', {name: 'Flottes neutres'});
-        userEvent.click(own);
-        expect(own).not.toBeChecked();
-        expect(neutral).toBeChecked();
-        userEvent.click(screen.getByRole('button', {name: 'Très grande +'}));
-        expect(own).not.toBeChecked();
-        expect(neutral).toBeChecked();
-        userEvent.click(neutral);
-        expect(neutral).not.toBeChecked();
+
+    it('displays the selected thresholds, 18000+ at the top stop', () => {
+        const {rerender} = render(<FleetFilters {...base} range={{min: 3, max: 5}} />);
+        expect(screen.getByText('100 – 500')).toBeInTheDocument();
+        rerender(<FleetFilters {...base} range={{min: 0, max: MAX_POWER_LEVEL}} />);
+        expect(screen.getByText('0 – 18000+')).toBeInTheDocument();
     });
-    it('always includes unknown strength without a dedicated toggle, even after a legacy value', () => {
-        const onBandsChange = jest.fn();
-        render(<FleetFilters {...base} bands={['weak']} onBandsChange={onBandsChange} />);
-        userEvent.click(screen.getByRole('button', {name: 'Très grande +'}));
-        expect(onBandsChange).toHaveBeenLastCalledWith(['weak', 'massive', 'unknown']);
-        userEvent.click(screen.getByRole('button', {name: 'Faible'}));
-        expect(onBandsChange).toHaveBeenLastCalledWith(['unknown']);
+
+    it('clamps the min slider below the max and the max slider above the min', () => {
+        const onRangeChange = jest.fn();
+        render(<FleetFilters {...base} range={{min: 5, max: 7}} onRangeChange={onRangeChange} />);
+        fireEvent.change(screen.getByRole('slider', {name: 'Puissance minimale'}), {target: {value: '9'}});
+        expect(onRangeChange).toHaveBeenLastCalledWith({min: 7, max: 7});
+        fireEvent.change(screen.getByRole('slider', {name: 'Puissance maximale'}), {target: {value: '2'}});
+        expect(onRangeChange).toHaveBeenLastCalledWith({min: 5, max: 5});
     });
-    it('disables visibility controls with the fleet layer', () => {
+
+    it('changes ownership independently of the power range', () => {
+        const onVisibilityChange = jest.fn();
+        const onRangeChange = jest.fn();
+        render(<FleetFilters {...base} onVisibilityChange={onVisibilityChange} onRangeChange={onRangeChange} />);
+        userEvent.click(screen.getByRole('checkbox', {name: 'Mes flottes'}));
+        expect(onVisibilityChange).toHaveBeenLastCalledWith({showOwn: false, showNeutral: true});
+        expect(onRangeChange).not.toHaveBeenCalled();
+    });
+
+    it('disables the controls with the fleet layer', () => {
         render(<FleetFilters {...base} enabled={false} />);
         expect(screen.getByRole('checkbox', {name: 'Mes flottes'})).toBeDisabled();
         expect(screen.getByRole('checkbox', {name: 'Flottes neutres'})).toBeDisabled();
-        expect(screen.getByRole('button', {name: 'Faible'})).toBeDisabled();
+        expect(screen.getByRole('slider', {name: 'Puissance minimale'})).toBeDisabled();
+        expect(screen.getByRole('slider', {name: 'Puissance maximale'})).toBeDisabled();
     });
 });

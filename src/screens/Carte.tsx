@@ -12,7 +12,7 @@ import {isTypingTarget} from '../utils/keyboard';
 import {wrapX, wrapY, posToString} from '../utils/position';
 import {computePresence, PresenceData} from '../utils/presence';
 import {adaptColorToTheme, MAP_THEMES, MapThemeName} from '../utils/mapTheme';
-import {FleetOwnerVisibility, FleetSizeBand, isFleetVisible, MapFleet, restoreFleetSizeBands} from '../utils/fleetModel';
+import {FleetOwnerVisibility, FleetPowerRange, isFleetVisible, MapFleet, restoreFleetPowerRange} from '../utils/fleetModel';
 import Modal from '../components/utils/Modal';
 import {GlobalData, Strategie, XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
@@ -109,9 +109,9 @@ export default function Carte() {
     const saved = localStorage.getItem('carte_show_fleet_badges');
     return saved !== null ? JSON.parse(saved) : true;
   });
-  // Filtres de flottes : bandes issues des termes de puissance du jeu + visibilité par propriétaire
-  const [fleetSizeBands, setFleetSizeBands] = useState<FleetSizeBand[]>(() =>
-    restoreFleetSizeBands(localStorage.getItem('carte_fleet_size_bands')));
+  // Filtres de flottes : plage de puissance (seuils du jeu) + visibilité par propriétaire
+  const [fleetPowerRange, setFleetPowerRange] = useState<FleetPowerRange>(() =>
+    restoreFleetPowerRange(localStorage.getItem('carte_fleet_power_range')));
   const [showOwnFleets, setShowOwnFleets] = useState(() => localStorage.getItem('carte_show_own_fleets') !== 'false');
   const [showNeutralFleets, setShowNeutralFleets] = useState(() => localStorage.getItem('carte_show_neutral_fleets') !== 'false');
   const fleetVisibility = useMemo<FleetOwnerVisibility>(
@@ -126,9 +126,9 @@ export default function Carte() {
     ];
     return {
       total: all.length,
-      visible: all.filter(f => isFleetVisible(f, fleetSizeBands, fleetVisibility)).length,
+      visible: all.filter(f => isFleetVisible(f, fleetPowerRange, fleetVisibility)).length,
     };
-  }, [rapport, fleetSizeBands, fleetVisibility]);
+  }, [rapport, fleetPowerRange, fleetVisibility]);
   // Portées radar : désactivées par défaut (voile bleu sur la carte) ; à activer dans les Filtres si besoin
   const [showSystemRadar, setShowSystemRadar] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_show_system_radar');
@@ -304,8 +304,8 @@ export default function Carte() {
   }, [showFleetBadges]);
 
   useEffect(() => {
-    localStorage.setItem('carte_fleet_size_bands', JSON.stringify(fleetSizeBands));
-  }, [fleetSizeBands]);
+    localStorage.setItem('carte_fleet_power_range', JSON.stringify(fleetPowerRange));
+  }, [fleetPowerRange]);
 
   useEffect(() => {
     localStorage.setItem('carte_show_own_fleets', JSON.stringify(showOwnFleets));
@@ -909,7 +909,7 @@ export default function Carte() {
             showCombatBadges={showCombatBadges}
             showOwnerBadges={showOwnerBadges}
             showFleetBadges={showFleetBadges}
-            fleetSizeBands={fleetSizeBands}
+            fleetPowerRange={fleetPowerRange}
             fleetVisibility={fleetVisibility}
             showSystemRadar={showSystemRadar}
             showFleetRadar={showFleetRadar}
@@ -1269,10 +1269,10 @@ par diplo
                           </label>
                       </div>
                       <FleetFilters
-                        enabled={showFleetBadges} bands={fleetSizeBands}
+                        enabled={showFleetBadges} range={fleetPowerRange}
                         visibility={fleetVisibility}
                         visibleCount={fleetCounts.visible} totalCount={fleetCounts.total}
-                        onBandsChange={setFleetSizeBands}
+                        onRangeChange={setFleetPowerRange}
                         onVisibilityChange={visibility => {
                           setShowOwnFleets(visibility.showOwn);
                           setShowNeutralFleets(visibility.showNeutral);

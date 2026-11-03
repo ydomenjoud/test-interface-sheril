@@ -1,74 +1,50 @@
 import {FlotteDetectee, FlotteJoueur} from '../types';
-import {getDescriptionPuissance, getPuissance} from './puissance';
-
-// Les bandes sont un filtre d'affichage, jamais une estimation de puissance cumulée.
-export type FleetSizeBand = 'weak' | 'petite' | 'moyenne' | 'grande' | 'massive' | 'unknown';
-export const FLEET_SIZE_BAND_OPTIONS: {value: FleetSizeBand; label: string; shortLabel: string; title: string}[] = [
-    {value: 'weak', label: 'Faible', shortLabel: 'Fbl', title: 'Insignifiante, ridicule, très petite ou faible'},
-    {value: 'petite', label: 'Petite', shortLabel: 'Pte', title: 'Petite'},
-    {value: 'moyenne', label: 'Moyenne', shortLabel: 'Moy', title: 'Moyenne'},
-    {value: 'grande', label: 'Grande', shortLabel: 'Grd', title: 'Assez grande ou grande'},
-    {value: 'massive', label: 'Très grande +', shortLabel: 'TG+', title: 'Très grande, gigantesque, titanesque ou inimaginable'},
-    {value: 'unknown', label: '?', shortLabel: '?', title: 'Puissance inconnue'},
-];
-export const ALL_FLEET_SIZE_BANDS = FLEET_SIZE_BAND_OPTIONS.map(option => option.value);
-export const KNOWN_FLEET_SIZE_BANDS = ALL_FLEET_SIZE_BANDS.filter(band => band !== 'unknown');
+import {PUISSANCE_STOPS, getPuissance, getPuissanceNiveauFromLabel} from './puissance';
 
 export type FleetOwnerVisibility = {showOwn: boolean; showNeutral: boolean};
 export const DEFAULT_FLEET_OWNER_VISIBILITY: FleetOwnerVisibility = {showOwn: true, showNeutral: true};
 
-/** Les anciennes préférences conservent les tailles connues ; sans contrôle dédié, les inconnues restent incluses. */
-export function restoreFleetSizeBands(saved: string | null): FleetSizeBand[] {
+/** Plage de puissance : indices dans PUISSANCE_STOPS ; {0, MAX_POWER_LEVEL} = pas de filtre. */
+export type FleetPowerRange = {min: number; max: number};
+export const MAX_POWER_LEVEL = PUISSANCE_STOPS.length - 1;
+export const DEFAULT_FLEET_POWER_RANGE: FleetPowerRange = {min: 0, max: MAX_POWER_LEVEL};
+
+/** Restaure une plage enregistrée : valeurs bornées dans [0, MAX] et min ≤ max garanti. */
+export function restoreFleetPowerRange(saved: string | null): FleetPowerRange {
+    const def = DEFAULT_FLEET_POWER_RANGE;
     try {
-        const parsed: unknown = saved === null ? ALL_FLEET_SIZE_BANDS : JSON.parse(saved);
-        if (!Array.isArray(parsed)) return [...ALL_FLEET_SIZE_BANDS];
-        return [...KNOWN_FLEET_SIZE_BANDS.filter(band => parsed.includes(band)), 'unknown'];
+        const parsed: unknown = saved === null ? null : JSON.parse(saved);
+        if (typeof parsed !== 'object' || parsed === null) return {...def};
+        const {min, max} = parsed as {min?: unknown; max?: unknown};
+        const clamp = (value: unknown, fallback: number) =>
+            typeof value === 'number' && Number.isFinite(value) ? Math.min(Math.max(value, 0), MAX_POWER_LEVEL) : fallback;
+        const lo = clamp(min, def.min);
+        const hi = clamp(max, def.max);
+        return {min: Math.min(lo, hi), max: Math.max(lo, hi)};
     } catch {
-        return [...ALL_FLEET_SIZE_BANDS];
+        return {...def};
     }
 }
 
 export type MapFleet = (FlotteJoueur | FlotteDetectee) & {owner: number};
-export type FleetStrength = {
-    label: string;
-    normalized: string;
-    band: FleetSizeBand;
-};
 
-export function strengthFromLabel(rawLabel?: string): FleetStrength {
-    const label = rawLabel?.trim() || 'inconnue';
-    const normalized = label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
-    const known: [string, FleetSizeBand][] = [
-        ['inimaginable', 'massive'],
-        ['titanesque', 'massive'],
-        ['gigantesque', 'massive'],
-        ['tres grande', 'massive'],
-        ['assez grande', 'grande'],
-        ['grande', 'grande'],
-        ['moyenne', 'moyenne'],
-        ['tres petite', 'weak'],
-        ['petite', 'petite'],
-        ['faible', 'weak'],
-        ['ridicule', 'weak'],
-        ['insignifiante', 'weak'],
-    ];
-    const match = known.find(([value]) => value === normalized);
-    if (match) {
-        return {label, normalized, band: match[1]};
-    }
-    // Une valeur nouvelle reste visible comme renseignement inconnu, pas comme force faible.
-    return {label, normalized, band: 'unknown'};
+/** Critère de filtre : puissance exacte pour nos flottes, borne haute de l'intervalle pour une
+ *  détection (inimaginable = sans borne), null si la puissance est inconnue. */
+export function fleetPowerCriterion(fleet: MapFleet): number | null {
+    if (fleet.type === 'joueur') return getPuissance(fleet);
+    const level = getPuissanceNiveauFromLabel(fleet.puiss);
+    if (level === null) return null;
+    return level === MAX_POWER_LEVEL ? Infinity : PUISSANCE_STOPS[level + 1];
 }
 
-export function fleetStrength(fleet: MapFleet): FleetStrength {
-    return strengthFromLabel(fleet.type === 'joueur'
-        ? getDescriptionPuissance(getPuissance(fleet))
-        : fleet.puiss);
-}
-
-/** Visibilité d'une flotte : propriétaire (nôtres / neutres) × bandes de taille sélectionnées. */
-export function isFleetVisible(fleet: MapFleet, visibleBands: readonly FleetSizeBand[] = ALL_FLEET_SIZE_BANDS,
+/** Visibilité d'une flotte : propriétaire (nôtres / neutres) × plage de puissance (seuils du jeu). */
+export function isFleetVisible(fleet: MapFleet, range: FleetPowerRange = DEFAULT_FLEET_POWER_RANGE,
     visibility: FleetOwnerVisibility = DEFAULT_FLEET_OWNER_VISIBILITY): boolean {
     const ownerVisible = fleet.type === 'joueur' ? visibility.showOwn : fleet.owner !== 0 || visibility.showNeutral;
-    return ownerVisible && visibleBands.includes(fleetStrength(fleet).band);
+    if (!ownerVisible) return false;
+    const criterion = fleetPowerCriterion(fleet);
+    if (criterion === null) return range.min === DEFAULT_FLEET_POWER_RANGE.min && range.max === DEFAULT_FLEET_POWER_RANGE.max;
+    if (criterion < PUISSANCE_STOPS[range.min]) return false;
+    if (range.max < MAX_POWER_LEVEL && criterion > PUISSANCE_STOPS[range.max]) return false;
+    return true;
 }
