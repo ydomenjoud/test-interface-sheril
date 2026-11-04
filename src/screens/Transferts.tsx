@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useReport } from '../context/ReportContext';
 import { SystemeJoueur, XY } from '../types';
 import { posToString } from '../utils/position';
+
+// Tri des systèmes par coordonnées : x, puis y
+const comparerPositions = (a: XY, b: XY) => a.x - b.x || a.y - b.y;
 import { copierSchema, deserialiserSchema } from '../utils/ordreSchema';
 import {
     CODE_MINERAI, InventaireSysteme, inventaireDuRapport, lireOrdreTransfert, nombreMaxTransferts, nouvelIdTransfert,
@@ -66,7 +69,7 @@ export default function Transferts() {
     const numeroJoueur = rapport?.joueur.numero ?? -1;
 
     const systemes = useMemo(
-        () => [...(rapport?.systemesJoueur ?? [])].sort((a, b) => a.nom.localeCompare(b.nom)),
+        () => [...(rapport?.systemesJoueur ?? [])].sort((a, b) => comparerPositions(a.pos, b.pos)),
         [rapport],
     );
     const systemeParCle = useMemo(() => {
@@ -151,7 +154,8 @@ export default function Transferts() {
         const codes = new Set<string>();
         [avant[cle], simulation.apres[cle]].forEach((inv?: InventaireSysteme) => {
             if (!inv) return;
-            inv.planetes.forEach(p => Object.entries(p.batiments).forEach(([c, n]) => { if (n > 0) codes.add(c); }));
+            // Bâtiments des seules planètes du joueur : ceux d'un voisin dans le même système ne sont pas transférables
+            inv.planetes.filter(p => p.mienne).forEach(p => Object.entries(p.batiments).forEach(([c, n]) => { if (n > 0) codes.add(c); }));
             Object.entries(inv.marchandises).forEach(([c, n]) => { if (n > 0) codes.add(c); });
         });
         if (systemeParCle[cle]?.marchandises?.some(m => m.prod > 0)) {
@@ -391,7 +395,7 @@ export default function Transferts() {
             });
         });
         return Array.from(parSysteme.entries())
-            .sort(([a], [b]) => systemeParCle[a].nom.localeCompare(systemeParCle[b].nom))
+            .sort(([a], [b]) => comparerPositions(systemeParCle[a].pos, systemeParCle[b].pos))
             .map(([cle, codes]) => ({
                 cle,
                 lignes: Array.from(codes)
