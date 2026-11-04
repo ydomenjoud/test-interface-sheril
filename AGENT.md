@@ -30,6 +30,7 @@ src/
 │   ├── Planification.tsx      # File de construction (bâtiments + vaisseaux)
 │   ├── PlanificationRevenu.tsx # Planification des revenus (taxes, politique, budgets, gouverneurs…)
 │   ├── RechercheTechnologique.tsx  # Allocation de recherche
+│   ├── Transferts.tsx         # Transferts de bâtiments/marchandises/minerai entre systèmes
 │   ├── ListeSystemes.tsx      # Liste des systèmes
 │   ├── ListeTechnologies.tsx  # Catalogue des technologies
 │   ├── ListeFlottes.tsx       # Liste des flottes
@@ -63,6 +64,7 @@ src/
 ├── storage/
 │   ├── rapportStore.ts        # Couche d'abstraction IndexedDB
 │   ├── deplacementOrdersStorage.ts # Ordres de déplacement par tour (localStorage)
+│   ├── transfertsStorage.ts   # Ordres de transfert par tour (localStorage)
 │   └── radarsAlliesStorage.ts # Portées radar importées des alliés
 └── utils/                     # Fonctions utilitaires
     ├── position.ts            # Coordonnées toroïdales (wrapping), bornes de la galaxie
@@ -142,6 +144,8 @@ La galaxie est une grille (par défaut **60×60**) avec wrapping sur les bords (
 - `recherche-technologique-tour-*` / `recherche-technologique-budget-tour-*` : allocation et budget de recherche par tour
 - `planification_*` : files de construction et préférences de l'écran Planification
 - `planification_revenu_tour_*` : choix de l'écran Revenus, par tour
+- `transferts_tour_*` : ordres de transfert entre systèmes, par tour
+- `transferts_colonne_gauche` / `transferts_colonne_droite` : systèmes affichés dans les colonnes de l'écran Transferts
 - `sheril_detected_systems_v1` : systèmes saisis manuellement
 
 ## Commandes
@@ -176,6 +180,7 @@ Le projet reçoit beaucoup de contributions : chaque utilisateur doit pouvoir ga
 | Planification | `Planification.tsx` | File de construction multi-systèmes avec calcul de coûts |
 | Revenus | `PlanificationRevenu.tsx` | Simulation des revenus par système et génération des ordres |
 | Recherche | `RechercheTechnologique.tsx` | Répartition du budget de recherche |
+| Transferts | `Transferts.tsx` | Transferts entre systèmes (ordre charger_cargo) |
 | Systèmes | `ListeSystemes.tsx` | Liste triable/filtrable des systèmes |
 | Technologies | `ListeTechnologies.tsx` | Catalogue des technologies avec statut |
 | Flottes | `ListeFlottes.tsx` | Liste des flottes joueur et détectées |
@@ -192,6 +197,10 @@ Le projet reçoit beaucoup de contributions : chaque utilisateur doit pouvoir ga
 ### Construction et revenus
 - **Revenus** (`PlanificationRevenu.tsx`) : par système, taxation (système ou planète), politique, budgets (technologique, services spéciaux, contre-espionnage), terraformation et affectation des gouverneurs. Recalcule stabilité, croissance de population (détail par race), revenu, revenu technologique et bénéfice, avec infobulles détaillées ; les valeurs différentes du rapport sont marquées. Génère le schéma d'ordres (types dans l'ordre de résolution du tour) et peut envoyer le budget tech vers l'écran Recherche. Règles : `docs/gouverneurs-politiques-stocks.md`, `docs/ordres-revenus.md`.
 - **Construction** (`Planification.tsx`) : lit en lecture seule les choix de l'écran Revenus du même tour pour ajuster les PDC (politique, gouverneur, stock de robots — `utils/pdc.ts`). « Action multiple » (Alt+A) ajoute le maximum possible d'une construction dans chaque système, avec option pour se limiter aux systèmes ayant un chantier naval. Copie et import du schéma de construction.
+
+### Transferts
+- Deux colonnes côte à côte, chacune avec son système (et sa planète, facultative) : un objet (minerai, bâtiment, marchandise) se glisse d'une colonne vers l'autre, ou s'envoie avec ses boutons → / ←, pour créer un ordre `charger_cargo`. Chaque ligne affiche le stock du rapport, l'effet des transferts, le stock après transferts et la production du tour.
+- La liste des ordres se réordonne (↑/↓) ; la limite de transferts par tour est matérialisée et les ordres au-delà sont marqués ignorés. Un bilan par système donne stock avant, transferts, après transferts, production et fin de tour. Règles : `docs/transferts.md`.
 
 ## Patterns et conventions
 
