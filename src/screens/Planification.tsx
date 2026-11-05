@@ -446,9 +446,9 @@ export default function Planification() {
         return formatPlannedItems(
             Object.values(queues).flat(),
             global?.technologies || [],
-            rapport?.plansVaisseaux || []
+            plans
         );
-    }, [queues, global, rapport]);
+    }, [queues, global, plans]);
 
     const copyBluePrint = () => {
         navigator.clipboard.writeText(blueprint)
