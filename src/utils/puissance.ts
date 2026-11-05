@@ -23,6 +23,23 @@ const seuil = [B, 2 * B, 4 * B, 8 * B, 20 * B, 40 * B, 80 * B, 200 * B, 400 * B,
 
 const desc = ["insignifiante", "ridicule", "très petite", "petite", "moyenne", "assez grande", "grande", "très grande", "gigantesque", "titanesque", "inimaginable"]
 
+/** Seuils de changement de nom de puissance : 0 (pas de filtre) + bornes hautes de chaque intervalle. */
+export const PUISSANCE_STOPS = [0, ...seuil];
+
+const NIVEAU_PAR_LIBELLE: [string, number][] = [
+    ['insignifiante', 0], ['ridicule', 1], ['tres petite', 2], ['petite', 3], ['moyenne', 4],
+    ['assez grande', 5], ['grande', 6], ['tres grande', 7], ['gigantesque', 8], ['titanesque', 9], ['inimaginable', 10],
+];
+
+/** Niveau de puissance (0-10) d'un libellé de détection ; null si inconnu. */
+export function getPuissanceNiveauFromLabel(label?: string): number | null {
+    if (!label) return null;
+    const key = label.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+    if (key === 'faible') return 0;
+    const found = NIVEAU_PAR_LIBELLE.find(([nom]) => nom === key);
+    return found ? found[1] : null;
+}
+
 export function getPuissance(fleet: FlotteJoueur) {
     return (fleet.as || 0) + (fleet.ap || 0) / 2;
 }
@@ -33,7 +50,7 @@ export function getDescriptionPuissance(p: number) {
             return desc[i];
         }
     }
-    return "??????";
+    return desc[desc.length - 1];
 }
 
 export function getPuissanceFromString(p: string){
@@ -43,6 +60,9 @@ export function getPuissanceFromString(p: string){
     }
     if (index === 0){
         return `0-${seuil[0]}`
+    }
+    if (index === desc.length - 1){
+        return `${seuil[index-1]}+`;
     }
 
     return `${seuil[index-1]}-${seuil[index]}`;
