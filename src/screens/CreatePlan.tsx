@@ -448,7 +448,7 @@ export default function CreatePlan() {
                     pt.type === 1 && pt.base === t.base && pt.niv === t.niv - 1
                 );
 
-                const isKnown = !rapport || rapport.technologiesConnues.includes(e.code);
+                const isKnown = !rapport || t.publique || rapport.technologiesConnues.includes(e.code);
 
                 return (
                     <tr key={e.code} style={{backgroundColor: isKnown ? 'transparent' : 'rgba(255, 0, 0, 0.1)'}}>
