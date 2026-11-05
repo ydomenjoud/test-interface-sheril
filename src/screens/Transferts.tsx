@@ -2,15 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useReport } from '../context/ReportContext';
 import { SystemeJoueur, XY } from '../types';
 import { posToString } from '../utils/position';
-
-// Tri des systèmes par coordonnées : x, puis y
-const comparerPositions = (a: XY, b: XY) => a.x - b.x || a.y - b.y;
 import { copierSchema, deserialiserSchema } from '../utils/ordreSchema';
 import {
     CODE_MINERAI, InventaireSysteme, inventaireDuRapport, lireOrdreTransfert, nombreMaxTransferts, nouvelIdTransfert,
     quantite, ResultatTransfert, schemaTransferts, simulerTransferts, TransfertOrdre, typeObjet,
 } from '../utils/ordreTransfert';
 import { loadTransferts, saveTransferts } from '../storage/transfertsStorage';
+import './Transferts.css';
 
 // Écran « Transferts » : programmation des ordres charger_cargo (déplacement de bâtiments,
 // marchandises et minerai entre ses systèmes). Règles du moteur : docs/transferts.md.
@@ -25,12 +23,9 @@ const ecrireColonne = (cle: string, valeur: string) => {
     try { localStorage.setItem(cle, valeur); } catch { /* préférence non conservée */ }
 };
 
-const COULEURS_STATUT: Record<ResultatTransfert['statut'], string> = {
-    ok: '#81c784',
-    partiel: '#ffb74d',
-    erreur: '#e57373',
-    ignore: '#888',
-};
+// Tri des systèmes par coordonnées : x, puis y
+const comparerPositions = (a: XY, b: XY) => a.x - b.x || a.y - b.y;
+
 const LIBELLES_STATUT: Record<ResultatTransfert['statut'], string> = {
     ok: '✓',
     partiel: '⚠ partiel',
@@ -38,25 +33,10 @@ const LIBELLES_STATUT: Record<ResultatTransfert['statut'], string> = {
     ignore: '✖ ignoré',
 };
 
-const panneau: React.CSSProperties = {
-    backgroundColor: '#2a2a2a',
-    borderRadius: '8px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-    padding: '8px 12px',
-};
-const bouton: React.CSSProperties = {
-    background: '#333', color: '#e0e0e0', border: '1px solid #555', borderRadius: '4px', padding: '4px 10px', cursor: 'pointer',
-};
-const petitBouton: React.CSSProperties = { ...bouton, padding: '0 6px', fontSize: '0.9em' };
-const champ: React.CSSProperties = {
-    background: '#1e1e1e', color: '#e0e0e0', border: '1px solid #555', borderRadius: '4px', padding: '2px 4px',
-};
-const th: React.CSSProperties = { padding: '3px 8px', color: '#aaa', fontWeight: 'normal', textAlign: 'right', whiteSpace: 'nowrap' };
-const td: React.CSSProperties = { padding: '2px 8px', textAlign: 'right', whiteSpace: 'nowrap' };
-const titreGroupe: React.CSSProperties = { color: '#aaa', textTransform: 'uppercase', fontSize: '0.75em', paddingTop: '8px' };
-
 const signe = (n: number) => (n > 0 ? `+${n}` : String(n));
-const couleurDelta = (n: number) => (n > 0 ? '#81c784' : n < 0 ? '#e57373' : undefined);
+// Classe de couleur d'une variation : ajout en vert, retrait en rouge (Transferts.css)
+const classeDelta = (n: number) => (n > 0 ? 'ajout' : n < 0 ? 'retrait' : '');
+const classes = (...noms: (string | false | undefined)[]) => noms.filter(Boolean).join(' ');
 
 interface ObjetDrag {
     colonne: number;
@@ -149,13 +129,13 @@ export default function Transferts() {
         return 0;
     };
 
-    // Objets d'un système : minerai, puis bâtiments et marchandises présents avant ou après les transferts
-    const objetsDuSysteme = (cle: string): { batiments: string[]; marchandises: string[] } => {
+    // Objets d'un système (ou d'une de ses planètes) : bâtiments et marchandises présents avant ou après les transferts
+    const objetsDuSysteme = (cle: string, planete: number | null): { batiments: string[]; marchandises: string[] } => {
         const codes = new Set<string>();
         [avant[cle], simulation.apres[cle]].forEach((inv?: InventaireSysteme) => {
             if (!inv) return;
             // Bâtiments des seules planètes du joueur : ceux d'un voisin dans le même système ne sont pas transférables
-            inv.planetes.filter(p => p.mienne).forEach(p => Object.entries(p.batiments).forEach(([c, n]) => { if (n > 0) codes.add(c); }));
+            inv.planetes.filter(p => p.mienne && (planete === null || p.num === planete)).forEach(p => Object.entries(p.batiments).forEach(([c, n]) => { if (n > 0) codes.add(c); }));
             Object.entries(inv.marchandises).forEach(([c, n]) => { if (n > 0) codes.add(c); });
         });
         if (systemeParCle[cle]?.marchandises?.some(m => m.prod > 0)) {
@@ -237,7 +217,7 @@ export default function Transferts() {
     };
 
     if (!rapport) {
-        return <div style={{ padding: 20, color: '#e0e0e0' }}>Chargez un rapport pour programmer des transferts.</div>;
+        return <div className="transferts-vide">Chargez un rapport pour programmer des transferts.</div>;
     }
 
     const nomSysteme = (pos: XY) => {
@@ -245,8 +225,8 @@ export default function Transferts() {
         return s ? `${s.nom} (${pos.x}-${pos.y})` : `${pos.x}-${pos.y} (non possédé)`;
     };
 
-    const selectSysteme = (valeur: string | null, onChange: (cle: string) => void, style?: React.CSSProperties) => (
-        <select value={valeur ?? ''} onChange={e => onChange(e.target.value)} style={{ ...champ, ...style }}>
+    const selectSysteme = (valeur: string | null, onChange: (cle: string) => void) => (
+        <select value={valeur ?? ''} onChange={e => onChange(e.target.value)} className="transferts-champ systeme">
             {valeur && !systemeParCle[valeur] && <option value={valeur}>{valeur.replace('_', '-')} (non possédé)</option>}
             {systemes.map(s => (
                 <option key={posToString(s.pos)} value={posToString(s.pos)}>{s.nom} ({s.pos.x}-{s.pos.y})</option>
@@ -261,7 +241,7 @@ export default function Transferts() {
             <select
                 value={valeur === null ? '' : String(valeur)}
                 onChange={e => onChange(e.target.value === '' ? null : Number(e.target.value))}
-                style={champ}
+                className="transferts-champ"
                 title="Planète précise (facultatif)"
             >
                 <option value="">toutes</option>
@@ -298,18 +278,17 @@ export default function Transferts() {
                         setGlisse({ colonne: i, code });
                     }}
                     onDragEnd={() => { setGlisse(null); setSurvol(null); }}
-                    style={{ cursor: peutEnvoyer ? 'grab' : 'default' }}
                     title={peutEnvoyer ? "Glisser vers l'autre colonne pour programmer un transfert" : undefined}
                 >
-                    <td style={{ ...td, textAlign: 'left' }}>{nomObjet(code)}</td>
-                    <td style={td}>{qAvant}</td>
-                    <td style={{ ...td, color: couleurDelta(delta) }}>{delta !== 0 ? signe(delta) : ''}</td>
-                    <td style={{ ...td, fontWeight: 'bold', color: couleurDelta(delta) }}>{qApres}</td>
-                    <td style={{ ...td, color: '#4fc3f7' }}>{prod !== 0 ? signe(prod) : ''}</td>
-                    <td style={td}>
+                    <td className="gauche">{nomObjet(code)}</td>
+                    <td>{qAvant}</td>
+                    <td className={classeDelta(delta)}>{delta !== 0 ? signe(delta) : ''}</td>
+                    <td className={classes('apres', classeDelta(delta))}>{qApres}</td>
+                    <td className="prod">{prod !== 0 ? signe(prod) : ''}</td>
+                    <td>
                         <button
                             type="button"
-                            style={{ ...petitBouton, opacity: peutEnvoyer ? 1 : 0.3 }}
+                            className="transferts-btn petit"
                             disabled={!peutEnvoyer}
                             onClick={() => ajouterTransfert(i, code)}
                             title={`Transférer vers l'autre colonne (quantité : stock disponible)`}
@@ -321,25 +300,19 @@ export default function Transferts() {
             );
         };
 
-        const objets = cle ? objetsDuSysteme(cle) : { batiments: [], marchandises: [] };
+        const objets = cle ? objetsDuSysteme(cle, planete) : { batiments: [], marchandises: [] };
         const groupe = (titre: string, codes: string[]) => (
             <>
-                <tr><td colSpan={6} style={titreGroupe}>{titre}</td></tr>
+                <tr><td colSpan={6} className="groupe">{titre}</td></tr>
                 {codes.length === 0
-                    ? <tr><td colSpan={6} style={{ ...td, textAlign: 'left', color: '#666' }}>aucun</td></tr>
+                    ? <tr><td colSpan={6} className="aucun">aucun</td></tr>
                     : codes.map(ligne)}
             </>
         );
 
         return (
             <div
-                style={{
-                    ...panneau,
-                    flex: '1 1 340px',
-                    minWidth: 0,
-                    overflow: 'auto',
-                    outline: accepteDepot && survol === i ? '2px dashed #4fc3f7' : accepteDepot ? '1px dashed #4fc3f7' : undefined,
-                }}
+                className={classes('transferts-panneau', 'transferts-colonne', accepteDepot && 'depot', accepteDepot && survol === i && 'survol')}
                 onDragOver={e => {
                     if (!accepteDepot) return;
                     e.preventDefault();
@@ -355,22 +328,22 @@ export default function Transferts() {
                     setSurvol(null);
                 }}
             >
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {selectSysteme(cle, c => choisirSysteme(i, c), { flex: '1 1 160px', minWidth: 0 })}
+                <div className="transferts-selecteurs">
+                    {selectSysteme(cle, c => choisirSysteme(i, c))}
                     {selectPlanete(cle, planete, p => choisirPlanete(i, p))}
                 </div>
                 {cle && cle === autre && (
-                    <div style={{ color: '#ffb74d', fontSize: '0.85em', marginTop: '4px' }}>Choisissez deux systèmes différents.</div>
+                    <div className="transferts-avertissement">Choisissez deux systèmes différents.</div>
                 )}
-                <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.9em', marginTop: '4px' }}>
+                <table className="transferts-table pleine">
                     <thead>
                         <tr>
-                            <th style={{ ...th, textAlign: 'left' }}>Objet</th>
-                            <th style={th} title="Stock du rapport">Rapport</th>
-                            <th style={th} title="Effet des transferts programmés">Transf.</th>
-                            <th style={th} title="Stock après les transferts">Après</th>
-                            <th style={{ ...th, color: '#4fc3f7' }} title="Production du tour (résolue après les transferts)">Prod.</th>
-                            <th style={th}></th>
+                            <th className="gauche">Objet</th>
+                            <th title="Stock du rapport">Rapport</th>
+                            <th title="Effet des transferts programmés">Transf.</th>
+                            <th title="Stock après les transferts">Après</th>
+                            <th className="prod" title="Production du tour (résolue après les transferts)">Prod.</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -418,69 +391,66 @@ export default function Transferts() {
     const depasse = ordres.some(o => simulation.resultats[o.id]?.statut === 'ignore');
 
     return (
-        <div style={{ padding: '20px', color: '#e0e0e0', flex: 1, minWidth: 0, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', borderBottom: '1px solid #444', paddingBottom: '4px' }}>
-                <h2 style={{ color: '#fff', margin: 0, fontSize: '1.1em' }}>Transferts entre systèmes — tour {tour}</h2>
-                <span
-                    title={detailMax}
-                    style={{ textDecoration: 'underline dotted', cursor: 'help', color: depasse ? '#e57373' : '#e0e0e0' }}
-                >
+        <div className="transferts">
+            <div className="transferts-entete">
+                <h2>Transferts entre systèmes — tour {tour}</h2>
+                <span title={detailMax} className={classes('transferts-compteur', depasse && 'depasse')}>
                     Transferts : <strong>{simulation.utilises}</strong> / {max.total}
                 </span>
-                <div style={{ flex: 1 }} />
-                <button type="button" style={{ ...bouton, opacity: schema ? 1 : 0.3 }} disabled={!schema} onClick={copier}
+                <div className="transferts-espace" />
+                <button type="button" className="transferts-btn" disabled={!schema} onClick={copier}
                         title="Copier le schéma des ordres de transfert à coller dans la console d'ordres">
                     {schemaCopie ? '✓ Schéma copié' : 'Copier le schéma des ordres'}
                 </button>
-                <button type="button" style={bouton} onClick={() => { setImportOuvert(v => !v); setErreurImport(null); }}
+                <button type="button" className="transferts-btn" onClick={() => { setImportOuvert(v => !v); setErreurImport(null); }}
                         title="Remplacer les ordres du tour par ceux d'un schéma">
                     Importer un schéma
                 </button>
-                <button type="button" style={{ ...bouton, opacity: ordres.length ? 1 : 0.3 }} disabled={!ordres.length}
+                <button type="button" className="transferts-btn" disabled={!ordres.length}
                         onClick={() => setOrdres(() => [])} title="Supprimer tous les transferts du tour">
                     ✕ Tout effacer
                 </button>
             </div>
 
             {importOuvert && (
-                <div style={{ ...panneau, display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div className="transferts-panneau transferts-import">
                     <input
                         value={texteImport}
                         onChange={e => setTexteImport(e.target.value)}
                         placeholder="transfert|…"
-                        style={{ ...champ, flex: '1 1 300px', minWidth: 0 }}
+                        className="transferts-champ"
                         autoFocus
                     />
-                    <button type="button" style={bouton} onClick={importer} disabled={!texteImport.trim()}>Remplacer les ordres</button>
-                    {erreurImport && <span style={{ color: '#e57373' }}>{erreurImport}</span>}
+                    <button type="button" className="transferts-btn" onClick={importer} disabled={!texteImport.trim()}>Remplacer les ordres</button>
+                    {erreurImport && <span className="transferts-erreur">{erreurImport}</span>}
                 </div>
             )}
 
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div className="transferts-colonnes">
                 {colonne(0)}
                 {colonne(1)}
             </div>
 
-            <div style={panneau}>
-                <strong style={{ color: '#aaa', textTransform: 'uppercase', fontSize: '0.8em' }}>Ordres du tour (résolus dans cet ordre)</strong>
+            <div className="transferts-panneau">
+                <strong className="transferts-titre-panneau">Ordres du tour (résolus dans cet ordre)</strong>
                 {ordres.length === 0 ? (
-                    <div style={{ color: '#888', padding: '6px 0' }}>
+                    <div className="transferts-aucun-ordre">
                         Aucun transfert : glissez un objet d'une colonne vers l'autre, ou utilisez ses boutons → / ←.
                     </div>
                 ) : (
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ borderCollapse: 'collapse', fontSize: '0.9em', marginTop: '4px' }}>
+                    <div className="transferts-defilement">
+                        <table className="transferts-table">
                             <thead>
                                 <tr>
-                                    <th style={th}>#</th>
-                                    <th style={th}></th>
-                                    <th style={th}>Qté</th>
-                                    <th style={{ ...th, textAlign: 'left' }}>Objet</th>
-                                    <th style={{ ...th, textAlign: 'left' }}>De</th>
-                                    <th style={th}></th>
-                                    <th style={{ ...th, textAlign: 'left' }}>Vers</th>
-                                    <th style={{ ...th, textAlign: 'left' }}>Résultat</th>
-                                    <th style={th}></th>
+                                    <th>#</th>
+                                    <th></th>
+                                    <th>Qté</th>
+                                    <th className="gauche">Objet</th>
+                                    <th className="gauche">De</th>
+                                    <th></th>
+                                    <th className="gauche">Vers</th>
+                                    <th className="gauche">Résultat</th>
+                                    <th></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -490,53 +460,53 @@ export default function Transferts() {
                                         <React.Fragment key={o.id}>
                                             {index === indexPremierIgnore && (
                                                 <tr>
-                                                    <td colSpan={9} style={{ ...td, textAlign: 'center', color: '#e57373', borderTop: '1px dashed #e57373', fontSize: '0.85em' }}>
+                                                    <td colSpan={9} className="limite">
                                                         limite de {max.total} transferts atteinte : les ordres suivants seront ignorés
                                                     </td>
                                                 </tr>
                                             )}
-                                            <tr style={{ opacity: r?.statut === 'ignore' ? 0.5 : 1 }}>
-                                                <td style={td}>{index + 1}</td>
-                                                <td style={td}>
-                                                    <button type="button" style={petitBouton} disabled={index === 0}
+                                            <tr className={r?.statut === 'ignore' ? 'ignore' : undefined}>
+                                                <td>{index + 1}</td>
+                                                <td>
+                                                    <button type="button" className="transferts-btn petit" disabled={index === 0}
                                                             onClick={() => deplacerOrdre(index, -1)} title="Monter">↑</button>
-                                                    <button type="button" style={{ ...petitBouton, marginLeft: 2 }} disabled={index === ordres.length - 1}
+                                                    <button type="button" className="transferts-btn petit" disabled={index === ordres.length - 1}
                                                             onClick={() => deplacerOrdre(index, 1)} title="Descendre">↓</button>
                                                 </td>
-                                                <td style={td}>
+                                                <td>
                                                     <input
                                                         type="number"
                                                         min={1}
                                                         max={9999}
                                                         value={o.nombre}
                                                         onChange={e => modifierOrdre(o.id, { nombre: Math.max(0, Math.min(9999, Math.floor(Number(e.target.value) || 0))) })}
-                                                        style={{ ...champ, width: '5em', textAlign: 'right' }}
+                                                        className="transferts-champ quantite"
                                                     />
                                                 </td>
-                                                <td style={{ ...td, textAlign: 'left' }}>
+                                                <td className="gauche">
                                                     <span
                                                         onClick={() => afficherOrdre(o)}
-                                                        style={{ cursor: 'pointer', textDecoration: 'underline dotted' }}
+                                                        className="transferts-lien"
                                                         title="Afficher les deux systèmes dans les colonnes"
                                                     >
                                                         {nomObjet(o.code)}
                                                     </span>
                                                 </td>
-                                                <td style={{ ...td, textAlign: 'left' }}>
+                                                <td className="gauche">
                                                     {selectSysteme(posToString(o.de), c => systemeParCle[c] && modifierOrdre(o.id, { de: systemeParCle[c].pos, planeteDe: null }))}{' '}
                                                     {selectPlanete(posToString(o.de), o.planeteDe, p => modifierOrdre(o.id, { planeteDe: p }))}
                                                 </td>
-                                                <td style={td}>→</td>
-                                                <td style={{ ...td, textAlign: 'left' }}>
+                                                <td>→</td>
+                                                <td className="gauche">
                                                     {selectSysteme(posToString(o.vers), c => systemeParCle[c] && modifierOrdre(o.id, { vers: systemeParCle[c].pos, planeteVers: null }))}{' '}
                                                     {selectPlanete(posToString(o.vers), o.planeteVers, p => modifierOrdre(o.id, { planeteVers: p }))}
                                                 </td>
-                                                <td style={{ ...td, textAlign: 'left', color: r ? COULEURS_STATUT[r.statut] : undefined }} title={r?.message}>
+                                                <td className={classes('gauche', r && `statut-${r.statut}`)} title={r?.message}>
                                                     {r ? LIBELLES_STATUT[r.statut] : ''}
-                                                    {r?.message && <span style={{ marginLeft: 6, fontSize: '0.85em' }}>{r.message}</span>}
+                                                    {r?.message && <span className="transferts-message">{r.message}</span>}
                                                 </td>
-                                                <td style={td}>
-                                                    <button type="button" style={petitBouton} onClick={() => supprimerOrdre(o.id)} title="Supprimer ce transfert">✕</button>
+                                                <td>
+                                                    <button type="button" className="transferts-btn petit" onClick={() => supprimerOrdre(o.id)} title="Supprimer ce transfert">✕</button>
                                                 </td>
                                             </tr>
                                         </React.Fragment>
@@ -549,31 +519,31 @@ export default function Transferts() {
             </div>
 
             {bilan.length > 0 && (
-                <div style={panneau}>
-                    <strong style={{ color: '#aaa', textTransform: 'uppercase', fontSize: '0.8em' }}>Bilan par système</strong>
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ borderCollapse: 'collapse', fontSize: '0.9em', marginTop: '4px' }}>
+                <div className="transferts-panneau">
+                    <strong className="transferts-titre-panneau">Bilan par système</strong>
+                    <div className="transferts-defilement">
+                        <table className="transferts-table">
                             <thead>
                                 <tr>
-                                    <th style={{ ...th, textAlign: 'left' }}>Système</th>
-                                    <th style={{ ...th, textAlign: 'left' }}>Objet</th>
-                                    <th style={th} title="Stock du rapport">Rapport</th>
-                                    <th style={th} title="Effet des transferts programmés">Transferts</th>
-                                    <th style={th} title="Stock juste après les transferts">Après transferts</th>
-                                    <th style={{ ...th, color: '#4fc3f7' }} title="Production du tour (résolue après les transferts)">Prod. du tour</th>
-                                    <th style={th} title="Après transferts + production, hors consommation par les constructions">Fin de tour</th>
+                                    <th className="gauche">Système</th>
+                                    <th className="gauche">Objet</th>
+                                    <th title="Stock du rapport">Rapport</th>
+                                    <th title="Effet des transferts programmés">Transferts</th>
+                                    <th title="Stock juste après les transferts">Après transferts</th>
+                                    <th className="prod" title="Production du tour (résolue après les transferts)">Prod. du tour</th>
+                                    <th title="Après transferts + production, hors consommation par les constructions">Fin de tour</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {bilan.map(({ cle, lignes }) => lignes.map((l, j) => (
-                                    <tr key={`${cle}-${l.code}`} style={{ borderTop: j === 0 ? '1px solid #444' : undefined }}>
-                                        <td style={{ ...td, textAlign: 'left' }}>{j === 0 ? nomSysteme(systemeParCle[cle].pos) : ''}</td>
-                                        <td style={{ ...td, textAlign: 'left' }}>{nomObjet(l.code)}</td>
-                                        <td style={td}>{l.qAvant}</td>
-                                        <td style={{ ...td, color: couleurDelta(l.delta) }}>{l.delta !== 0 ? signe(l.delta) : '0'}</td>
-                                        <td style={{ ...td, fontWeight: 'bold' }}>{l.qApres}</td>
-                                        <td style={{ ...td, color: '#4fc3f7' }}>{l.prod !== 0 ? signe(l.prod) : '—'}</td>
-                                        <td style={td}>{l.qApres + l.prod}</td>
+                                    <tr key={`${cle}-${l.code}`} className={j === 0 ? 'debut-systeme' : undefined}>
+                                        <td className="gauche">{j === 0 ? nomSysteme(systemeParCle[cle].pos) : ''}</td>
+                                        <td className="gauche">{nomObjet(l.code)}</td>
+                                        <td>{l.qAvant}</td>
+                                        <td className={classeDelta(l.delta)}>{l.delta !== 0 ? signe(l.delta) : '0'}</td>
+                                        <td className="apres">{l.qApres}</td>
+                                        <td className="prod">{l.prod !== 0 ? signe(l.prod) : '—'}</td>
+                                        <td>{l.qApres + l.prod}</td>
                                     </tr>
                                 )))}
                             </tbody>

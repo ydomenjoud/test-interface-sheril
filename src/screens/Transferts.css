@@ -1,0 +1,270 @@
+/* Écran « Transferts » : toutes les classes sont préfixées par .transferts pour rester locales à l'écran */
+
+.transferts {
+    padding: 20px;
+    color: #e0e0e0;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.transferts-vide {
+    padding: 20px;
+    color: #e0e0e0;
+}
+
+/* En-tête : titre, compteur, actions sur le schéma */
+.transferts-entete {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #444;
+    padding-bottom: 4px;
+}
+
+.transferts-entete h2 {
+    color: #fff;
+    margin: 0;
+    font-size: 1.1em;
+}
+
+.transferts-compteur {
+    text-decoration: underline dotted;
+    cursor: help;
+}
+
+.transferts-compteur.depasse {
+    color: #e57373;
+}
+
+.transferts-espace {
+    flex: 1;
+}
+
+/* Panneaux */
+.transferts-panneau {
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    padding: 8px 12px;
+}
+
+.transferts-titre-panneau {
+    color: #aaa;
+    text-transform: uppercase;
+    font-size: 0.8em;
+}
+
+.transferts-aucun-ordre {
+    color: #888;
+    padding: 6px 0;
+}
+
+.transferts-defilement {
+    overflow-x: auto;
+}
+
+.transferts-import {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.transferts-import .transferts-champ {
+    flex: 1 1 300px;
+    min-width: 0;
+}
+
+/* Contrôles */
+.transferts-btn {
+    background: #333;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 4px 10px;
+    cursor: pointer;
+}
+
+.transferts-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.transferts-btn.petit {
+    padding: 0 6px;
+    font-size: 0.9em;
+}
+
+.transferts-btn.petit + .transferts-btn.petit {
+    margin-left: 2px;
+}
+
+.transferts-champ {
+    background: #1e1e1e;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 2px 4px;
+}
+
+.transferts-champ.quantite {
+    width: 5em;
+    text-align: right;
+}
+
+.transferts-erreur {
+    color: #e57373;
+}
+
+/* Colonnes des deux systèmes */
+.transferts-colonnes {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
+
+.transferts-colonne {
+    flex: 1 1 340px;
+    min-width: 0;
+    overflow: auto;
+}
+
+/* Glisser-déposer : colonne qui accepte le dépôt, puis survolée */
+.transferts-colonne.depot {
+    outline: 1px dashed #4fc3f7;
+}
+
+.transferts-colonne.depot.survol {
+    outline-width: 2px;
+}
+
+.transferts-selecteurs {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.transferts-selecteurs .transferts-champ.systeme {
+    flex: 1 1 160px;
+    min-width: 0;
+}
+
+.transferts-avertissement {
+    color: #ffb74d;
+    font-size: 0.85em;
+    margin-top: 4px;
+}
+
+/* Tableaux */
+.transferts-table {
+    border-collapse: collapse;
+    font-size: 0.9em;
+    margin-top: 4px;
+}
+
+.transferts-table.pleine {
+    width: 100%;
+}
+
+.transferts-table th {
+    padding: 3px 8px;
+    color: #aaa;
+    font-weight: normal;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.transferts-table td {
+    padding: 2px 8px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.transferts-table .gauche {
+    text-align: left;
+}
+
+.transferts-table td.groupe {
+    color: #aaa;
+    text-transform: uppercase;
+    font-size: 0.75em;
+    padding-top: 8px;
+    text-align: left;
+}
+
+.transferts-table td.aucun {
+    color: #666;
+    text-align: left;
+}
+
+.transferts-table tr[draggable='true'] {
+    cursor: grab;
+}
+
+/* Valeurs : stock après transferts, variations, production */
+.transferts .apres {
+    font-weight: bold;
+}
+
+.transferts .ajout {
+    color: #81c784;
+}
+
+.transferts .retrait {
+    color: #e57373;
+}
+
+.transferts .prod {
+    color: #4fc3f7;
+}
+
+/* Liste des ordres */
+.transferts-table tr.ignore {
+    opacity: 0.5;
+}
+
+.transferts-table td.limite {
+    text-align: center;
+    color: #e57373;
+    border-top: 1px dashed #e57373;
+    font-size: 0.85em;
+}
+
+.transferts-lien {
+    cursor: pointer;
+    text-decoration: underline dotted;
+}
+
+.transferts .statut-ok {
+    color: #81c784;
+}
+
+.transferts .statut-partiel {
+    color: #ffb74d;
+}
+
+.transferts .statut-erreur {
+    color: #e57373;
+}
+
+.transferts .statut-ignore {
+    color: #888;
+}
+
+.transferts-message {
+    margin-left: 6px;
+    font-size: 0.85em;
+}
+
+/* Bilan : un filet au-dessus de la première ligne de chaque système */
+.transferts-table tr.debut-systeme {
+    border-top: 1px solid #444;
+}

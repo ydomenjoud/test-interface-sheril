@@ -31,6 +31,7 @@ src/
 │   ├── PlanificationRevenu.tsx # Planification des revenus (taxes, politique, budgets, gouverneurs…)
 │   ├── RechercheTechnologique.tsx  # Allocation de recherche
 │   ├── Transferts.tsx         # Transferts de bâtiments/marchandises/minerai entre systèmes
+│   ├── Transferts.css         # Styles de l'écran Transferts (classes .transferts-*)
 │   ├── ListeSystemes.tsx      # Liste des systèmes
 │   ├── ListeTechnologies.tsx  # Catalogue des technologies
 │   ├── ListeFlottes.tsx       # Liste des flottes
@@ -210,6 +211,7 @@ Le projet reçoit beaucoup de contributions : chaque utilisateur doit pouvoir ga
 - **Gestion d'erreurs silencieuse** : les erreurs de parsing XML retournent des données vides, IndexedDB indisponible se rabat sur localStorage
 - **Migration legacy** : ancien format `rapportXml` dans localStorage migré automatiquement vers IndexedDB
 - **Données d'exemple** : `public/examples/` contient des fichiers XML de test pour le développement offline
+- **Styles en feuille de style, pas inline** : un écran a sa feuille `src/screens/<Ecran>.css`, importée par le composant, avec des classes préfixées par le nom de l'écran (ex. `.transferts-table`) pour ne pas déborder sur les autres écrans. Pas de `style={{…}}` répété ligne par ligne : les variantes (état de glisser-déposer, couleur d'un ajout/retrait, statut d'un ordre) passent par des classes modificatrices (`depot`, `ajout`, `statut-erreur`…). L'inline reste réservé aux valeurs vraiment calculées (position, taille, couleur issue des données). Appliqué à l'écran Transferts ; les autres écrans gardent leur style inline tant qu'ils ne sont pas repris.
 
 ## Fichiers d'exemple
 
