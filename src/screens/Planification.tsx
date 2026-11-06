@@ -8,6 +8,13 @@ import {ajouterPrefixeSchema, retirerPrefixeSchema} from '../utils/ordreSchema';
 import {posToString} from '../utils/position';
 import {detailPdc, gouverneursParPosition, pdcSysteme} from '../utils/pdc';
 import {loadPlanificationRevenu} from '../utils/planificationRevenuStorage';
+import {
+    ConstructionEnCours,
+    ConstructionsEnCoursHtml,
+    parseConstructionsEnCoursHtml,
+    resoudreConstructionEnCours
+} from '../parsers/parseConstructionsEnCours';
+import {loadConstructionsEnCours, saveConstructionsEnCours} from '../storage/constructionsEnCoursStorage';
 
 type PlannedItem = {
     id: string;
@@ -18,6 +25,9 @@ type PlannedItem = {
 };
 
 type SystemQueue = Record<string, PlannedItem[]>; // Key = x_y
+
+// Construction en cours (rapport HTML) et l'objet qu'elle produit, s'il est reconnu
+type EnCoursResolu = ConstructionEnCours & { item?: PlannedItem };
 
 const construireBluePrintSeparator = '%#!%';
 
@@ -191,6 +201,115 @@ export default function Planification() {
 
     const marchandisesCols = useMemo(() => global?.marchandises || [], [global]);
 
+    // --- Constructions en cours, importées depuis le rapport HTML (principal.htm) du tour ---
+    const [enCoursImport, setEnCoursImport] = useState<ConstructionsEnCoursHtml | undefined>(undefined);
+    const [isEnCoursModalOpen, setIsEnCoursModalOpen] = useState(false);
+    const [enCoursMessage, setEnCoursMessage] = useState('');
+
+    useEffect(() => {
+        setEnCoursImport(tour === undefined ? undefined : loadConstructionsEnCours(tour));
+    }, [tour]);
+
+    const enCoursParSysteme = useMemo(() => {
+        const res: Record<string, EnCoursResolu[]> = {};
+        Object.entries(enCoursImport?.systemes || {}).forEach(([key, list]) => {
+            res[key] = list.map((c, i) => {
+                const r = resoudreConstructionEnCours(c.nom, global?.technologies || [], plans);
+                return {
+                    ...c,
+                    item: r ? { id: `en-cours-${key}-${i}`, type: r.type, code: r.code, quantity: c.nombre, planetNum: c.planete } : undefined
+                };
+            });
+        });
+        return res;
+    }, [enCoursImport, global, plans]);
+
+    const enCoursNonReconnus = useMemo(() =>
+        Array.from(new Set(Object.values(enCoursParSysteme).flat().filter(c => !c.item).map(c => c.nom))),
+        [enCoursParSysteme]
+    );
+
+    const importerEnCours = async (file: File) => {
+        if (tour === undefined) return;
+        const html = await file.text();
+        const parsed = parseConstructionsEnCoursHtml(html);
+        if (parsed.nbSystemes === 0) {
+            setEnCoursMessage("Aucun système trouvé : ce fichier n'est pas le rapport principal (principal.htm).");
+            return;
+        }
+        if (parsed.commandant !== undefined && numeroJoueur !== undefined && parsed.commandant !== numeroJoueur) {
+            setEnCoursMessage(`Ce rapport HTML est celui du commandant n°${parsed.commandant}, pas celui du rapport chargé (n°${numeroJoueur}).`);
+            return;
+        }
+        const connus = new Set(systems.map(s => `${s.pos.x}_${s.pos.y}`));
+        const inconnus = Object.keys(parsed.systemes).filter(k => !connus.has(k));
+        inconnus.forEach(k => delete parsed.systemes[k]);
+        saveConstructionsEnCours(tour, parsed);
+        setEnCoursImport(parsed);
+        const lots = Object.values(parsed.systemes).flat().length;
+        setEnCoursMessage(
+            `${lots} construction(s) en cours sur ${Object.keys(parsed.systemes).length} système(s), rattachées au tour ${tour}.`
+            + (inconnus.length ? ` ${inconnus.length} système(s) absent(s) du rapport XML ignoré(s) : ${inconnus.map(k => k.replace('_', '-')).join(', ')}.` : '')
+        );
+    };
+
+    // Retire une construction en cours d'un système (simulation d'une annulation)
+    const annulerEnCours = (key: string, index: number) => {
+        if (!enCoursImport || tour === undefined) return;
+        const reste = (enCoursImport.systemes[key] || []).filter((_, i) => i !== index);
+        const systemes = { ...enCoursImport.systemes };
+        if (reste.length > 0) systemes[key] = reste;
+        else delete systemes[key];
+        const next = { ...enCoursImport, systemes };
+        saveConstructionsEnCours(tour, next);
+        setEnCoursImport(next);
+    };
+
+    const boutonAnnulerEnCours = (key: string, index: number) => (
+        <button
+            onClick={(e) => { e.stopPropagation(); annulerEnCours(key, index); }}
+            title="Annuler cette construction en cours (la retire de la liste)"
+            style={{ background: 'none', border: 'none', color: '#f55', cursor: 'pointer', padding: 2, lineHeight: 0, fontWeight: 'bold', fontSize: '1.1em' }}
+        >
+            ✕
+        </button>
+    );
+
+    const retirerEnCours = () => {
+        if (tour !== undefined) saveConstructionsEnCours(tour, undefined);
+        setEnCoursImport(undefined);
+        setEnCoursMessage('');
+    };
+
+    // Ce que les constructions en cours d'un système consomment encore : leurs PDC restants,
+    // et à leur sortie le minerai et les marchandises de toutes les unités du lot
+    const consoEnCours = (key: string) => {
+        let pc = 0;
+        let minerai = 0;
+        const marchandises: Record<number, number> = {};
+        (enCoursParSysteme[key] || []).forEach(c => {
+            pc += c.pdcRestants;
+            if (!c.item) return;
+            const data = getItemData(c.item);
+            minerai += data.minerai * c.nombre;
+            data.marchandises.forEach(m => {
+                marchandises[m.code] = (marchandises[m.code] || 0) + m.nb * c.nombre;
+            });
+        });
+        return { pc, minerai, marchandises };
+    };
+
+    // Ressources d'un système une fois les constructions en cours servies
+    const ressourcesLibres = (s: SystemeJoueur) => {
+        const initial = getSystemResources(s);
+        const ec = consoEnCours(`${s.pos.x}_${s.pos.y}`);
+        const marchandises: Record<number, number> = { ...initial.initialMarchandises };
+        Object.entries(ec.marchandises).forEach(([code, nb]) => {
+            marchandises[Number(code)] = (marchandises[Number(code)] || 0) - nb;
+        });
+        return { pc: (initial.pc || 0) - ec.pc, minerai: initial.minerai - ec.minerai, marchandises };
+    };
+
     const addToQueue = (systemKey: string, type: 'building' | 'ship', code: string, planetNum?: number) => {
         const newEntry: PlannedItem = {
             id: Math.random().toString(36).substr(2, 9),
@@ -233,10 +352,11 @@ export default function Planification() {
             const system = systems.find(s => `${s.pos.x}_${s.pos.y}` === systemKey);
             if (!system) return prev;
 
-            const initial = getSystemResources(system);
-            let remPc = initial.pc || 0;
-            let remMin = initial.minerai;
-            let remMarchandises: Record<number, number> = { ...initial.initialMarchandises };
+            // Les constructions en cours sont servies avant les nouvelles
+            const libre = ressourcesLibres(system);
+            let remPc = libre.pc;
+            let remMin = libre.minerai;
+            let remMarchandises: Record<number, number> = libre.marchandises;
 
             // On calcule ce qui est consommé par TOUS les autres éléments
             for (let i = 0; i < queue.length; i++) {
@@ -306,10 +426,10 @@ export default function Planification() {
                     pl.proprietaire === rapport?.joueur?.numero && pl.batiments?.some(b => b.techCode === 'chantierI' && b.count > 0)
                 )) return;
 
-                const initial = getSystemResources(system);
-                let remPc = initial.pc || 0;
-                let remMin = initial.minerai;
-                const remMarch: Record<number, number> = { ...initial.initialMarchandises };
+                const libre = ressourcesLibres(system);
+                let remPc = libre.pc;
+                let remMin = libre.minerai;
+                const remMarch: Record<number, number> = libre.marchandises;
                 queue.forEach(item => {
                     const data = getItemData(item);
                     remPc -= data.pc * item.quantity;
@@ -450,6 +570,30 @@ export default function Planification() {
         );
     }, [queues, global, plans]);
 
+    // Coût des constructions en cours : PDC restants ; prix, minerai et marchandises payés à la sortie
+    const coutEnCours = useMemo(() => {
+        const liste = Object.values(enCoursParSysteme).flat();
+        const reconnus = liste.filter(c => c.item).map(c => c.item as PlannedItem);
+        const cout = formatPlannedItems(reconnus, global?.technologies || [], plans).totalGlobalCost;
+        return { ...cout, pdc: liste.reduce((sum, c) => sum + c.pdcRestants, 0), nb: liste.length };
+    }, [enCoursParSysteme, global, plans]);
+
+    const totalCost = useMemo(() => {
+        const base = summaryData.totalGlobalCost;
+        const marchandises = base.marchandises.map((m: { code: number; nb: number }) => ({ ...m }));
+        coutEnCours.marchandises.forEach(m => {
+            const existing = marchandises.find((x: { code: number }) => x.code === m.code);
+            if (existing) existing.nb += m.nb;
+            else marchandises.push({ ...m });
+        });
+        return {
+            prix: base.prix + coutEnCours.prix,
+            pdc: base.pdc + coutEnCours.pdc,
+            minerai: base.minerai + coutEnCours.minerai,
+            marchandises
+        };
+    }, [summaryData, coutEnCours]);
+
     const copyBluePrint = () => {
         navigator.clipboard.writeText(blueprint)
             .then(() => alert("Blueprint global copié !"))
@@ -532,7 +676,7 @@ export default function Planification() {
 
     const getItemData = (item: PlannedItem) => {
         if (item.type === 'building') {
-            const b = buildings.find(x => x.code === item.code);
+            const b = buildings.find(x => x.code === item.code) ?? global?.technologies.find(x => x.code === item.code);
             return {
                 name: b ? formatTechName(b) : item.code,
                 pc: b?.specification?.case || b?.specification?.pc || 0,
@@ -581,10 +725,9 @@ export default function Planification() {
         } else if (sortBy === 'pdc') {
             sorted.sort((a, b) => {
                 const getRemainingPdc = (s: SystemeJoueur) => {
-                    const initial = getSystemResources(s);
                     const key = `${s.pos.x}_${s.pos.y}`;
                     const queue = queues[key] || [];
-                    let remPc = initial.pc;
+                    let remPc = ressourcesLibres(s).pc;
                     queue.forEach(item => {
                         const data = getItemData(item);
                         remPc -= data.pc * item.quantity;
@@ -675,6 +818,20 @@ export default function Planification() {
                             title="Afficher / masquer les bâtiments déjà construits dans les systèmes dépliés"
                         >
                             Bâtiments construits
+                        </button>
+                        <button
+                            onClick={() => setIsEnCoursModalOpen(true)}
+                            style={{
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                backgroundColor: enCoursImport ? '#2c3e50' : '#333',
+                                color: '#eee',
+                                border: '1px solid #555',
+                                borderRadius: 4
+                            }}
+                            title="Importer les constructions en cours depuis le rapport HTML (principal.htm) : leurs PDC restants, minerai et marchandises sont déduits des systèmes"
+                        >
+                            Constructions en cours{enCoursImport ? ` (${Object.values(enCoursParSysteme).flat().length})` : ''}
                         </button>
                     </div>
                 </div>
@@ -801,9 +958,12 @@ export default function Planification() {
                         const initial = getSystemResources(s);
                         const queue = queues[key] || [];
 
-                        let finalPc = initial.pc;
-                        let finalMinerai = initial.minerai;
-                        let finalMarchandises: Record<number, number> = { ...initial.initialMarchandises };
+                        const enCours = enCoursParSysteme[key] || [];
+                        const ec = consoEnCours(key);
+                        const libre = ressourcesLibres(s);
+                        let finalPc = libre.pc;
+                        let finalMinerai = libre.minerai;
+                        let finalMarchandises: Record<number, number> = libre.marchandises;
 
                         // S'assurer que toutes les colonnes de marchandises sont initialisées (à 0 si pas en stock)
                         marchandisesCols.forEach(m => {
@@ -837,7 +997,18 @@ export default function Planification() {
                             modifPdc
                                 ? `${detailPdc(s, numeroJoueur, gouverneurDe(state), state.politique)}\nRapport : ${s.pdc}`
                                 : 'Points de Construction (total actuel, dépensé par les constructions)',
+                            enCours.length > 0 ? `Constructions en cours (rapport HTML) : ${ec.pc} PDC restants` : undefined,
                         ].filter(Boolean).join('\n\n');
+
+                        const tooltipEnCours = (c: EnCoursResolu) => [
+                            `En cours : ${c.nombre} × ${c.nom}`,
+                            `PDC restants pour le lot : ${c.pdcRestants}`,
+                            `Planète : ${c.planete === undefined ? 'non précisée' : `P${c.planete + 1}`}`,
+                            c.item
+                                ? 'Minerai et marchandises de tout le lot réservés pour sa sortie'
+                                : 'Non reconnu dans data.xml : seuls les PDC restants sont comptés',
+                        ].join('\n');
+                        const libelleEnCours = (c: EnCoursResolu) => c.item ? getItemData(c.item).name : c.nom;
 
                         const ownedPlanets = s.planetes.filter(p => p.proprietaire === rapport?.joueur?.numero);
                         const isCollapsed = collapsedSystems[key];
@@ -845,7 +1016,7 @@ export default function Planification() {
                         if (isCollapsed) {
                             return (
                                 <React.Fragment key={key}>
-                                <tr className={`systemStart ${idx % 2 ? 'rowOdd' : 'rowEven'}`} style={{ borderBottom: queue.length > 0 ? 'none' : '1px solid #444', backgroundColor: finalPc > 0 ? '' : '#333' }}>
+                                <tr className={`systemStart ${idx % 2 ? 'rowOdd' : 'rowEven'}`} style={{ borderBottom: queue.length + enCours.length > 0 ? 'none' : '1px solid #444', backgroundColor: finalPc > 0 ? '' : '#333' }}>
                                     <td style={{ padding: 8 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                             <button
@@ -886,9 +1057,15 @@ export default function Planification() {
                                         );
                                     })}
                                 </tr>
-                                {queue.length > 0 && (
+                                {queue.length + enCours.length > 0 && (
                                     <tr className={idx % 2 ? 'rowOdd' : 'rowEven'} style={{ borderBottom: '1px solid #444', backgroundColor: finalPc > 0 ? '' : '#333' }}>
                                         <td colSpan={3 + marchandisesCols.length} style={{ padding: '0 8px 8px 8px', fontSize: '0.85em', color: '#bbb' }}>
+                                            {enCours.map((c, i) => (
+                                                <span key={`en-cours-${i}`} title={tooltipEnCours(c)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, backgroundColor: '#1d2a33', border: `1px dashed ${c.item ? '#5a8' : COULEUR_MODIFIE}`, borderRadius: 12, padding: '2px 4px 2px 10px', marginRight: 6, marginBottom: 2, cursor: 'help' }}>
+                                                    ⏳ {c.nombre} × {libelleEnCours(c)} <span style={{ color: '#88a' }}>({c.pdcRestants} PDC)</span>
+                                                    {boutonAnnulerEnCours(key, i)}
+                                                </span>
+                                            ))}
                                             {(() => {
                                                 // Un groupe par type de bâtiment (tous niveaux confondus) ou par plan de vaisseau
                                                 const technologies = global?.technologies || [];
@@ -997,6 +1174,38 @@ export default function Planification() {
                                             style={{ width: '100%', minWidth: 250 }}
                                         />
                                     </div>
+
+                                    {enCours.length > 0 && (
+                                        <div style={{ marginBottom: 10 }}>
+                                            <div style={{ color: '#888', fontSize: '0.85em', marginBottom: 4 }}>
+                                                Constructions en cours (rapport HTML) : {ec.pc} PDC restants
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'row', gap: '10px', flexWrap: 'wrap' }}>
+                                                {enCours.map((c, i) => (
+                                                    <div key={`en-cours-${i}`} title={tooltipEnCours(c)} style={{
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center',
+                                                        gap: 8,
+                                                        backgroundColor: '#1d2a33',
+                                                        border: `1px dashed ${c.item ? '#5a8' : COULEUR_MODIFIE}`,
+                                                        padding: '2px 8px',
+                                                        borderRadius: 4,
+                                                        width: '300px',
+                                                        boxSizing: 'border-box',
+                                                        fontSize: '0.9em',
+                                                        cursor: 'help'
+                                                    }}>
+                                                        <span>⏳ {libelleEnCours(c)}{!c.item && <span style={{ color: COULEUR_MODIFIE }}> (non reconnu)</span>}</span>
+                                                        <span style={{ color: '#aaa', whiteSpace: 'nowrap' }}>
+                                                            {c.planete === undefined ? '--' : `P${c.planete + 1}`} · ×{c.nombre} · {c.pdcRestants} PDC
+                                                            {boutonAnnulerEnCours(key, i)}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     <div style={{ display: 'flex', flexDirection: 'row', gap: '10px', flexWrap: 'wrap' }}>
                                     {queueData.length === 0 && <span style={{ color: '#555', fontStyle: 'italic' }}>Rien de prévu</span>}
@@ -1188,7 +1397,7 @@ export default function Planification() {
                                     fontSize: '0.85em'
                                 }}
                             >
-                                Coûts: <span className="cur">{summaryData.totalGlobalCost.prix.toLocaleString()}</span>
+                                Coûts: <span className="cur">{totalCost.prix.toLocaleString()}</span>
                             </button>
                         </div>
                         <div style={{ padding: 12, overflowY: 'auto', fontSize: '0.9em' }}>
@@ -1214,19 +1423,24 @@ export default function Planification() {
                                 )
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {coutEnCours.nb > 0 && (
+                                        <div style={{ color: '#888', fontSize: '0.85em' }} title="PDC restants, et prix, minerai et marchandises payés à la sortie">
+                                            Inclut {coutEnCours.nb} construction(s) en cours : <span className="cur">{coutEnCours.prix.toLocaleString()}</span>, {coutEnCours.pdc.toLocaleString()} PDC, {coutEnCours.minerai.toLocaleString()} minerai
+                                        </div>
+                                    )}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: 4 }}>
                                         <span>Centaures</span>
-                                        <span style={{ fontWeight: 'bold' }} className="cur">{summaryData.totalGlobalCost.prix.toLocaleString()}</span>
+                                        <span style={{ fontWeight: 'bold' }} className="cur">{totalCost.prix.toLocaleString()}</span>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: 4 }}>
                                         <span>PDC</span>
-                                        <span style={{ fontWeight: 'bold', color: '#55f' }}>{summaryData.totalGlobalCost.pdc.toLocaleString()}</span>
+                                        <span style={{ fontWeight: 'bold', color: '#55f' }}>{totalCost.pdc.toLocaleString()}</span>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: 4 }}>
                                         <span>Minerai</span>
-                                        <span style={{ fontWeight: 'bold', color: '#5f5' }}>{summaryData.totalGlobalCost.minerai.toLocaleString()}</span>
+                                        <span style={{ fontWeight: 'bold', color: '#5f5' }}>{totalCost.minerai.toLocaleString()}</span>
                                     </div>
-                                    {summaryData.totalGlobalCost.marchandises.sort((a: any, b: any) => a.code - b.code).map((m: any) => {
+                                    {totalCost.marchandises.sort((a: any, b: any) => a.code - b.code).map((m: any) => {
                                         const mData = global?.marchandises.find(x => x.code === m.code);
                                         return (
                                             <div key={m.code} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: 4 }}>
@@ -1235,7 +1449,7 @@ export default function Planification() {
                                             </div>
                                         );
                                     })}
-                                    {summaryData.totalGlobalCost.marchandises.length === 0 && summaryData.totalGlobalCost.prix === 0 && summaryData.totalGlobalCost.pdc === 0 && summaryData.totalGlobalCost.minerai === 0 && (
+                                    {totalCost.marchandises.length === 0 && totalCost.prix === 0 && totalCost.pdc === 0 && totalCost.minerai === 0 && (
                                         <div style={{ color: '#666', fontStyle: 'italic' }}>Aucun coût à afficher</div>
                                     )}
                                 </div>
@@ -1334,6 +1548,67 @@ export default function Planification() {
                             }}
                         >
                             Ajouter les constructions
+                        </button>
+                    </div>
+                </Modal>
+            )}
+
+            {isEnCoursModalOpen && (
+                <Modal
+                    title="Constructions en cours"
+                    showCloseButton
+                    onClose={() => setIsEnCoursModalOpen(false)}
+                    zIndex={1500}
+                    panelStyle={{
+                        backgroundColor: '#222',
+                        padding: '16px',
+                        borderRadius: '8px',
+                        border: '1px solid #444',
+                        maxWidth: '520px',
+                        width: '90%',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+                    }}
+                >
+                    <p style={{ color: '#aaa', fontSize: '0.9em', marginTop: 0, lineHeight: 1.5 }}>
+                        Le rapport XML ne contient pas les constructions en cours. Chargez le rapport HTML du même tour
+                        (<strong style={{ color: '#ddd' }}>principal.htm</strong>, dans l'archive du tour) : pour chaque système,
+                        leurs PDC restants sont déduits en premier, puis le minerai et les marchandises nécessaires à la sortie de tout le lot.
+                        Elles ne sont pas ajoutées au schéma de construction (les ordres sont déjà passés).
+                    </p>
+                    <input
+                        type="file"
+                        accept=".htm,.html"
+                        onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) importerEnCours(f);
+                            e.target.value = '';
+                        }}
+                        style={{ color: '#ccc', marginBottom: 12 }}
+                    />
+                    {enCoursMessage && <p style={{ color: '#ddd', fontSize: '0.9em' }}>{enCoursMessage}</p>}
+                    {enCoursImport && (
+                        <p style={{ color: '#aaa', fontSize: '0.9em' }}>
+                            Tour {tour} : {coutEnCours.nb} construction(s) en cours, {coutEnCours.pdc} PDC restants.
+                        </p>
+                    )}
+                    {enCoursNonReconnus.length > 0 && (
+                        <p style={{ color: COULEUR_MODIFIE, fontSize: '0.9em' }}>
+                            Non reconnu(s) dans data.xml, seuls leurs PDC restants sont comptés : {enCoursNonReconnus.join(', ')}
+                        </p>
+                    )}
+                    <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                        <button
+                            onClick={retirerEnCours}
+                            disabled={!enCoursImport}
+                            style={{ padding: '8px 16px', backgroundColor: enCoursImport ? '#822' : '#333', color: enCoursImport ? '#fff' : '#666', border: 'none', borderRadius: 4, cursor: enCoursImport ? 'pointer' : 'not-allowed' }}
+                        >
+                            Retirer
+                        </button>
+                        <button
+                            onClick={() => setIsEnCoursModalOpen(false)}
+                            style={{ padding: '8px 16px', backgroundColor: '#444', color: '#eee', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                        >
+                            Fermer
                         </button>
                     </div>
                 </Modal>
