@@ -61,8 +61,7 @@ src/
 │   ├── parseData.ts           # Données globales (XML)
 │   ├── parsePublicCombats.ts  # Combats publics (scraping HTML)
 │   ├── parseCombatMessages.ts # Messages de combat
-│   ├── parseManualSystems.ts  # Saisie manuelle de systèmes
-│   └── parseConstructionsEnCours.ts # Constructions en cours (rapport HTML principal.htm)
+│   └── parseManualSystems.ts  # Saisie manuelle de systèmes
 ├── storage/
 │   ├── rapportStore.ts        # Couche d'abstraction IndexedDB
 │   ├── deplacementOrdersStorage.ts # Ordres de déplacement par tour (localStorage)
@@ -145,7 +144,8 @@ La galaxie est une grille (par défaut **60×60**) avec wrapping sur les bords (
 - `deplacements_tour_*` : ordres de déplacement saisis sur la carte, par tour
 - `recherche-technologique-tour-*` / `recherche-technologique-budget-tour-*` : allocation et budget de recherche par tour
 - `planification_*` : files de construction et préférences de l'écran Planification
-- `planification_en_cours_tour_*` : constructions en cours importées du rapport HTML (`principal.htm`), par tour
+- `planification_show_en_cours` : prise en compte des constructions en cours dans l'écran Planification
+- `planification_en_cours_annulees_tour_*` : constructions en cours retirées à la main (simulation d'annulation), par tour
 - `planification_revenu_tour_*` : choix de l'écran Revenus, par tour
 - `transferts_tour_*` : ordres de transfert entre systèmes, par tour
 - `transferts_colonne_gauche` / `transferts_colonne_droite` : systèmes affichés dans les colonnes de l'écran Transferts
@@ -199,7 +199,7 @@ Le projet reçoit beaucoup de contributions : chaque utilisateur doit pouvoir ga
 
 ### Construction et revenus
 - **Revenus** (`PlanificationRevenu.tsx`) : par système, taxation (système ou planète), politique, budgets (technologique, services spéciaux, contre-espionnage), terraformation et affectation des gouverneurs. Recalcule stabilité, croissance de population (détail par race), revenu, revenu technologique et bénéfice, avec infobulles détaillées ; les valeurs différentes du rapport sont marquées. Génère le schéma d'ordres (types dans l'ordre de résolution du tour) et peut envoyer le budget tech vers l'écran Recherche. Règles : `docs/gouverneurs-politiques-stocks.md`, `docs/ordres-revenus.md`.
-- **Construction** (`Planification.tsx`) : lit en lecture seule les choix de l'écran Revenus du même tour pour ajuster les PDC (politique, gouverneur, stock de robots — `utils/pdc.ts`). « Action multiple » (Alt+A) ajoute le maximum possible d'une construction dans chaque système, avec option pour se limiter aux systèmes ayant un chantier naval. Copie et import du schéma de construction. « Constructions en cours » importe `principal.htm` du tour (le XML ne les contient pas) : leurs PDC restants, puis le minerai et les marchandises de leur sortie, sont déduits de chaque système — `docs/constructions-en-cours.md`.
+- **Construction** (`Planification.tsx`) : lit en lecture seule les choix de l'écran Revenus du même tour pour ajuster les PDC (politique, gouverneur, stock de robots — `utils/pdc.ts`). « Action multiple » (Alt+A) ajoute le maximum possible d'une construction dans chaque système, avec option pour se limiter aux systèmes ayant un chantier naval. Copie et import du schéma de construction. L'option « Constructions en cours » (bloc `<constructions>` du rapport XML) déduit de chaque système leurs PDC restants, puis le minerai et les marchandises de leur sortie — `docs/constructions-en-cours.md`.
 
 ### Transferts
 - Deux colonnes côte à côte, chacune avec son système (et sa planète, facultative) : un objet (minerai, bâtiment, marchandise) se glisse d'une colonne vers l'autre, ou s'envoie avec ses boutons → / ←, pour créer un ordre `charger_cargo`. Chaque ligne affiche le stock du rapport, l'effet des transferts, le stock après transferts et la production du tour.

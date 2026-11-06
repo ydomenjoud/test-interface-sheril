@@ -1,31 +1,31 @@
 # Constructions en cours
 
 Une construction commencée et pas terminée reste dans la file du système d'un tour à l'autre. L'écran Planification
-les prend en compte si l'on importe le rapport HTML du tour (bouton « Constructions en cours »).
+les prend en compte quand l'option « Constructions en cours » est activée.
 
-## Où les trouver
+## Format XML
 
-- **Pas dans `rapport.xml`** : l'export XML des systèmes (`<s>`, `RapportXML.java`) ne contient pas la file de constructions.
-- **Dans `principal.htm`** (archive du tour), tableau « Constructions en cours » de chaque système, après le bloc « Budget ».
-  Le tableau n'apparaît que si le système a des constructions en cours.
+Dans chaque système du joueur (`<s>`), après `<planetes>`, et seulement si le système a des constructions en cours :
 
-```html
-<A name="0_29_10"> … (fiche du système)
-<TR><TD colspan="6" class="bg"><SPAN class="c7">Constructions en cours</SPAN></TD></TR>
-<TR><TD>Type</TD><TD>Nombre</TD><TD colspan="2">Points constru. nécessaires</TD><TD colspan="2">Pour la planète</TD></TR>
-<TR><TD>station de produits de luxe de type I</TD><TD>1</TD><TD colspan="2">1</TD><TD colspan="2">Non précisé</TD></TR>
-<TR><TD colspan="6" class="bg"><SPAN class="c7">Bâtiments</SPAN></TD></TR>
+```xml
+<constructions>
+  <construction code="modeI" type="batiment" nombre="1" pdcRestants="1" pdcEffectues="9"/>
+  <construction code="Colonisateur" type="vaisseau" nombre="1" pdcRestants="0" pdcEffectues="12" planete="6"/>
+</constructions>
 ```
 
-| Colonne | Contenu |
-|---------|---------|
-| Type | Bâtiment : nom complet `nom + " de type " + niveau romain` (le nom seul si le bâtiment n'a qu'un niveau). Vaisseau : nom du plan. |
-| Nombre | Unités du lot restant à sortir |
-| Points constru. nécessaires | PDC **restants** pour tout le lot (`pdc unitaire × nombre − points déjà effectués`) |
-| Pour la planète | Numéro de planète en **base 1**, ou « Non précisé » |
+| Attribut | Contenu |
+|----------|---------|
+| `code` | Code du bâtiment (`modeI`), ou nom du plan pour un vaisseau |
+| `type` | `batiment` ou `vaisseau` |
+| `nombre` | Unités du lot restant à sortir |
+| `pdcRestants` | PDC encore nécessaires pour tout le lot (`pdc unitaire × nombre − pdcEffectues`) |
+| `pdcEffectues` | PDC déjà acquis par le lot |
+| `planete` | Numéro de planète en **base 0** ; absent si la planète n'est pas précisée |
 
-Le système est donné par l'ancre `<A name="0_x_y">` qui précède sa fiche. Le titre de la page porte le numéro
-du commandant : `Rapport du commandant <span>Nom&nbsp;(23)</span>` (pas de numéro de tour).
+Ce bloc est produit par `RapportXML.java` (moteur `sheril-old-java`). Les rapports plus anciens ne le contiennent pas.
+On trouve les mêmes informations dans le tableau « Constructions en cours » du rapport HTML (`principal.htm`), avec le
+nom complet du bâtiment au lieu du code et la planète en base 1.
 
 ## Règles de résolution (`Possession.resolutionConstructions`)
 
@@ -34,15 +34,14 @@ du commandant : `Rapport du commandant <span>Nom&nbsp;(23)</span>` (pas de numé
 - S'il manque des centaures, du minerai, des marchandises ou de l'encombrement, seules les unités finançables sortent ;
   les autres restent en cours avec leurs PDC acquis (d'où des lignes à 0 PDC restant).
 - Un vaisseau ne sort pas sans chantier naval sur le système.
+- L'ordre `annuler_construction` annule **toutes** les constructions en cours d'un système.
 
 ## Dans l'outil
 
-- `parsers/parseConstructionsEnCours.ts` : lecture de `principal.htm` et rapprochement nom → code de bâtiment ou plan.
-- Stockage par tour : `planification_en_cours_tour_<n>` (localStorage), rattaché au tour du rapport XML chargé.
-  L'import est refusé si le numéro de commandant ne correspond pas au rapport chargé.
+- Lecture : `parsers/parseRapport.ts` → `SystemeJoueur.constructionsEnCours`.
+- Option « Constructions en cours » de l'écran Planification (`planification_show_en_cours`, désactivée par défaut).
 - Pour chaque système, l'écran déduit d'abord les PDC restants, puis le minerai et les marchandises de tout le lot ;
   « MAX », « Action multiple » et le tri « PDC restant » partent de ce qui reste. Le récapitulatif des coûts les inclut.
 - Les constructions en cours ne sont pas ajoutées au schéma de construction : les ordres ont déjà été passés.
-- Un nom non reconnu dans `data.xml` est signalé ; seuls ses PDC restants sont comptés.
-- La croix rouge d'une construction en cours la retire de la liste du tour, pour simuler son annulation. Elle ne
-  produit aucun ordre. Dans le jeu, l'ordre `annuler_construction` annule **toutes** les constructions en cours du système.
+- La croix rouge retire une construction de la liste du tour pour simuler son annulation (aucun ordre produit) ;
+  « Rétablir » la remet. Stockage : `planification_en_cours_annulees_tour_<n>`.
