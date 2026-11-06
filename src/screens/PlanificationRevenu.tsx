@@ -9,6 +9,9 @@ import { ajouterPrefixeSchema } from '../utils/ordreSchema';
 
 interface SystemState {
     taxation: number;
+    // Taxation imposée à toutes les planètes même si elle vaut la moyenne du rapport
+    // (utile quand les planètes du système ont des taxations différentes)
+    taxationForcee?: boolean;
     btech: number;
     besp: number;
     bcont: number;
@@ -60,6 +63,10 @@ function etatDuRapport(s: SystemeJoueur, gouverneurs: Record<string, string>, nu
         gouverneur: gouverneurs[posToString(s.pos)] ?? null,
     };
 }
+
+// La taxation saisie doit-elle remplacer celle de chaque planète ?
+const taxationModifiee = (etat: SystemState, ref: SystemState) =>
+    etat.taxation !== ref.taxation || !!etat.taxationForcee;
 
 // Coût de terraformation d'une planète : 50 + (niveau + 1) × 2
 const coutTerraformationPlanete = (niveau: number) => 50 + (niveau + 1) * 2;
@@ -277,10 +284,11 @@ export default function PlanificationRevenu() {
         if (tour !== undefined && store.tour === tour) savePlanificationRevenu(tour, store.states);
     }, [store, tour]);
 
-    const handleTaxChange = (key: string, val: number) => {
+    // Valeur de la liste : "2" (rapport / valeur choisie) ou "2f" (2 forcé sur toutes les planètes)
+    const handleTaxChange = (key: string, val: string) => {
         setStates(prev => ({
             ...prev,
-            [key]: { ...prev[key], taxation: val }
+            [key]: { ...prev[key], taxation: parseInt(val, 10), taxationForcee: val.endsWith('f') }
         }));
     };
 
@@ -415,7 +423,7 @@ export default function PlanificationRevenu() {
             let populationMax = 0;
             let revenuPlanetes = 0;
             let revenuPlanetesTech = 0;
-            const taxationModifiee = state.taxation !== etatDuRapport(s, gouverneurs, numeroJoueur).taxation;
+            const taxationSaisie = taxationModifiee(state, etatDuRapport(s, gouverneurs, numeroJoueur));
 
             mesPlanetes.forEach(p => {
                 const pPop = (p.populations ?? []).reduce((acc, pop) => acc + (pop.nb || 0), 0);
@@ -437,7 +445,7 @@ export default function PlanificationRevenu() {
                 if (pPop > 0) pGrowth = Math.min(Math.max(pGrowth, CROISSANCE_MIN_PLANETE), Math.max(0, pMax - pPop));
 
                 // Taxation du système si l'utilisateur l'a modifiée, sinon celle de la planète dans le rapport
-                const taxPlanete = taxationModifiee ? state.taxation : p.tax;
+                const taxPlanete = taxationSaisie ? state.taxation : p.tax;
                 // Pas d'arrondi : le revenu du rapport est exactement la somme de pop × taxation / 10
                 const revenuPlanete = (pPop + pGrowth) * taxPlanete / 10;
 
@@ -579,7 +587,7 @@ export default function PlanificationRevenu() {
                 // pas d'ordre pour annuler une terraformation : le rapport ne la contient jamais
                 ajoute('terraformation', `${pos} ${etat.terraformation ? 'terraformation' : 'sans terraformation'}`, etat.terraformation ? ['terraformer_systeme', codePos] : undefined);
             }
-            if (etat.taxation !== ref.taxation) {
+            if (taxationModifiee(etat, ref)) {
                 ajoute('taxation', `${pos} taxation ${etat.taxation}`, ['modifier_taxation_systeme', codePos, String(etat.taxation)]);
             }
             if (etat.politique !== ref.politique) {
@@ -773,7 +781,7 @@ export default function PlanificationRevenu() {
                             const modPolitique = state.politique !== ref.politique;
                             const modTerra = state.terraformation !== ref.terraformation;
                             const modGouv = state.gouverneur !== ref.gouverneur;
-                            const modTax = state.taxation !== ref.taxation;
+                            const modTax = taxationModifiee(state, ref);
                             // Taxations différentes entre les planètes du joueur : la valeur affichée n'est qu'une moyenne
                             const planetesTax = planetesDuJoueur(s, numeroJoueur);
                             const taxationsHeterogenes = new Set(planetesTax.map(p => p.tax)).size > 1;
@@ -849,12 +857,17 @@ export default function PlanificationRevenu() {
                                     </td>
                                     <td style={tdStyle}>
                                         <select 
-                                            value={row.taxation} 
-                                            onChange={(e) => handleTaxChange(row.key, parseInt(e.target.value, 10))}
+                                            value={state.taxationForcee && state.taxation === ref.taxation ? `${state.taxation}f` : String(state.taxation)}
+                                            onChange={(e) => handleTaxChange(row.key, e.target.value)}
                                             style={{ ...styleModifie(selectStyle, modTax), ...(modTax ? SOULIGNE_INFOBULLE : {}) }}
-                                            title={modTax ? `Rapport : ${ref.taxation}` : undefined}
+                                            title={modTax ? `Rapport : ${taxationsHeterogenes ? `planètes de ${planetesTax.map(p => p.tax).join(', ')}` : ref.taxation}` : undefined}
                                         >
-                                            {[0, 1, 2, 3, 4, 5].map(t => <option key={t} value={t}>{t}</option>)}
+                                            {[0, 1, 2, 3, 4, 5].flatMap(t => (taxationsHeterogenes && t === ref.taxation
+                                                ? [
+                                                    <option key={t} value={t}>{t} - rapport</option>,
+                                                    <option key={`${t}f`} value={`${t}f`}>{t} - forcé</option>,
+                                                ]
+                                                : [<option key={t} value={t}>{t}</option>]))}
                                         </select>
                                         {marque(modTax)}
                                         {taxationsHeterogenes && (
