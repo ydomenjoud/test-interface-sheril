@@ -321,7 +321,18 @@ export function parseRapportXml(text: string): Rapport {
                 t: getAttr(evo, ['t']) || '',
                 v: getAttrNum(evo, ['v']) || 0
             })),
-            marchandises: marchandiseMap.get(posStr)
+            marchandises: marchandiseMap.get(posStr),
+            constructionsEnCours: qAll(s, ['constructions > construction']).map(c => {
+                const planete = getAttr(c, ['planete']);
+                return {
+                    type: getAttr(c, ['type']) === 'vaisseau' ? 'ship' as const : 'building' as const,
+                    code: getAttr(c, ['code']) || '',
+                    nombre: getAttrNum(c, ['nombre']) || 0,
+                    pdcRestants: getAttrNum(c, ['pdcRestants']) || 0,
+                    pdcEffectues: getAttrNum(c, ['pdcEffectues']) || 0,
+                    ...(planete ? {planete: Number(planete)} : {}),
+                };
+            }),
         });
     });
 

@@ -19,6 +19,10 @@ describe('parseRapportXml - XML lowercase only', () => {
                 <batiment code="minei" nombre="4" />
               </p>
             </planetes>
+            <constructions>
+              <construction code="modeI" type="batiment" nombre="3" pdcRestants="12" pdcEffectues="3"/>
+              <construction code="Colonisateur" type="vaisseau" nombre="1" pdcRestants="0" pdcEffectues="12" planete="6"/>
+            </constructions>
           </s>
         </systemes>
 
@@ -58,6 +62,11 @@ describe('parseRapportXml - XML lowercase only', () => {
     expect(s2.pos).toEqual({ x: 4, y: 5 });
     expect(s2.typeEtoile).toBe(0);
     expect(s2.nbPla).toBe(18); // lu via nbpla
+    expect(s1.constructionsEnCours).toEqual([]);
+    expect(s2.constructionsEnCours).toEqual([
+      { type: 'building', code: 'modeI', nombre: 3, pdcRestants: 12, pdcEffectues: 3 },
+      { type: 'ship', code: 'Colonisateur', nombre: 1, pdcRestants: 0, pdcEffectues: 12, planete: 6 },
+    ]);
   });
 
   it('extrait les systèmes détectés en lowercase et lit typeetoile correctement', () => {
