@@ -384,7 +384,8 @@ export default function Planification() {
                     const pNumStr = parts[3];
 
                     quantity = parseInt(qtyStr, 10);
-                    if (pNumStr !== '') planetNum = parseInt(pNumStr, 10);
+                    const pNum = parseInt(pNumStr, 10);
+                    if (!isNaN(pNum) && pNum !== 100) planetNum = pNum;
 
                     // Déduction du type : si le code est dans buildings, c'est un building
                     if (buildings.some(b => b.code === code)) {
@@ -425,7 +426,8 @@ export default function Planification() {
                     systemPos,
                     qty: item.quantity,
                     code: item.code,
-                    planetNum: item.planetNum || 100,
+                    // Planète 0-based : P1 vaut 0, d'où ?? et non || ; 100 = non précisée
+                    planetNum: item.planetNum ?? 100,
                 });
             });
         });
