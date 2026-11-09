@@ -153,6 +153,17 @@ export interface SystemeJoueur extends SystemBase {
     scan: number;
     marchandises?: MarchandiseData[];
     evostab: { t: string, v: number }[];
+    constructionsEnCours?: ConstructionEnCours[];
+}
+
+// Construction commencée et pas terminée (rapport XML : <s><constructions><construction …/>)
+export interface ConstructionEnCours {
+    type: 'building' | 'ship';
+    code: string;          // code du bâtiment, ou nom du plan de vaisseau
+    nombre: number;        // unités restant à sortir
+    pdcRestants: number;   // PDC encore nécessaires pour tout le lot
+    pdcEffectues: number;  // PDC déjà acquis
+    planete?: number;      // numéro de planète (0-based) ; absent = non précisé
 }
 
 export interface SystemeDetecte extends SystemBase {
