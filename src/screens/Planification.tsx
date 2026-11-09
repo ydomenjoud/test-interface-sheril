@@ -1133,7 +1133,7 @@ export default function Planification() {
                                         />
                                     </div>
 
-                                    {(enCours.length > 0 || nbAnnuleesSysteme(key) > 0) && (
+                                    {showEnCours && (enCours.length > 0 || nbAnnuleesSysteme(key) > 0) && (
                                         <div style={{ marginBottom: 10 }}>
                                             <div style={{ color: '#888', fontSize: '0.85em', marginBottom: 4 }}>
                                                 Constructions en cours : {ec.pc} PDC restants
