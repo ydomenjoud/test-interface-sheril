@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Lieutenant, SystemeJoueur } from '../types';
@@ -6,6 +6,7 @@ import { useReport } from '../context/ReportContext';
 import { isPos, parsePosString, posToString } from '../utils/position';
 import { loadPlanificationRevenu, savePlanificationRevenu } from '../utils/planificationRevenuStorage';
 import { ajouterPrefixeSchema } from '../utils/ordreSchema';
+import { appliquerATous, ChampBudget, depasseraitCent, plage, restaurer, valeursAvant } from '../utils/revenuMasse';
 
 interface SystemState {
     taxation: number;
@@ -222,6 +223,13 @@ function Change({ children, style, detail, rapport }: { children: string; style?
     );
 }
 
+// Saisie de la ligne « actions de masse » (chaîne vide : rien à appliquer pour cette colonne)
+type SaisieMasse = { politique: string; terraformation: string; taxation: string; btech: string; besp: string; bcont: string };
+const MASSE_VIDE: SaisieMasse = { politique: '', terraformation: '', taxation: '', btech: '', besp: '', bcont: '' };
+// Action de masse annulable : valeurs des champs remplacés, par système
+type ActionMasse = { libelle: string; avant: Record<string, Partial<SystemState>> };
+const LIBELLES_BUDGET: Record<ChampBudget, string> = { btech: 'budget tech', besp: 'budget SS', bcont: 'budget CE' };
+
 type Revenus = { revenus: number; benefice: number; revenu_tech: number; revenu_besp: number; revenu_bcont: number };
 const additionne = (lignes: Revenus[]): Revenus => lignes.reduce((acc, l) => ({
     revenus: acc.revenus + l.revenus,
@@ -343,17 +351,113 @@ export default function PlanificationRevenu() {
         const etats: Record<string, SystemState> = {};
         systems.forEach(s => { etats[posToString(s.pos)] = etatDuRapport(s, gouverneurs, numeroJoueur); });
         setStates(() => etats);
+        setHistorique({ tour, pile: [] });
     };
 
     const handleTerraChange = (key: string, val: boolean) => {
         setStates(prev => ({
             ...prev,
-            [key]: { 
-                ...prev[key], 
+            [key]: {
+                ...prev[key],
                 terraformation: val
             }
         }));
     };
+
+    // --- Actions de masse ---
+    // Systèmes exclus de la sélection : par défaut, tous les systèmes sont sélectionnés
+    const [exclus, setExclus] = useState<Set<string>>(() => new Set());
+    const cles = useMemo(() => systems.map(s => posToString(s.pos)), [systems]);
+    const selection = useMemo(() => cles.filter(k => !exclus.has(k)), [cles, exclus]);
+    const nbSelection = selection.length;
+    const dernierCoche = useRef<number | null>(null);
+
+    // Maj+clic : la case cliquée donne son nouvel état à toute la plage depuis la dernière case cliquée
+    const basculerSelection = (index: number, selectionne: boolean, plageDemandee: boolean) => {
+        const concernees = plageDemandee && dernierCoche.current !== null ? plage(cles, dernierCoche.current, index) : [cles[index]];
+        dernierCoche.current = index;
+        setExclus(prev => {
+            const next = new Set(prev);
+            concernees.forEach(k => (selectionne ? next.delete(k) : next.add(k)));
+            return next;
+        });
+    };
+    const toutSelectionner = (oui: boolean) => {
+        dernierCoche.current = null;
+        setExclus(oui ? new Set() : new Set(cles));
+    };
+
+    const [masse, setMasse] = useState<SaisieMasse>(MASSE_VIDE);
+    const [historique, setHistorique] = useState<{ tour: number | undefined; pile: ActionMasse[] }>({ tour: undefined, pile: [] });
+    const pileAnnulation = historique.tour === tour ? historique.pile : [];
+
+    // Applique une modification aux systèmes donnés, en gardant de quoi l'annuler
+    const appliquerMasse = (libelle: string, cibles: string[], maj: (etat: SystemState, cle: string) => Partial<SystemState>) => {
+        if (cibles.length === 0) return;
+        const avant: Record<string, Partial<SystemState>> = {};
+        cibles.forEach(k => { if (states[k]) avant[k] = valeursAvant(states[k], maj(states[k], k)); });
+        setStates(prev => appliquerATous(prev, cibles, maj));
+        setHistorique(prev => ({ tour, pile: [...(prev.tour === tour ? prev.pile : []), { libelle: `${libelle} sur ${cibles.length} système${cibles.length > 1 ? 's' : ''}`, avant }] }));
+    };
+
+    const annulerMasse = () => {
+        const derniere = pileAnnulation[pileAnnulation.length - 1];
+        if (!derniere) return;
+        setStates(prev => restaurer(prev, derniere.avant));
+        setHistorique({ tour, pile: pileAnnulation.slice(0, -1) });
+    };
+
+    // Systèmes dont les taxations diffèrent entre planètes : une taxation de masse doit être forcée sur toutes
+    const taxationsHeterogenes = useMemo(() => new Set(systems
+        .filter(s => new Set(planetesDuJoueur(s, numeroJoueur).map(p => p.tax)).size > 1)
+        .map(s => posToString(s.pos))), [systems, numeroJoueur]);
+
+    const appliquerMassePolitique = () => {
+        const v = parseInt(masse.politique, 10);
+        appliquerMasse(`politique ${global?.politiques[v] ?? v}`, selection, () => ({ politique: v }));
+        setMasse(m => ({ ...m, politique: '' }));
+    };
+    const appliquerMasseTerraformation = () => {
+        const v = masse.terraformation === 'avec';
+        appliquerMasse(v ? 'terraformation' : 'sans terraformation', selection, () => ({ terraformation: v }));
+        setMasse(m => ({ ...m, terraformation: '' }));
+    };
+    const appliquerMasseTaxation = () => {
+        const v = parseInt(masse.taxation, 10);
+        appliquerMasse(`taxation ${v}`, selection, (_, k) => ({ taxation: v, taxationForcee: taxationsHeterogenes.has(k) }));
+        setMasse(m => ({ ...m, taxation: '' }));
+    };
+    // Systèmes sélectionnés dont le total des budgets dépasserait 100 % avec la valeur saisie
+    const depassementsBudget = (champ: ChampBudget) => {
+        const v = parseInt(masse[champ], 10);
+        if (isNaN(v)) return [];
+        return selection.filter(k => states[k] && depasseraitCent(states[k], champ, v));
+    };
+    const appliquerMasseBudget = (champ: ChampBudget, ignorerDepassements: boolean) => {
+        const v = parseInt(masse[champ], 10);
+        if (isNaN(v)) return;
+        const ignores = ignorerDepassements ? new Set(depassementsBudget(champ)) : new Set<string>();
+        appliquerMasse(`${LIBELLES_BUDGET[champ]} ${v} %`, selection.filter(k => !ignores.has(k)), () => ({ [champ]: v }));
+        setMasse(m => ({ ...m, [champ]: '' }));
+    };
+    const saisirMasseBudget = (champ: ChampBudget, val: string) => {
+        const n = parseInt(val, 10);
+        setMasse(m => ({ ...m, [champ]: isNaN(n) ? '' : String(Math.max(0, Math.min(100, n))) }));
+    };
+
+    // La ligne de masse est collée sous la ligne d'en-tête : il faut connaître la hauteur de celle-ci
+    const ligneEnTete = useRef<HTMLTableRowElement>(null);
+    const [hauteurEnTete, setHauteurEnTete] = useState(0);
+    useLayoutEffect(() => {
+        const ligne = ligneEnTete.current;
+        if (!ligne) return;
+        const mesure = () => setHauteurEnTete(ligne.offsetHeight);
+        mesure();
+        if (typeof ResizeObserver === 'undefined') return;
+        const observateur = new ResizeObserver(mesure);
+        observateur.observe(ligne);
+        return () => observateur.disconnect();
+    }, []);
 
     const rows = useMemo(() => {
         // Calcul d'un système pour un état donné (choix de l'utilisateur ou état du rapport)
@@ -654,6 +758,16 @@ export default function PlanificationRevenu() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #444', paddingBottom: '4px', marginBottom: '8px', flexShrink: 0 }}>
                 <h2 style={{ color: '#fff', margin: 0, fontSize: '1.1em' }}>Planification des Revenus</h2>
                 <div style={{ display: 'flex', gap: '8px' }}>
+                {pileAnnulation.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={annulerMasse}
+                        title={`Annuler : ${pileAnnulation[pileAnnulation.length - 1].libelle}`}
+                        style={{ ...resetButtonStyle, padding: '6px 12px', ...SOULIGNE_INFOBULLE, cursor: 'pointer' }}
+                    >
+                        ↶ Annuler l'action de masse
+                    </button>
+                )}
                 <button
                     type="button"
                     onClick={copierSchema}
@@ -751,7 +865,17 @@ export default function PlanificationRevenu() {
             <div style={{ overflow: 'auto', flex: 1, minHeight: 200 }}>
                 <table className="planification_table" style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: '#1e1e1e', borderRadius: '8px', overflow: 'hidden' }}>
                     <thead>
-                        <tr style={{ backgroundColor: '#333', color: '#ccc', textAlign: 'left' }}>
+                        <tr ref={ligneEnTete} style={{ backgroundColor: '#333', color: '#ccc', textAlign: 'left' }}>
+                            <th style={thStyle}>
+                                <input
+                                    type="checkbox"
+                                    checked={nbSelection === cles.length && cles.length > 0}
+                                    ref={el => { if (el) el.indeterminate = nbSelection > 0 && nbSelection < cles.length; }}
+                                    onChange={e => toutSelectionner(e.target.checked)}
+                                    title="Sélectionner tous les systèmes ou aucun, pour les actions de masse"
+                                    style={caseSelectionStyle}
+                                />
+                            </th>
                             <th style={thStyle}>Position</th>
                             <th style={thStyle}>Nom</th>
                             <th style={thStyle}>Stabilité</th>
@@ -768,6 +892,97 @@ export default function PlanificationRevenu() {
                             <th style={thStyle}>Budget CE</th>
                             <th style={thStyle}>Revenu CE</th>
                             <th style={thStyle}></th>
+                        </tr>
+                        {/* Actions de masse : chaque contrôle est dans la colonne qu'il modifie et s'applique aux systèmes cochés */}
+                        <tr>
+                            {(() => {
+                                const th: React.CSSProperties = { ...thStyle, ...thMasseStyle, top: hauteurEnTete };
+                                const aucun = nbSelection === 0;
+                                const bouton = (onClick: () => void, libelle = `✓ Appliquer (${nbSelection})`, titre = `Appliquer aux ${nbSelection} système(s) coché(s)`) => (
+                                    <button type="button" onClick={onClick} disabled={aucun} title={titre}
+                                        style={{ ...boutonMasseStyle, ...SOULIGNE_INFOBULLE, opacity: aucun ? 0.3 : 1, cursor: aucun ? 'default' : 'pointer' }}>
+                                        {libelle}
+                                    </button>
+                                );
+                                const politiqueCodes = Object.keys(global?.politiques || {}).map(Number)
+                                    .filter(c => !global?.politiques[c]?.startsWith('anti-'))
+                                    .sort((a, b) => a - b);
+                                const celluleBudget = (champ: ChampBudget) => {
+                                    const depassements = masse[champ] !== '' ? depassementsBudget(champ) : [];
+                                    const noms = depassements.map(k => systems.find(s => posToString(s.pos) === k)?.nom ?? k).join(', ');
+                                    return (
+                                        <th style={th} colSpan={2}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                                <input
+                                                    type="number" min="0" max="100" placeholder="—"
+                                                    value={masse[champ]}
+                                                    onChange={e => saisirMasseBudget(champ, e.target.value)}
+                                                    onKeyDown={e => { if (e.key === 'Enter' && !aucun && depassements.length === 0) appliquerMasseBudget(champ, false); }}
+                                                    title={`${LIBELLES_BUDGET[champ]} à appliquer aux systèmes cochés (Entrée pour appliquer)`}
+                                                    style={inputStyle}
+                                                />
+                                                <span style={{ fontSize: '0.8em', color: '#666' }}>%</span>
+                                                {masse[champ] !== '' && depassements.length === 0 && bouton(() => appliquerMasseBudget(champ, false))}
+                                            </div>
+                                            {depassements.length > 0 && (
+                                                <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                                    <span style={{ color: '#f44336', cursor: 'help', ...SOULIGNE_INFOBULLE }} title={`Total des budgets au-delà de 100 % : ${noms}\nLe serveur annule tous les budgets d'un système qui dépasse 100 %.`}>
+                                                        ⚠ {depassements.length} dépasserai{depassements.length > 1 ? 'ent' : 't'} 100 %
+                                                    </span>
+                                                    {depassements.length < nbSelection && bouton(() => appliquerMasseBudget(champ, true), `Sans ces ${depassements.length} (${nbSelection - depassements.length})`, `Appliquer aux ${nbSelection - depassements.length} autre(s) système(s) coché(s), sans toucher à : ${noms}`)}
+                                                    {bouton(() => appliquerMasseBudget(champ, false), `Tous quand même (${nbSelection})`, `Appliquer aux ${nbSelection} système(s) coché(s), y compris : ${noms}`)}
+                                                </div>
+                                            )}
+                                        </th>
+                                    );
+                                };
+                                return (
+                                    <>
+                                        <th style={th}></th>
+                                        <th style={{ ...th, color: '#aaa', fontWeight: 'normal' }} colSpan={3}>
+                                            Actions de masse : <b style={{ color: '#fff' }}>{nbSelection}</b> / {cles.length} système{cles.length > 1 ? 's' : ''} coché{nbSelection > 1 ? 's' : ''}
+                                        </th>
+                                        <th style={th}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                                <select value={masse.politique} onChange={e => setMasse(m => ({ ...m, politique: e.target.value }))} style={selectStyle} title="Politique à appliquer aux systèmes cochés">
+                                                    <option value="">—</option>
+                                                    {politiqueCodes.map(c => {
+                                                        const eff = formatEffetPolitique(c);
+                                                        return <option key={c} value={c}>{global?.politiques[c]}{eff ? ` (${eff})` : ''}</option>;
+                                                    })}
+                                                </select>
+                                                {masse.politique !== '' && bouton(appliquerMassePolitique)}
+                                            </div>
+                                        </th>
+                                        <th style={th}></th>
+                                        <th style={th}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                                <select value={masse.terraformation} onChange={e => setMasse(m => ({ ...m, terraformation: e.target.value }))} style={selectStyle} title="Cocher ou décocher la terraformation des systèmes cochés">
+                                                    <option value="">—</option>
+                                                    <option value="avec">avec</option>
+                                                    <option value="sans">sans</option>
+                                                </select>
+                                                {masse.terraformation !== '' && bouton(appliquerMasseTerraformation)}
+                                            </div>
+                                        </th>
+                                        <th style={th}></th>
+                                        <th style={th}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                                <select value={masse.taxation} onChange={e => setMasse(m => ({ ...m, taxation: e.target.value }))} style={selectStyle} title="Taxation à appliquer à toutes les planètes des systèmes cochés">
+                                                    <option value="">—</option>
+                                                    {[0, 1, 2, 3, 4, 5].map(t => <option key={t} value={t}>{t}</option>)}
+                                                </select>
+                                                {masse.taxation !== '' && bouton(appliquerMasseTaxation)}
+                                            </div>
+                                        </th>
+                                        <th style={th}></th>
+                                        {celluleBudget('btech')}
+                                        {celluleBudget('besp')}
+                                        {celluleBudget('bcont')}
+                                        <th style={th}></th>
+                                    </>
+                                );
+                            })()}
                         </tr>
                     </thead>
                     <tbody>
@@ -801,6 +1016,15 @@ export default function PlanificationRevenu() {
 
                             return (
                                 <tr key={row.key} style={{ borderBottom: '1px solid #333', backgroundColor: idx % 2 === 0 ? '#1e1e1e' : '#252525' }}>
+                                    <td style={tdStyle}>
+                                        <input
+                                            type="checkbox"
+                                            checked={!exclus.has(key)}
+                                            onChange={e => basculerSelection(idx, e.target.checked, (e.nativeEvent as MouseEvent).shiftKey)}
+                                            title="Inclure ce système dans les actions de masse (Maj+clic : toute la plage depuis la dernière case cliquée)"
+                                            style={caseSelectionStyle}
+                                        />
+                                    </td>
                                     <td style={tdStyle}>{row.pos}</td>
                                     <td style={{ ...tdStyle, fontWeight: 'bold' }}>{row.nom}</td>
                                     <td style={tdStyle}>
@@ -974,6 +1198,29 @@ const selectStyle: React.CSSProperties = {
     padding: '4px 6px',
     fontSize: '0.9em',
     cursor: 'pointer'
+};
+
+const caseSelectionStyle: React.CSSProperties = { cursor: 'pointer', width: '16px', height: '16px' };
+
+// Ligne des actions de masse : distincte de l'en-tête (pas de majuscules, fond plus clair)
+const thMasseStyle: React.CSSProperties = {
+    padding: '6px 8px',
+    textTransform: 'none',
+    letterSpacing: 'normal',
+    fontWeight: 'normal',
+    backgroundColor: '#1f2a3a',
+    verticalAlign: 'top',
+    zIndex: 9,
+};
+
+const boutonMasseStyle: React.CSSProperties = {
+    backgroundColor: '#2e4a6b',
+    color: '#fff',
+    border: '1px solid #4f7aa8',
+    borderRadius: '4px',
+    padding: '3px 8px',
+    fontSize: '0.85em',
+    whiteSpace: 'nowrap',
 };
 
 const resetButtonStyle: React.CSSProperties = {
