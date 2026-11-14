@@ -46,7 +46,7 @@ L'évolution de stabilité par tour est la somme de :
 - le gouverneur (dans le rapport : `<evostab t="gouverneur">`) ;
 - la politique ;
 - les stocks de marchandises (`t="marchandise"`) ;
-- la distance à la capitale (pénalité maximale sans capitale) ;
+- la distance à la capitale (pénalité maximale sans capitale) ; barème et changement de capitale : voir [ordres-revenus.md](ordres-revenus.md#changement-de-capitale) ;
 - la taxation : `{+6, +3, +1, −3, −7, −12}` pour les taux 0 à 5.
 
 Le risque de révolte d'un système est `1 − (stabilité/100)^nombre de planètes`.

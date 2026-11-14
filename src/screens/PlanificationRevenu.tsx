@@ -1,10 +1,11 @@
 import React, { useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Lieutenant, SystemeJoueur } from '../types';
+import { Lieutenant, SystemeJoueur, XY } from '../types';
 import { useReport } from '../context/ReportContext';
-import { isPos, parsePosString, posToString } from '../utils/position';
-import { loadPlanificationRevenu, savePlanificationRevenu } from '../utils/planificationRevenuStorage';
+import { getTorusDistance, isPos, parsePosString, posToString } from '../utils/position';
+import { loadCapitaleRevenu, loadPlanificationRevenu, saveCapitaleRevenu, savePlanificationRevenu } from '../utils/planificationRevenuStorage';
+import { bilansCapitales, COUT_CHANGER_CAPITALE, modificateurStabiliteCapitale } from '../utils/capitale';
 import { ajouterPrefixeSchema } from '../utils/ordreSchema';
 import { appliquerATous, ChampBudget, depasseraitCent, plage, restaurer, valeursAvant } from '../utils/revenuMasse';
 
@@ -74,6 +75,9 @@ const coutTerraformationPlanete = (niveau: number) => 50 + (niveau + 1) * 2;
 
 const COULEUR_MODIFIE = '#ff9800';
 
+// Nombre signé : « +3 », « 0 », « -2 »
+const signeNombre = (n: number) => `${n > 0 ? '+' : ''}${n}`;
+
 // Style d'un champ dont la valeur diffère du rapport
 // Souligne en pointillés les éléments qui possèdent une infobulle
 const SOULIGNE_INFOBULLE: React.CSSProperties = { textDecoration: 'underline dotted' };
@@ -103,7 +107,7 @@ const POSITION_RESERVE = '0_0_0';
 const codePositionOrdre = (pos: { x: number; y: number }) => `0_${pos.x}_${pos.y}`;
 const SEPARATEUR_SCHEMA = '%#!%';
 // Types d'ordres dans l'ordre de résolution du tour (php/ordres/fr/ordres.txt) ; les budgets sont distingués par domaine
-const ORDRE_GROUPES = ['gouverneur', 'politique', 'budget_tech', 'budget_ss', 'budget_ce', 'taxation', 'terraformation'];
+const ORDRE_GROUPES = ['gouverneur', 'capitale', 'politique', 'budget_tech', 'budget_ss', 'budget_ce', 'taxation', 'terraformation'];
 const CROISSANCE_MIN_PLANETE = 10;
 // Bonus de croissance de population (en points de %) d'un stock important, absents du rapport
 const BONUS_POP_ALIMENTAIRE = 5;
@@ -264,6 +268,27 @@ export default function PlanificationRevenu() {
         return m;
     }, [gouverneursDuRapport]);
 
+    // --- Capitale ---
+    // Capitale du rapport, seulement si c'est un de nos systèmes (sans capitale, le parseur renvoie 1_1 par défaut)
+    const capitaleRapport = useMemo(() => {
+        const cap = rapport?.joueur.capitale;
+        return cap && systems.some(s => s.pos.x === cap.x && s.pos.y === cap.y) ? posToString(cap) : null;
+    }, [rapport, systems]);
+    // Nouvelle capitale choisie pour le tour (clé « x_y ») ; null : la capitale du rapport est conservée
+    const [capitaleStore, setCapitaleStore] = useState<{ tour: number | undefined; cle: string | null }>({ tour: undefined, cle: null });
+    useEffect(() => {
+        if (tour !== undefined) setCapitaleStore({ tour, cle: loadCapitaleRevenu(tour) });
+    }, [tour]);
+    const nouvelleCapitale = useMemo(() => {
+        const cle = capitaleStore.tour === tour ? capitaleStore.cle : null;
+        return systems.find(s => posToString(s.pos) === cle && cle !== capitaleRapport) ?? null;
+    }, [capitaleStore, tour, systems, capitaleRapport]);
+    const choisirCapitale = (cle: string | null) => {
+        const valeur = cle && cle !== capitaleRapport ? cle : null;
+        setCapitaleStore({ tour, cle: valeur });
+        if (tour !== undefined) saveCapitaleRevenu(tour, valeur);
+    };
+
     // Les états sont rattachés à un tour : un changement de rapport repart des valeurs du rapport
     const [store, setStore] = useState<{ tour: number | undefined; states: Record<string, SystemState> }>({ tour: undefined, states: {} });
     const states = useMemo(() => (store.tour === tour ? store.states : {}), [store, tour]);
@@ -352,6 +377,7 @@ export default function PlanificationRevenu() {
         systems.forEach(s => { etats[posToString(s.pos)] = etatDuRapport(s, gouverneurs, numeroJoueur); });
         setStates(() => etats);
         setHistorique({ tour, pile: [] });
+        choisirCapitale(null);
     };
 
     const handleTerraChange = (key: string, val: boolean) => {
@@ -460,8 +486,9 @@ export default function PlanificationRevenu() {
     }, []);
 
     const rows = useMemo(() => {
-        // Calcul d'un système pour un état donné (choix de l'utilisateur ou état du rapport)
-        const calcul = (s: SystemeJoueur, state: SystemState) => {
+        // Calcul d'un système pour un état donné (choix de l'utilisateur ou état du rapport).
+        // `capitale` : nouvelle capitale choisie, qui remplace le modificateur « position » du rapport ; absente, on garde celui du rapport
+        const calcul = (s: SystemeJoueur, state: SystemState, capitale?: XY) => {
             const key = posToString(s.pos);
 
             // Le rapport reflète déjà la politique actuelle : on n'applique que l'écart avec la politique choisie
@@ -491,6 +518,8 @@ export default function PlanificationRevenu() {
                     variation_stab += taxModif;
                 } else if (evo.t === 'gouverneur') {
                     // remplacé par l'apport du gouverneur choisi
+                } else if (evo.t === 'position' && capitale) {
+                    // remplacé par le modificateur de distance à la nouvelle capitale
                 } else {
                     variation_stab += (evo.v || 0);
                     detailStab.push(`${evo.t} : ${signe(evo.v || 0)}`);
@@ -500,6 +529,12 @@ export default function PlanificationRevenu() {
             // L'énoncé dit "lorsque je change une taxation, il faut remplacé le taxation par le modificateur de stab"
             if (!evostab.some(evo => evo.t === 'taxation')) {
                 variation_stab += taxModif;
+            }
+            if (capitale) {
+                const distance = getTorusDistance(capitale, s.pos);
+                const modPosition = modificateurStabiliteCapitale(distance, global?.modificateursStabilite);
+                variation_stab += modPosition;
+                detailStab.push(`position : ${signe(modPosition)} (distance ${distance} à la nouvelle capitale [${capitale.x}-${capitale.y}])`);
             }
             detailStab.push(`taxation ${state.taxation} : ${signe(taxModif)}`);
             variation_stab += deltaStabPolitique;
@@ -649,13 +684,28 @@ export default function PlanificationRevenu() {
         return systems.map(s => {
             const key = posToString(s.pos);
             return {
-                ...calcul(s, states[key] || etatDuRapport(s, gouverneurs, numeroJoueur)),
+                ...calcul(s, states[key] || etatDuRapport(s, gouverneurs, numeroJoueur), nouvelleCapitale?.pos),
                 rapport: calcul(s, etatDuRapport(s, gouverneurs, numeroJoueur)),
             };
         });
-    }, [systems, states, global, gouverneursDuRapport, gouverneurs, numeroJoueur]);
+    }, [systems, states, global, gouverneursDuRapport, gouverneurs, numeroJoueur, nouvelleCapitale]);
 
     const totals = useMemo(() => additionne(rows), [rows]);
+
+    // Aide au choix de la capitale : pour chaque système, somme des modificateurs « position » de tout l'empire s'il devenait la capitale
+    const aideCapitale = useMemo(() => {
+        const mods = global?.modificateursStabilite;
+        const bilans = bilansCapitales(systems.map(s => s.pos), mods);
+        const nom = (cle: string) => {
+            const s = systems.find(x => posToString(x.pos) === cle);
+            return s ? `[${s.pos.x}-${s.pos.y}] ${s.nom}` : cle;
+        };
+        // Sans capitale, chaque système subit le malus maximal
+        const malusSansCapitale = modificateurStabiliteCapitale(null, mods);
+        const actuel = bilans.find(b => b.cle === capitaleRapport)
+            ?? { total: systems.length * malusSansCapitale, nbMalus: malusSansCapitale < 0 ? systems.length : 0 };
+        return { bilans, nom, actuel, malusSansCapitale };
+    }, [systems, global, capitaleRapport]);
 
     // Coût de la terraformation des systèmes cochés (somme sur les planètes du joueur)
     const terraformation = useMemo(() => {
@@ -708,6 +758,10 @@ export default function PlanificationRevenu() {
                 ajoute('budget_ce', `${pos} budget CE ${etat.bcont}%`, ['modifier_budget', codePos, String(BUDGET_CE), String(etat.bcont)]);
             }
         });
+        if (nouvelleCapitale) {
+            ajoute('capitale', `Capitale [${nouvelleCapitale.pos.x}-${nouvelleCapitale.pos.y}] ${nouvelleCapitale.nom} (${COUT_CHANGER_CAPITALE} centaures)`,
+                ['changer_capitale', codePositionOrdre(nouvelleCapitale.pos)]);
+        }
         // Changements d'affectation : on ne donne que la nouvelle affectation du lieutenant
         const affectation = (etats: (s: SystemeJoueur) => string | null, format: (s: SystemeJoueur) => string = s => `[${s.pos.x}-${s.pos.y}] ${s.nom}`) => {
             const m: Record<string, string> = {};
@@ -730,7 +784,7 @@ export default function PlanificationRevenu() {
             lignes: ORDRE_GROUPES.flatMap(g => groupes[g].lignes),
             serveur: ORDRE_GROUPES.flatMap(g => groupes[g].serveur),
         };
-    }, [systems, states, gouverneurs, gouverneursDuRapport, global, numeroJoueur]);
+    }, [systems, states, gouverneurs, gouverneursDuRapport, global, numeroJoueur, nouvelleCapitale]);
     // Schéma à coller dans la console d'ordres : « table:param:param » par ordre, séparés par %#!%, le tout en base64 (UTF-8)
     const schema = useMemo(() => {
         if (ordresServeur.length === 0) return '';
@@ -772,7 +826,7 @@ export default function PlanificationRevenu() {
                     type="button"
                     onClick={copierSchema}
                     disabled={!schema}
-                    title="Copier le schéma des ordres (taxation, politique, budgets, terraformation, gouverneurs) à coller dans la console d'ordres"
+                    title="Copier le schéma des ordres (capitale, taxation, politique, budgets, terraformation, gouverneurs) à coller dans la console d'ordres"
                     style={{ ...resetButtonStyle, padding: '6px 12px', ...SOULIGNE_INFOBULLE, opacity: schema ? 1 : 0.3, cursor: schema ? 'pointer' : 'default' }}
                 >
                     {schemaCopie ? '✓ Schéma copié' : 'Copier le schéma des ordres'}
@@ -848,6 +902,73 @@ export default function PlanificationRevenu() {
                     Coût terraformation : <b style={{ color: '#fff' }}><Change>{String(terraformation.total)}</Change></b>
                     {terraformation.nb > 0 && <span style={{ fontSize: '0.85em' }}> ({terraformation.nb} système{terraformation.nb > 1 ? 's' : ''})</span>}
                 </div>
+            </div>
+
+            <div style={{
+                flex: '0 1 auto',
+                minWidth: 260,
+                padding: '8px 12px',
+                backgroundColor: '#2a2a2a',
+                borderRadius: '8px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                fontSize: '0.9em',
+            }}>
+                <strong style={{ color: '#aaa', textTransform: 'uppercase', fontSize: '0.8em' }}>Capitale</strong>
+                <div
+                    style={{ marginTop: '4px', color: '#aaa', cursor: 'help', ...SOULIGNE_INFOBULLE }}
+                    title={`Chaque système reçoit à chaque tour un modificateur de stabilité selon sa distance à la capitale (ligne « position »).\nΣ = somme de ces modificateurs sur vos ${systems.length} systèmes.`}
+                >
+                    Actuelle : <b style={{ color: '#fff' }}>{capitaleRapport ? aideCapitale.nom(capitaleRapport) : 'aucune'}</b>
+                    {' '}(Σ {signeNombre(aideCapitale.actuel.total)}
+                    {!capitaleRapport && `, ${signeNombre(aideCapitale.malusSansCapitale)} par système`})
+                </div>
+                <div style={{ marginTop: '4px' }}>
+                    <select
+                        value={nouvelleCapitale ? posToString(nouvelleCapitale.pos) : ''}
+                        onChange={e => choisirCapitale(e.target.value || null)}
+                        title={`Changer de capitale (ordre changer_capitale, ${COUT_CHANGER_CAPITALE} centaures, un seul par tour).\nSystèmes classés du meilleur au moins bon : Σ des modificateurs « position », écart avec la capitale actuelle, nombre de systèmes en malus.`}
+                        style={styleModifie({ ...selectStyle, maxWidth: 340 }, !!nouvelleCapitale)}
+                    >
+                        <option value="">{capitaleRapport ? 'Conserver la capitale actuelle' : 'Pas de nouvelle capitale'}</option>
+                        {aideCapitale.bilans.filter(b => b.cle !== capitaleRapport).map(b => (
+                            <option key={b.cle} value={b.cle}>
+                                {`${aideCapitale.nom(b.cle)} : Σ ${signeNombre(b.total)} (${signeNombre(b.total - aideCapitale.actuel.total)}), ${b.nbMalus} en malus`}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                {nouvelleCapitale && (() => {
+                    const bilan = aideCapitale.bilans.find(b => b.cle === posToString(nouvelleCapitale.pos));
+                    const ecart = bilan ? bilan.total - aideCapitale.actuel.total : 0;
+                    return (
+                        <div style={{ marginTop: '4px', color: '#aaa' }}>
+                            Stabilité par tour : <b style={{ color: ecart >= 0 ? '#4caf50' : '#f44336' }}>{signeNombre(ecart)}</b> au total
+                            {' '}· Coût : <b style={{ color: '#fff' }}>{COUT_CHANGER_CAPITALE}</b> centaures
+                        </div>
+                    );
+                })()}
+                {(() => {
+                    const meilleure = aideCapitale.bilans[0];
+                    if (!meilleure) return null;
+                    if (meilleure.cle === capitaleRapport || meilleure.total <= aideCapitale.actuel.total) {
+                        return <div style={{ marginTop: '4px', color: '#666' }}>La capitale actuelle est déjà la meilleure position.</div>;
+                    }
+                    if (nouvelleCapitale && posToString(nouvelleCapitale.pos) === meilleure.cle) return null;
+                    return (
+                        <div style={{ marginTop: '4px', color: '#aaa' }}>
+                            Meilleure : <b style={{ color: '#fff' }}>{aideCapitale.nom(meilleure.cle)}</b>
+                            {' '}(<span style={{ color: '#4caf50' }}>{signeNombre(meilleure.total - aideCapitale.actuel.total)}</span>)
+                            <button
+                                type="button"
+                                onClick={() => choisirCapitale(meilleure.cle)}
+                                title="Choisir ce système comme nouvelle capitale"
+                                style={{ ...boutonMasseStyle, marginLeft: '6px', cursor: 'pointer' }}
+                            >
+                                Choisir
+                            </button>
+                        </div>
+                    );
+                })()}
             </div>
 
                 <div style={{ flex: 1, minWidth: 220, position: 'relative', backgroundColor: '#2a2a2a', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
