@@ -30,6 +30,8 @@ type Props = {
   onMoveFleet?: (fleetNum: number) => void;
   // Numéros des flottes ayant déjà un ordre de déplacement en mémoire (lignes en bleu)
   fleetsWithOrder?: ReadonlySet<number>;
+  // Bloc « Fusion / division » de la case (option de la carte), affiché après « Mes flottes »
+  blocOrdresFlottes?: React.ReactNode;
   colorMode?: 'status' | 'race' | 'player';
 };
 
@@ -49,7 +51,7 @@ const StaleIcon = () => (
 
 
 
-export default function InfoPanel({ selected, onFleetHover, onMoveFleet, fleetsWithOrder, colorMode = 'status' }: Props) {
+export default function InfoPanel({ selected, onFleetHover, onMoveFleet, fleetsWithOrder, blocOrdresFlottes, colorMode = 'status' }: Props) {
   const { rapport, global, notes, addNote, deleteNote, allTags, publicCombats, zones, zoneLabels, fleetSnapshots, systemSnapshots } = useReport();
 
   // Zones affichées : celles qui couvrent la case, plus celles déjà listées pour cette sélection
@@ -431,6 +433,7 @@ export default function InfoPanel({ selected, onFleetHover, onMoveFleet, fleetsW
           <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 6 }}>vert = à portée · bleu = à portée, ordre de déplacement déjà donné · orange estompé = hors de portée ce tour · → = déplacer vers la case sélectionnée</div>
         </div>
       )}
+      {blocOrdresFlottes}
       {cellCombats.length > 0 && (
       <div className="info-block">
         <h4>Combats</h4>

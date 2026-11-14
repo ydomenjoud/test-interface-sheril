@@ -1,6 +1,7 @@
 import React, {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {FlotteJoueur, XY} from '../../types';
 import {isTypingTarget} from '../../utils/keyboard';
+import {libelleNumFlotte} from '../../utils/ordreFlotte';
 import {IconAlert, IconClose, IconFleetMove, IconGrip} from '../icons/Icons';
 
 export interface FleetPickerProps {
@@ -256,7 +257,7 @@ export function FleetPicker({anchor, fleets, dragNum, onSelectFleet, onDragEnd, 
                                         {fleet.nom}
                                     </span>
                                     <span style={{ color: '#94a3b8', fontSize: '0.8rem', flexShrink: 0 }}>
-                                        (#{fleet.num + 1})
+                                        ({libelleNumFlotte(fleet.num)})
                                     </span>
                                 </div>
                             </div>

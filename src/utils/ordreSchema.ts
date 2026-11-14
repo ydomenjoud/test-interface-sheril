@@ -4,7 +4,7 @@ import { XY } from '../types';
 export const SEPARATEUR_SCHEMA = '%#!%';
 
 // Type d'un schéma, écrit en préfixe « type|base64 » pour que la console d'ordres sache quoi importer
-export type TypeSchema = 'plan' | 'revenus' | 'construction' | 'deplacement' | 'recherche' | 'transfert';
+export type TypeSchema = 'plan' | 'revenus' | 'construction' | 'deplacement' | 'recherche' | 'transfert' | 'flotte';
 
 export const ajouterPrefixeSchema = (type: TypeSchema, schema: string): string => `${type}|${schema}`;
 
