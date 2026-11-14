@@ -19,6 +19,7 @@ import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
 import {loadDeplacements, saveDeplacements, clearDeplacements} from '../storage/deplacementOrdersStorage';
 import {DeplacementEnAttente, DeplacementOrdre, DIRECTIVE_DEFAUT, OPTIONS_DIRECTIVES, PRECISION_DEFAUT, PRECISION_PLANETE_MAX, PRECISION_PLANETE_MIN, STRATEGIE_DEFAUT, schemaDeplacements} from '../utils/ordreDeplacement';
 import {copierSchema} from '../utils/ordreSchema';
+import {nouvelleCapitaleOrdonnee} from '../utils/capitale';
 import {exportSystemesJoueur} from '../parsers/parseManualSystems';
 import {
   IconSystem,
@@ -372,6 +373,14 @@ export default function Carte() {
       setStabilitySystemPos(`${rapport.joueur.capitale.x}_${rapport.joueur.capitale.y}`);
     }
   }, [rapport, stabilitySystemPos]);
+
+  // « Distance Capitale » : l'option « Capitale » suit la nouvelle capitale ordonnée dans l'écran Revenus (ordre changer_capitale) ;
+  // un autre système choisi explicitement comme centre reste inchangé
+  const capitaleRapportCle = rapport?.joueur?.capitale ? posToString(rapport.joueur.capitale) : undefined;
+  const nouvelleCapitale = useMemo(() => nouvelleCapitaleOrdonnee(rapport), [rapport]);
+  const centreStabilite = nouvelleCapitale && stabilitySystemPos === capitaleRapportCle
+    ? posToString(nouvelleCapitale)
+    : stabilitySystemPos;
 
   const noRapportMessage = !rapport ? (
     <div className="no-rapport-hint" style={{ padding: '6px 14px', background: 'rgba(245, 158, 11, 0.12)', color: '#fbbf24', borderBottom: '1px solid #f59e0b', fontSize: '0.85rem' }}>
@@ -924,7 +933,7 @@ export default function Carte() {
             colorMode={colorMode}
             mapTheme={mapTheme}
             showStabilityZones={showStabilityZones}
-            stabilitySystemPos={stabilitySystemPos}
+            stabilitySystemPos={centreStabilite}
             deplacements={ciblesDeplacements}
             dragFleet={dragState && dragCursor ? { from: dragState.from, vitesse: dragState.vitesse, cursor: dragCursor } : null}
             onFleetCellMouseDown={onFleetCellMouseDown}
@@ -1363,6 +1372,9 @@ par diplo
                           <select
                               value={stabilitySystemPos || ''}
                               onChange={(e) => setStabilitySystemPos(e.target.value)}
+                              title={nouvelleCapitale
+                                  ? `Un changement de capitale vers ${nouvelleCapitale.x}_${nouvelleCapitale.y} est ordonné dans l'écran Revenus : l'option « Nouvelle capitale » centre les zones sur elle.`
+                                  : undefined}
                               style={{
                                   background: '#1e2530',
                                   color: '#f1f5f9',
@@ -1374,7 +1386,9 @@ par diplo
                           >
                               {rapport?.joueur?.capitale && (
                                   <option value={`${rapport.joueur.capitale.x}_${rapport.joueur.capitale.y}`}>
-                                      Capitale ({rapport.joueur.capitale.x}_{rapport.joueur.capitale.y})
+                                      {nouvelleCapitale
+                                          ? `Nouvelle capitale (${nouvelleCapitale.x}_${nouvelleCapitale.y}), ordre Revenus`
+                                          : `Capitale (${rapport.joueur.capitale.x}_${rapport.joueur.capitale.y})`}
                                   </option>
                               )}
                               {(rapport?.systemesJoueur || [])

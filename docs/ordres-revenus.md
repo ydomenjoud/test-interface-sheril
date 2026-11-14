@@ -37,6 +37,7 @@ Dans l'écran Revenus (panneau « Capitale ») :
 - Tant que la capitale n'est pas changée, rien ne change : la ligne « position » du rapport est reprise telle quelle.
 - Une nouvelle capitale remplace, pour chaque système, la ligne « position » par le modificateur recalculé (colonne de variation de stabilité, détail au survol).
 - Aide au choix : chaque système du joueur est classé selon la somme des modificateurs « position » de tout l'empire s'il devenait la capitale (Σ, écart avec la capitale actuelle, nombre de systèmes en malus) ; la meilleure est proposée avec un bouton « Choisir ».
+- Carte : quand une nouvelle capitale est choisie pour le tour du rapport affiché, les carrés « Distance Capitale » (panneau Filtres) se centrent sur elle si l'option « Capitale » est sélectionnée ; l'option est alors libellée « Nouvelle capitale (x_y), ordre Revenus ». Un autre système choisi explicitement comme centre n'est pas déplacé.
 - La capitale du rapport n'est retenue que si elle fait partie des systèmes du joueur (sans capitale, le parseur renvoie 1_1 par défaut) ; sinon elle est considérée absente (−16 partout).
 - Le coût de 100 centaures est affiché, pas déduit du bénéfice.
 - Pas d'ajustement automatique de la taxation.

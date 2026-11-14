@@ -1,4 +1,6 @@
-import { bilansCapitales, modificateurPosition, modificateurStabiliteCapitale, MODIFICATEURS_STABILITE_CAPITALE_DEFAUT } from './capitale';
+import { bilansCapitales, modificateurPosition, modificateurStabiliteCapitale, MODIFICATEURS_STABILITE_CAPITALE_DEFAUT, nouvelleCapitaleOrdonnee } from './capitale';
+import { saveCapitaleRevenu } from './planificationRevenuStorage';
+import { Rapport } from '../types';
 
 describe('modificateurStabiliteCapitale', () => {
     it('suit le barème du moteur, seuils exclusifs', () => {
@@ -55,5 +57,31 @@ describe('bilansCapitales', () => {
 
     it('renvoie une liste vide sans système', () => {
         expect(bilansCapitales([])).toEqual([]);
+    });
+});
+
+describe('nouvelleCapitaleOrdonnee', () => {
+    const rapport = {
+        tour: 16,
+        joueur: { capitale: { x: 2, y: 1 } },
+        systemesJoueur: [{ pos: { x: 2, y: 1 } }, { pos: { x: 8, y: 9 } }],
+    } as unknown as Rapport;
+
+    afterEach(() => localStorage.clear());
+
+    it("renvoie la capitale choisie dans l'écran Revenus pour le tour du rapport", () => {
+        saveCapitaleRevenu(16, '8_9');
+        expect(nouvelleCapitaleOrdonnee(rapport)).toEqual({ x: 8, y: 9 });
+    });
+
+    it("ignore l'absence d'ordre, un autre tour, la capitale actuelle et un système qui n'est pas au joueur", () => {
+        expect(nouvelleCapitaleOrdonnee(rapport)).toBeNull();
+        saveCapitaleRevenu(15, '8_9');
+        expect(nouvelleCapitaleOrdonnee(rapport)).toBeNull();
+        saveCapitaleRevenu(16, '2_1');
+        expect(nouvelleCapitaleOrdonnee(rapport)).toBeNull();
+        saveCapitaleRevenu(16, '30_30');
+        expect(nouvelleCapitaleOrdonnee(rapport)).toBeNull();
+        expect(nouvelleCapitaleOrdonnee(undefined)).toBeNull();
     });
 });

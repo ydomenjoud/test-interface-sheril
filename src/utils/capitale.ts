@@ -1,5 +1,6 @@
-import { ModificateurStabilite, XY } from '../types';
+import { ModificateurStabilite, Rapport, XY } from '../types';
 import { getTorusDistance, posToString } from './position';
+import { loadCapitaleRevenu } from './planificationRevenuStorage';
 
 // Coût de l'ordre changer_capitale (moteur : Const.COUT_CHANGER_CAPITALE)
 export const COUT_CHANGER_CAPITALE = 100;
@@ -38,6 +39,19 @@ export function modificateurStabiliteCapitale(distance: number | null, mods?: Mo
 // Modificateur « position » d'un système pour une capitale donnée (null : pas de capitale)
 export const modificateurPosition = (systeme: XY, capitale: XY | null, mods?: ModificateurStabilite[]) =>
     modificateurStabiliteCapitale(capitale ? getTorusDistance(capitale, systeme) : null, mods);
+
+/**
+ * Nouvelle capitale ordonnée dans l'écran Revenus pour le tour du rapport (ordre changer_capitale), null s'il n'y en a pas.
+ * Seul un système du joueur, différent de la capitale du rapport, est retenu.
+ */
+export function nouvelleCapitaleOrdonnee(rapport: Rapport | undefined | null): XY | null {
+    if (!rapport || rapport.tour === undefined) return null;
+    const cle = loadCapitaleRevenu(rapport.tour);
+    if (!cle) return null;
+    const cap = rapport.joueur?.capitale;
+    if (cap && posToString(cap) === cle) return null;
+    return (rapport.systemesJoueur ?? []).find(s => posToString(s.pos) === cle)?.pos ?? null;
+}
 
 export type BilanCapitale = {
     cle: string;        // posToString de la capitale candidate
