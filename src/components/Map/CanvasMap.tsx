@@ -10,7 +10,7 @@ import {Alliance, GlobalData, XY, Zone} from '../../types';
 import {lightenHexColor, getColorForPlayer} from "../../utils/global";
 import {detectionWeight, PresenceData} from '../../utils/presence';
 import {isTypingTarget} from '../../utils/keyboard';
-import {DEFAULT_FLEET_OWNER_VISIBILITY, DEFAULT_FLEET_POWER_RANGE, FleetOwnerVisibility, FleetPowerRange, isFleetVisible} from '../../utils/fleetModel';
+import {DEFAULT_FLEET_OWNER_VISIBILITY, DEFAULT_FLEET_POWER_RANGE, FleetOwnerVisibility, FleetPowerRange, isFleetOwnerSelected, isFleetVisible} from '../../utils/fleetModel';
 
 const OWNER_BADGE_COLORS: Record<number, string> = {
     1: '#0066CC',
@@ -275,10 +275,11 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
     }, [rapport, currentPlayerId]);
 
     // Sous-ensemble dessiné : flottes restantes après filtres (plage de puissance, nos flottes,
-    // flottes neutres). N'affecte que l'affichage — le rapport et les ordres restent intacts.
+    // flottes neutres, commandants sélectionnés). N'affecte que l'affichage — le rapport et les ordres restent intacts.
     const visibleFleets = useMemo(
-        () => fleets.filter(fleet => isFleetVisible(fleet, fleetPowerRange, fleetVisibility)),
-        [fleets, fleetPowerRange, fleetVisibility]);
+        () => fleets.filter(fleet => isFleetVisible(fleet, fleetPowerRange, fleetVisibility)
+            && isFleetOwnerSelected(fleet, selectedOwners)),
+        [fleets, fleetPowerRange, fleetVisibility, selectedOwners]);
 
     const combats = useMemo(() => {
         const fromRapport = rapport?.combats ?? [];
@@ -1045,11 +1046,6 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             if (!owners || owners.length === 0) return false;
             return owners.some(o => selectedOwners.includes(o));
         };
-        const isFleetSelected = (owner?: number) => {
-            if (!selectedOwners || selectedOwners.length === 0) return true;
-            if (owner == null) return false;
-            return selectedOwners.includes(owner);
-        };
 
         if (showSystems) {
             systems.forEach(s => {
@@ -1348,12 +1344,7 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             const cy = py + cellSize / 2;
             const c2d = ctx as CanvasRenderingContext2D;
             const owners = Array.from(new Set(fGroup.map(f => f.owner)));
-            const isSelected = fGroup.some(f => isFleetSelected(f.owner));
-
             c2d.save();
-            if (!isSelected) {
-                c2d.filter = 'grayscale(1)';
-            }
 
             const ownerColor = tc(colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global)) || '#000000';
             c2d.fillStyle = '#ffffff';
@@ -1406,18 +1397,16 @@ export default function CanvasMap({onSelect, onCreateZone, previewZone, selected
             });
             c2d.restore();
 
-            // Contour fin si la flotte correspond au filtre (remplace l'ancien halo lumineux)
-            if (isSelected) {
-                const col = tc(colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global));
-                const cRing = ctx as CanvasRenderingContext2D;
-                cRing.save();
-                cRing.strokeStyle = col || '#000000';
-                cRing.lineWidth = 1;
-                cRing.beginPath();
-                cRing.arc(cx, cy, diameter / 2 + 2, 0, Math.PI * 2);
-                cRing.stroke();
-                cRing.restore();
-            }
+            // Contour fin (remplace l'ancien halo lumineux) ; les flottes hors filtre ne sont plus dessinées
+            const col = tc(colorForOwnership(currentPlayerId, owners, rapport?.joueur.alliances, rapport?.joueur.pna, colorMode, global));
+            const cRing = ctx as CanvasRenderingContext2D;
+            cRing.save();
+            cRing.strokeStyle = col || '#000000';
+            cRing.lineWidth = 1;
+            cRing.beginPath();
+            cRing.arc(cx, cy, diameter / 2 + 2, 0, Math.PI * 2);
+            cRing.stroke();
+            cRing.restore();
         }
 
         // Marqueurs de combat au-dessus des systèmes (S = spatial, P = planétaire)

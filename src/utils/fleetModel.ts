@@ -37,6 +37,12 @@ export function fleetPowerCriterion(fleet: MapFleet): number | null {
     return level === MAX_POWER_LEVEL ? Infinity : PUISSANCE_STOPS[level + 1];
 }
 
+/** Filtre « Afficher uniquement Commandants » de la carte : liste vide = tous les commandants. */
+export function isFleetOwnerSelected(fleet: MapFleet, selectedOwners?: number[]): boolean {
+    if (!selectedOwners || selectedOwners.length === 0) return true;
+    return selectedOwners.includes(fleet.owner);
+}
+
 /** Visibilité d'une flotte : propriétaire (nôtres / neutres) × plage de puissance (seuils du jeu). */
 export function isFleetVisible(fleet: MapFleet, range: FleetPowerRange = DEFAULT_FLEET_POWER_RANGE,
     visibility: FleetOwnerVisibility = DEFAULT_FLEET_OWNER_VISIBILITY): boolean {

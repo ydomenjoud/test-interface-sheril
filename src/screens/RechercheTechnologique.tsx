@@ -6,6 +6,44 @@ import {ajouterPrefixeSchema} from "../utils/ordreSchema";
 
 type Assign = { code: string; amount: number; percent: number };
 
+/** Le budget d'une technologie se répartit en % entiers du budget total, entre 0 et 100. */
+function bornerPourcentage(percent: number): number {
+    if (!Number.isFinite(percent)) return 0;
+    return Math.max(0, Math.min(100, Math.round(percent)));
+}
+
+/**
+ * Champ numérique saisi librement : la valeur n'est validée qu'à la sortie du champ ou sur Entrée
+ * (Échap annule), pour ne pas recalculer la ligne à chaque chiffre tapé.
+ */
+function SaisieNombre({valeur, onValider, width, title, suffixe}: {
+    valeur: number; onValider: (v: number) => void; width: number; title?: string; suffixe?: string;
+}) {
+    const [brouillon, setBrouillon] = useState<string | null>(null);
+    const valider = () => {
+        if (brouillon === null) return;
+        const v = parseFloat(brouillon.replace(',', '.'));
+        if (Number.isFinite(v)) onValider(v);
+        setBrouillon(null);
+    };
+    return (<>
+        <input
+            type="number"
+            min={0}
+            title={title}
+            value={brouillon ?? valeur}
+            onChange={e => setBrouillon(e.target.value)}
+            onFocus={e => e.target.select()}
+            onBlur={valider}
+            onKeyDown={e => {
+                if (e.key === 'Enter') valider();
+                if (e.key === 'Escape') setBrouillon(null);
+            }}
+            style={{width, textAlign: 'right'}}
+        />{suffixe}
+    </>);
+}
+
 export default function RechercheTechnologique() {
     const {global, rapport} = useReport();
     const tour = rapport?.tour;
@@ -70,8 +108,15 @@ export default function RechercheTechnologique() {
     }, [assigns, manualBudget, tour]); // This effect runs only when `assigns` or `manualBudget` changes.
 
     function updateAssign(assign: Pick<Assign, "code" | "percent">) {
-        const amount = assign.percent * onePercentAmount;
-        setAssigns(prev => prev.map(a => a.code === assign.code ? {...a, ...assign, amount} : a));
+        const percent = bornerPourcentage(assign.percent);
+        const amount = percent * onePercentAmount;
+        setAssigns(prev => prev.map(a => a.code === assign.code ? {...a, percent, amount} : a));
+    }
+
+    /** Montant saisi : arrondi au % supérieur (le jeu répartit le budget en % entiers). */
+    function updateAmount(code: string, amount: number) {
+        if (budget <= 0) return;
+        updateAssign({code, percent: Math.ceil(amount / budget * 100)});
     }
 
     const atteignables = rapport?.technologiesAtteignables;
@@ -109,13 +154,13 @@ export default function RechercheTechnologique() {
     const budget = manualBudget !== null ? manualBudget : calculatedBudget;
 
     const totalAllocated = assigns.reduce((s, a) => s + (a.amount || 0), 0);
-    const totalPercent = budget > 0 ? Math.min(100, Math.ceil((totalAllocated / budget) * 100)) : 0;
 
     function calculateAssign(code: string) {
         const t = (global?.technologies ?? []).find(tt => tt.code === code);
         const seuil = t?.recherche ?? 0;
         // pourcentage
-        const percent = Math.ceil((seuil / budget) * 100);
+        // Plafonné à 100 % : une technologie plus chère que le budget ne peut pas recevoir plus que tout le budget
+        const percent = budget > 0 ? bornerPourcentage(Math.ceil((seuil / budget) * 100)) : 0;
         const amount = Math.floor(percent * budget / 100);
 
         return {code, amount, percent};
@@ -150,20 +195,17 @@ export default function RechercheTechnologique() {
             return;
         }
 
-        const index = assigns.findIndex(a => a.code === code);
-        const assign = assigns[index]
+        const assign = assigns.find(a => a.code === code);
         if (!assign) return;
-        assign.percent += 1;
-        updateAssign(assign);
+        updateAssign({code, percent: bornerPourcentage(assign.percent) + 1});
 
     }
 
     function decreasePercent(code: string) {
-        const index = assigns.findIndex(a => a.code === code);
-        if (index < 0) return;
-        const assign = assigns[index]
-        assign.percent -= 1;
-        updateAssign(assign);
+        const assign = assigns.find(a => a.code === code);
+        if (!assign) return;
+        // Une valeur enregistrée au-delà de 100 % (anciennes versions) repart de 100 %
+        updateAssign({code, percent: bornerPourcentage(assign.percent) - 1});
     }
 
     const rows = assigns.map(a => {
@@ -180,6 +222,9 @@ export default function RechercheTechnologique() {
             return acc;
         }, {coutRecherche: 0, percent: 0});
     }, [rows]);
+
+    // Somme des % répartis (ce que porte l'ordre) : au-delà de 100 %, la répartition est impossible
+    const depassementPercent = Math.max(0, tableTotals.percent - 100);
 
     const shareCode = ajouterPrefixeSchema('recherche', btoa(rows.map(row=> `${row.a.code}:${row.rowPct}`).join('%')));
 
@@ -232,8 +277,13 @@ export default function RechercheTechnologique() {
             <div className="badge" style={{background: '#123', color: '#ddd'}}>
                 Reste: <b className="cur">{currencyFormatter.format(Math.max(0, budget - totalAllocated))}</b>
             </div>
-            <div className="badge" style={{background: '#235', color: '#ddd'}}>
-                % alloué: <b>{totalPercent}%</b>
+            <div
+                className="badge"
+                style={{background: depassementPercent > 0 ? '#7f1d1d' : '#235', color: depassementPercent > 0 ? '#fecaca' : '#ddd'}}
+                title={depassementPercent > 0 ? 'La somme des pourcentages dépasse 100 % du budget' : undefined}
+            >
+                % alloué: <b>{tableTotals.percent}%</b>
+                {depassementPercent > 0 && <> ⚠ +{depassementPercent}%</>}
             </div>
             <div className="badge" style={{background: '#235', color: '#ddd'}}>
                 1% = <b className="cur">{Math.floor(budget / 100)}</b>
@@ -269,6 +319,15 @@ export default function RechercheTechnologique() {
             </button>
             </div>
         </div>
+
+        {depassementPercent > 0 && (
+            <div
+                role="alert"
+                style={{marginBottom: 10, padding: '6px 10px', border: '1px solid #b91c1c', borderRadius: 4, background: '#450a0a', color: '#fecaca'}}
+            >
+                ⚠ La répartition totalise <b>{tableTotals.percent}%</b> du budget : réduisez de <b>{depassementPercent}%</b> pour revenir à 100 %.
+            </div>
+        )}
 
         <div style={{display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10}}>
             <div>
@@ -306,17 +365,22 @@ export default function RechercheTechnologique() {
                     <td dangerouslySetInnerHTML={{__html: t?.description || ''}}></td>
                     <td style={{textAlign: 'right'}}>{t?.recherche ?? '—'}</td>
                     <td style={{textAlign: 'right'}}>
-                        <input
-                            type="number"
-                            min={0}
-                            readOnly={true}
-                            value={a.amount}
-                            style={{width: 120, textAlign: 'right'}}
+                        <SaisieNombre
+                            valeur={a.amount}
+                            onValider={v => updateAmount(a.code, v)}
+                            width={120}
+                            title="Montant souhaité : arrondi au % de budget supérieur"
                         />
                     </td>
                     <td style={{textAlign: 'right', whiteSpace: 'nowrap'}}>
                         <button onClick={() => decreasePercent(a.code)} style={{padding: '2px 5px', marginRight: 5}} disabled={a.amount <= 0}>-</button>
-                        {rowPct}%
+                        <SaisieNombre
+                            valeur={rowPct}
+                            onValider={v => updateAssign({code: a.code, percent: v})}
+                            width={60}
+                            title="Pourcentage du budget (0 à 100)"
+                            suffixe="%"
+                        />
                         <button onClick={() => increasePercent(a.code)} style={{padding: '2px 5px', marginLeft: 5}} disabled={totalAllocated >= budget || a.amount >= (t?.recherche ?? Infinity)}>+</button>
                     </td>
                     <td>
@@ -335,7 +399,9 @@ export default function RechercheTechnologique() {
                     <td></td>
                     <td style={{textAlign: 'right', fontWeight: 'bold'}}>{tableTotals.coutRecherche}</td>
                     <td style={{textAlign: 'right', fontWeight: 'bold'}}>{totalAllocated}</td>
-                    <td style={{textAlign: 'right', fontWeight: 'bold'}}>{tableTotals.percent}%</td>
+                    <td style={{textAlign: 'right', fontWeight: 'bold', color: depassementPercent > 0 ? '#f87171' : undefined}}>
+                        {depassementPercent > 0 && '⚠ '}{tableTotals.percent}%
+                    </td>
                     <td></td>
                 </tr>
                 </tfoot>

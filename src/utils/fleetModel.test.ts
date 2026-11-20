@@ -1,5 +1,5 @@
 import {
-    DEFAULT_FLEET_POWER_RANGE, fleetPowerCriterion, isFleetVisible, MapFleet, MAX_POWER_LEVEL, restoreFleetPowerRange,
+    DEFAULT_FLEET_POWER_RANGE, fleetPowerCriterion, isFleetOwnerSelected, isFleetVisible, MapFleet, MAX_POWER_LEVEL, restoreFleetPowerRange,
 } from './fleetModel';
 
 const detected = (owner: number, num: number, puiss = 'moyenne', pos = {x: 19, y: 6}): MapFleet => ({
@@ -97,5 +97,19 @@ describe('fleet power range preference', () => {
 
     it.each([null, '{broken', '{}', 'true', '5', '"moyenne"'])('defaults safely for invalid or absent preferences %s', saved => {
         expect(restoreFleetPowerRange(saved)).toEqual(DEFAULT_FLEET_POWER_RANGE);
+    });
+});
+
+describe('commander filter on fleets', () => {
+    it('keeps every fleet when no commander is selected', () => {
+        expect(isFleetOwnerSelected(detected(7, 1), [])).toBe(true);
+        expect(isFleetOwnerSelected(detected(7, 1), undefined)).toBe(true);
+    });
+
+    it('keeps only the fleets of the selected commanders', () => {
+        expect(isFleetOwnerSelected(detected(7, 1), [7, 9])).toBe(true);
+        expect(isFleetOwnerSelected(detected(8, 2), [7, 9])).toBe(false);
+        expect(isFleetOwnerSelected(own(3), [7])).toBe(false);
+        expect(isFleetOwnerSelected(own(3), [50])).toBe(true);
     });
 });

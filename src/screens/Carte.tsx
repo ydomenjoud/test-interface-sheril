@@ -12,7 +12,7 @@ import {isTypingTarget} from '../utils/keyboard';
 import {wrapX, wrapY, posToString} from '../utils/position';
 import {computePresence, PresenceData} from '../utils/presence';
 import {adaptColorToTheme, MAP_THEMES, MapThemeName} from '../utils/mapTheme';
-import {FleetOwnerVisibility, FleetPowerRange, isFleetVisible, MapFleet, restoreFleetPowerRange} from '../utils/fleetModel';
+import {FleetOwnerVisibility, FleetPowerRange, isFleetOwnerSelected, isFleetVisible, MapFleet, restoreFleetPowerRange} from '../utils/fleetModel';
 import Modal from '../components/utils/Modal';
 import {GlobalData, Strategie, XY, Zone} from '../types';
 import {DropdownOption, MultiSelectDropdown} from "../components/multiselect";
@@ -127,9 +127,10 @@ export default function Carte() {
     ];
     return {
       total: all.length,
-      visible: all.filter(f => isFleetVisible(f, fleetPowerRange, fleetVisibility)).length,
+      visible: all.filter(f => isFleetVisible(f, fleetPowerRange, fleetVisibility)
+        && isFleetOwnerSelected(f, selectedOwners)).length,
     };
-  }, [rapport, fleetPowerRange, fleetVisibility]);
+  }, [rapport, fleetPowerRange, fleetVisibility, selectedOwners]);
   // Portées radar : désactivées par défaut (voile bleu sur la carte) ; à activer dans les Filtres si besoin
   const [showSystemRadar, setShowSystemRadar] = useState<boolean>(() => {
     const saved = localStorage.getItem('carte_show_system_radar');
