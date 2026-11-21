@@ -21,6 +21,10 @@ import {DeplacementEnAttente, DeplacementOrdre, DIRECTIVE_DEFAUT, OPTIONS_DIRECT
 import {copierSchema} from '../utils/ordreSchema';
 import {nouvelleCapitaleOrdonnee} from '../utils/capitale';
 import {exportSystemesJoueur} from '../parsers/parseManualSystems';
+import OrdresFlottesCase from '../components/Map/OrdresFlottesCase';
+import '../components/Map/OrdresFlottes.css';
+import {loadOrdresFlottes, saveOrdresFlottes} from '../storage/ordresFlottesStorage';
+import {appliquerDivisions, DivisionOrdre, estFlotteDivisee, FusionOrdre, flotteResultante, libelleNumFlotte, numFlotteDivisee, OrdresFlottes, ORDRES_FLOTTES_VIDES, positionFinale, prochainNumeroDivision, schemaOrdresFlottes} from '../utils/ordreFlotte';
 import {
   IconSystem,
   IconRadarSystem,
@@ -499,6 +503,16 @@ export default function Carte() {
   // Les déplacements sont rattachés au tour du rapport affiché, comme la planification des revenus
   const tour = rapport?.tour;
   const [deplacements, setDeplacements] = useState<Record<number, DeplacementEnAttente>>(() => (tour !== undefined ? loadDeplacements(tour) : {}));
+  // Fusions / divisions du tour
+  const [ordresFlottes, setOrdresFlottes] = useState<OrdresFlottes>(() => (tour !== undefined ? loadOrdresFlottes(tour) : ORDRES_FLOTTES_VIDES));
+  // Flottes du joueur après les divisions du tour : celles qu'on déplace et qu'on fusionne
+  // (une flotte divisée a le num 10000 + n° de division, comme dans les ordres du jeu)
+  const flottesTour = useMemo(
+    () => appliquerDivisions(rapport?.flottesJoueur ?? [], ordresFlottes.divisions),
+    [rapport, ordresFlottes.divisions]
+  );
+  const flottesDivisees = useMemo(() => flottesTour.filter(f => estFlotteDivisee(f.num)), [flottesTour]);
+  const [copieSchemaFlottes, setCopieSchemaFlottes] = useState<'ok' | 'ko' | null>(null);
   // Panneau des déplacements : replié par défaut (comme Filtres), s'ouvre tout seul au premier dépos
   const [deplacementsExpanded, setDeplacementsExpanded] = useState(false);
   // Le sélecteur de flotte, ancré sur le mousedown qui l'a ouvert (coordonnées client)
@@ -528,6 +542,7 @@ export default function Carte() {
   // stockage — sans ce compteur, les déplacements en mémoire ressusciteraient à la sauvegarde)
   useEffect(() => {
     setDeplacements(tour !== undefined ? loadDeplacements(tour) : {});
+    setOrdresFlottes(tour !== undefined ? loadOrdresFlottes(tour) : ORDRES_FLOTTES_VIDES);
     resetFleetDrag();
   }, [tour, rapport, importCount, resetFleetDrag]);
 
@@ -535,6 +550,9 @@ export default function Carte() {
   useEffect(() => {
     if (tour !== undefined) saveDeplacements(tour, deplacements);
   }, [deplacements, tour]);
+  useEffect(() => {
+    if (tour !== undefined) saveOrdresFlottes(tour, ordresFlottes);
+  }, [ordresFlottes, tour]);
 
   // Le mousedown ouvre le sélecteur ; le CanvasMap appelant « tout mousedown » AVANT « mousedown sur
   // case de flotte » dans la même tâche, les deux setPicker sont groupés et l'ouverture l'emporte —
@@ -564,11 +582,11 @@ export default function Carte() {
   // le drag — le démonter dans le dragstart ferait annuler le drag par le navigateur (la source du
   // drag disparaît de l'DOM avant que le drag ne démarre réellement) ; il se ferme à la fin du drag
   const onSelectFleet = useCallback((fleetNum: number) => {
-    const flotte = rapport?.flottesJoueur.find(f => f.num === fleetNum);
+    const flotte = flottesTour.find(f => f.num === fleetNum);
     if (!flotte) return;
     setDragState({ num: flotte.num, from: flotte.pos, vitesse: flotte.vitesse });
     setDragCursor(null);
-  }, [rapport]);
+  }, [flottesTour]);
   // Fin du drag (dépos ou annulation) : on arrête le suivi et on referme le sélecteur
   // (la ligne du sélecteur restant montée, son dragend nous parvient bien)
   const onDragEnd = useCallback(() => {
@@ -598,7 +616,7 @@ export default function Carte() {
   // Dépos : sur la case d'origine de la flotte = annulation ; sinon création/remplacement de son déplacement
   // (un seul déplacement par flotte, le re-drag remplace ; un dépos hors de portée reste autorisé, marqué en rouge)
   const onFleetDrop = useCallback((fleetNum: number, cell: XY) => {
-    const origine = rapport?.flottesJoueur.find(f => f.num === fleetNum)?.pos;
+    const origine = flottesTour.find(f => f.num === fleetNum)?.pos;
     // Flotte absente du rapport affiché (changement de tour pendant le drag) : on ignore le
     // dépos plutôt que de stocker un déplacement orphelin
     if (!origine) {
@@ -617,23 +635,23 @@ export default function Carte() {
       setDeplacementsExpanded(true); // on ouvre le panneau pour montrer le résultat du dépos
     }
     resetFleetDrag();
-  }, [rapport, resetFleetDrag]);
+  }, [flottesTour, resetFleetDrag]);
   // Alternative clavier au glisser-déposer : le bouton « → » de « Mes flottes » (panneau info)
   // déplace la flotte vers la case sélectionnée (même règle qu'un dépos : case d'origine = annulation)
   const onMoveFleetToSelected = useCallback((fleetNum: number) => {
-    const flotte = rapport?.flottesJoueur.find(f => f.num === fleetNum);
+    const flotte = flottesTour.find(f => f.num === fleetNum);
     if (!flotte || !selected) return;
     if (flotte.pos.x === selected.x && flotte.pos.y === selected.y) return;
     setDeplacements(d => ({ ...d, [fleetNum]: { to: selected, directive: DIRECTIVE_DEFAUT, strategy: STRATEGIE_DEFAUT } }));
     setDeplacementsExpanded(true);
-  }, [rapport, selected]);
+  }, [flottesTour, selected]);
 
   // Schéma d'ordres : un ordre par déplacement dont la flotte est encore dans le rapport
   // (une flotte introuvable, ex. tour différent, est ignorée ici et en ligne repliée du panneau)
   const ordresDeplacement = useMemo<DeplacementOrdre[]>(() => {
     const liste: DeplacementOrdre[] = [];
     for (const [num, deplacement] of Object.entries(deplacements)) {
-      const flotte = rapport?.flottesJoueur.find(f => f.num === Number(num));
+      const flotte = flottesTour.find(f => f.num === Number(num));
       if (flotte) liste.push({
         fleetNum: flotte.num,
         to: deplacement.to,
@@ -643,7 +661,7 @@ export default function Carte() {
       });
     }
     return liste;
-  }, [deplacements, rapport]);
+  }, [deplacements, flottesTour]);
   // Cibles seules (XY) pour le rendu de la carte (flèches/anneaux) : le reste (directive/stratégie)
   // ne concerne que le schéma d'ordres
   const ciblesDeplacements = useMemo<Record<number, XY>>(() => {
@@ -669,7 +687,7 @@ export default function Carte() {
   }, [rapport, global]);
 
   const copierLeSchema = async () => {
-    const ok = await copierSchema(schemaDeplacements(ordresDeplacement));
+    const ok = await copierSchema(schemaDeplacements(ordresDeplacementRapport));
     setCopieSchema(ok ? 'ok' : 'ko');
     window.clearTimeout(copieTimerRef.current);
     copieTimerRef.current = window.setTimeout(() => setCopieSchema(null), 2000);
@@ -691,6 +709,55 @@ export default function Carte() {
   }, []);
 
   const nbDeplacements = Object.keys(deplacements).length;
+  // Schéma de déplacement : flottes du rapport seulement ; une flotte issue d'une division n'a pas encore
+  // de numéro dans la console, son déplacement part dans le schéma fusion / division (référence div.<n°>)
+  const ordresDeplacementRapport = useMemo(() => ordresDeplacement.filter(d => !estFlotteDivisee(d.fleetNum)), [ordresDeplacement]);
+
+  // ---- Fusions / divisions de flottes ----
+  const ajouterFusion = useCallback((f: FusionOrdre) => {
+    setOrdresFlottes(o => ({ ...o, fusions: [...o.fusions, f] }));
+    setDeplacementsExpanded(true);
+  }, []);
+  const ajouterDivision = useCallback((d: Omit<DivisionOrdre, 'numero'>) => {
+    setOrdresFlottes(o => ({ ...o, divisions: [...o.divisions, { ...d, numero: prochainNumeroDivision(o.divisions) }] }));
+    setDeplacementsExpanded(true);
+  }, []);
+  const retirerFusion = (i: number) => setOrdresFlottes(o => ({ ...o, fusions: o.fusions.filter((_, j) => j !== i) }));
+  // Retirer une division retire aussi le déplacement et les fusions de la flotte qu'elle créait
+  const retirerDivision = (numero: number) => {
+    const num = numFlotteDivisee(numero);
+    setOrdresFlottes(o => ({
+      divisions: o.divisions.filter(d => d.numero !== numero),
+      fusions: o.fusions.filter(f => !f.flottes.includes(num)),
+    }));
+    setDeplacements(d => {
+      if (!d[num]) return d;
+      const reste = { ...d };
+      delete reste[num];
+      return reste;
+    });
+  };
+  // Une fusion n'est valable que si ses flottes existent et finissent toutes sur la même case
+  // (un déplacement modifié après coup peut la rendre caduque) : message du problème, sinon null
+  const problemeFusion = (f: FusionOrdre): string | null => {
+    const flottes = f.flottes.map(n => flottesTour.find(fl => fl.num === n));
+    if (flottes.some(fl => !fl)) return 'flotte absente du rapport';
+    const fins = flottes.map(fl => positionFinale(fl!, deplacements[fl!.num]));
+    if (fins.some(fin => fin.horsPortee)) return 'une flotte est hors de portée';
+    if (fins.some(fin => fin.pos.x !== fins[0].pos.x || fin.pos.y !== fins[0].pos.y)) return 'les flottes ne finissent pas sur la même case';
+    return null;
+  };
+  const nbOrdresFlottes = ordresFlottes.fusions.length + ordresFlottes.divisions.length;
+  const nomFlotte = (num: number) => {
+    const f = flottesTour.find(fl => fl.num === num);
+    return `${libelleNumFlotte(num)}${f ? ` ${f.nom}` : ''}`;
+  };
+  const copierLeSchemaFlottes = async () => {
+    const ok = await copierSchema(schemaOrdresFlottes(ordresFlottes, ordresDeplacement));
+    setCopieSchemaFlottes(ok ? 'ok' : 'ko');
+    window.clearTimeout(copieTimerRef.current);
+    copieTimerRef.current = window.setTimeout(() => setCopieSchemaFlottes(null), 2000);
+  };
 
   // Entrées de légende de la couche présence, insérées dans la légende du mode de couleur actif
   const presenceLegendItems = presenceOn && presenceMode === 'presence' ? (
@@ -936,6 +1003,7 @@ export default function Carte() {
             showStabilityZones={showStabilityZones}
             stabilitySystemPos={centreStabilite}
             deplacements={ciblesDeplacements}
+            flottesSupplementaires={flottesDivisees}
             dragFleet={dragState && dragCursor ? { from: dragState.from, vitesse: dragState.vitesse, cursor: dragCursor } : null}
             onFleetCellMouseDown={onFleetCellMouseDown}
             onAnyCanvasMouseDown={onAnyCanvasMouseDown}
@@ -1436,7 +1504,7 @@ par diplo
             >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 <IconFleetMove size={15} color="#38bdf8" />
-                Déplacements ({nbDeplacements})
+                Déplacements ({nbDeplacements}){nbOrdresFlottes > 0 ? ` · Fusions / divisions (${nbOrdresFlottes})` : ''}
               </span>
               <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, color: '#94a3b8' }}>
                 {tiroirDeplacementsOuvert ? <IconChevronDown size={15} /> : <IconChevronUp size={15} />}
@@ -1458,7 +1526,7 @@ par diplo
                       .sort((a, b) => a.num - b.num)
                       .map(({ num, deplacement }) => {
                         const to = deplacement.to;
-                        const flotte = rapport?.flottesJoueur.find(f => f.num === num);
+                        const flotte = flottesTour.find(f => f.num === num);
                         const origine = flotte?.pos;
                         // La directive choisie (détermine le menu de paramètre n° éventuel)
                         const optionDirective = OPTIONS_DIRECTIVES.find(o => o.value === deplacement.directive);
@@ -1478,11 +1546,13 @@ par diplo
                           <div key={num} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0' }}>
                             <div
                               style={{ flex: 1, fontSize: '0.85rem', color: '#f1f5f9', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                              title={flotte ? `#${String(num + 1).padStart(2, '0')} ${flotte.nom}` : `#Flotte ${num + 1} (absente du rapport affiché)`}
+                              title={flotte
+                                ? `${libelleNumFlotte(num)} ${flotte.nom}${estFlotteDivisee(num) ? " (nouvelle flotte issue d'une division)" : ''}`
+                                : `Flotte ${libelleNumFlotte(num)} (absente du rapport affiché)`}
                             >
                               {flotte
-                                ? <><span style={{ color: '#94a3b8', marginRight: 4 }}>#{String(num + 1).padStart(2, '0')}</span><strong>{flotte.nom}</strong></>
-                                : <strong>Flotte #{num + 1}</strong>}
+                                ? <><span style={{ color: '#94a3b8', marginRight: 4 }}>{libelleNumFlotte(num)}</span><strong>{flotte.nom}</strong></>
+                                : <strong>Flotte {libelleNumFlotte(num)}</strong>}
                             </div>
                             <div style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#cbd5e1', flexShrink: 0, display: 'inline-flex', alignItems: 'center' }}>
                               {/* Case de départ masquée quand le tiroir est étroit (CSS) : laisse la place au n° de flotte */}
@@ -1601,18 +1671,54 @@ par diplo
                         );
                       })
                   )}
+                  {nbOrdresFlottes > 0 && (
+                    <>
+                      <div className="ordres-flottes-tiroir-titre">Fusions / divisions (schéma à part)</div>
+                      {ordresFlottes.divisions.map(d => {
+                        const absente = !rapport?.flottesJoueur.some(f => f.num === d.fleetNum);
+                        const detail = Object.entries(d.vaisseaux).map(([plan, nb]) => `${nb} ${plan}`).join(', ');
+                        const nouvelle = libelleNumFlotte(numFlotteDivisee(d.numero));
+                        return (
+                          <div key={`div-${d.numero}`} className={`ordres-flottes-tiroir-ligne${absente ? ' erreur' : ''}`}>
+                            <span className="texte" title={`Nouvelle flotte ${nouvelle} : la console lui donne son numéro à l'import ; son déplacement et ses fusions sont dans ce schéma`}>
+                              {absente && <IconAlert size={12} />} Diviser <strong>{nomFlotte(d.fleetNum)}</strong> → {nouvelle} « {d.nom} » : {detail}
+                            </span>
+                            <button type="button" className="ordres-flottes-supprimer" title="Supprimer cette division (et le déplacement / les fusions de la nouvelle flotte)" aria-label="Supprimer cette division" onClick={() => retirerDivision(d.numero)}>
+                              <IconClose size={14} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                      {ordresFlottes.fusions.map((f, i) => {
+                        const probleme = problemeFusion(f);
+                        const directive = OPTIONS_DIRECTIVES.find(o => o.value === f.directive);
+                        const garde = flotteResultante(f);
+                        return (
+                          <div key={`fus-${i}`} className={`ordres-flottes-tiroir-ligne${probleme ? ' erreur' : ''}`}>
+                            <span className="texte" title={probleme ? `Le jeu refusera cette fusion : ${probleme}` : `Flotte gardée : ${nomFlotte(garde)}`}>
+                              {probleme && <IconAlert size={12} />} Fusionner {f.flottes.map(n => nomFlotte(n)).join(' + ')}
+                              {' '}<span style={{ color: '#94a3b8' }}>({directive?.label ?? f.directive}{directive?.precision ? ` ${f.precision ?? 0}` : ''})</span>
+                            </span>
+                            <button type="button" className="ordres-flottes-supprimer" title="Supprimer cette fusion" aria-label="Supprimer cette fusion" onClick={() => retirerFusion(i)}>
+                              <IconClose size={14} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: 8, padding: '8px 12px', borderTop: '1px solid #334155', flexShrink: 0 }}>
                   <button
                     type="button"
                     onClick={copierLeSchema}
-                    disabled={nbDeplacements === 0}
+                    disabled={ordresDeplacementRapport.length === 0}
                     title="Copier le schéma des ordres de déplacement à coller dans la console d'ordres"
                     style={{
                       ...styleBoutonDeplacement,
                       flex: 1,
-                      opacity: nbDeplacements === 0 ? 0.35 : 1,
-                      cursor: nbDeplacements === 0 ? 'default' : 'pointer'
+                      opacity: ordresDeplacementRapport.length === 0 ? 0.35 : 1,
+                      cursor: ordresDeplacementRapport.length === 0 ? 'default' : 'pointer'
                     }}
                   >
 {copieSchema === 'ok' ? (
@@ -1623,6 +1729,22 @@ par diplo
                       <><IconClipboard size={14} /> Copier le schéma</>
                     )}
                   </button>
+                  {nbOrdresFlottes > 0 && (
+                    <button
+                      type="button"
+                      onClick={copierLeSchemaFlottes}
+                      title="Copier le schéma des fusions / divisions de flottes à coller dans la console d'ordres"
+                      style={styleBoutonDeplacement}
+                    >
+                      {copieSchemaFlottes === 'ok' ? (
+                        <><IconCheck size={14} color="#4ade80" /> Copié</>
+                      ) : copieSchemaFlottes === 'ko' ? (
+                        <><IconAlert size={14} color="#f87171" /> Échec</>
+                      ) : (
+                        <><IconClipboard size={14} /> Fusions / divisions</>
+                      )}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={reinitialiserDeplacements}
@@ -1645,7 +1767,7 @@ par diplo
           {picker && rapport && (
             <FleetPicker
               anchor={picker.anchor}
-              fleets={rapport.flottesJoueur
+              fleets={flottesTour
                 .filter(f => f.pos.x === picker.cell.x && f.pos.y === picker.cell.y)
                 .map(f => ({ fleet: f, deplacement: deplacements[f.num]?.to }))}
               dragNum={dragState?.num}
@@ -1667,6 +1789,18 @@ par diplo
           onClose={() => setInfoPanelCollapsed(true)}
           onMoveFleet={onMoveFleetToSelected}
           fleetsWithOrder={flottesAvecOrdre}
+          blocOrdresFlottes={rapport && selected ? (
+            <OrdresFlottesCase
+              selected={selected}
+              flottes={flottesTour}
+              lieutenants={rapport.lieutenants ?? []}
+              deplacements={deplacements}
+              fusions={ordresFlottes.fusions}
+              divisions={ordresFlottes.divisions}
+              onFusion={ajouterFusion}
+              onDivision={ajouterDivision}
+            />
+          ) : undefined}
           colorMode={colorMode}
         />
       </div>

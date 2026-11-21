@@ -415,3 +415,63 @@ schéma d'ordres copiable dans la console d'ordres (comme le fait l'écran Plani
 - Les déplacements en attente sont stockés par tour dans le localStorage, clé `deplacements_tour_<tour>` ; un
   changement de tour recharge ceux du tour affiché.
 - Le chargement d'un nouveau rapport efface les déplacements de tous les tours (à refaire sur le nouveau rapport).
+
+## fusion / division de flottes (schéma d'ordres)
+
+Toujours disponible (ce sont des ordres, pas une couche d'affichage) : tant qu'on ne s'en sert pas, le tiroir des
+déplacements est inchangé.
+
+### règles du moteur (ReceptionOrdres.java, Commandant.java)
+
+- Ordre de résolution du tour : `diviser_flotte` (32) → `deplacer_flotte` (33, suivi du mouvement réel
+  `Flotte.deplacerVersBut`) → `pister` (34) → `fusionner_flotte` (35).
+  - une **division** a lieu sur la case de départ, avant le mouvement ;
+  - une **fusion** a lieu sur la case d'arrivée : les flottes doivent être sur la même case *après* leurs
+    déplacements, sinon erreur `ER_COMMANDANT_FUSIONNER_FLOTTE_0002`.
+- `fusionner_flotte` : `[flotte 1, flotte 2, directive]` — fusion deux à deux ; la flotte au plus petit numéro absorbe
+  l'autre (vaisseaux, construction en cours) et prend la directive de l'ordre (code + 100 × n°, comme le déplacement),
+  qui remplace celle du déplacement. Deux héros : celui de la flotte absorbée passe en réserve.
+- `diviser_flotte` : `[flotte, nom de la nouvelle flotte, n° de division]`, avec ses lignes `diviser_flotte_ajouter` :
+  `[flotte, n° de division, plan, nombre]`. Le jeu détache les vaisseaux les plus endommagés de chaque plan ; une
+  flotte vidée disparaît. La nouvelle flotte est adressable dans les ordres du même tour par `10000 + n° de division`.
+  La console d'ordres attribue les n° de division (le plus grand du commandant + 1).
+
+### panneau d'info de la case
+
+Bloc « Fusion / division » sous « Mes flottes » :
+- **fusion** : liste des flottes du joueur sur la case après les déplacements du tour (celles qui y restent, celles qui
+  y arrivent ; un déplacement hors de portée est listé mais non cochable). On coche au moins deux flottes, on choisit la
+  directive (proposée : celle du déplacement de la flotte gardée) et « Fusionner » ajoute l'ordre. Une flotte ne fait
+  partie que d'une fusion par tour. Avertissement si plusieurs flottes cochées ont un héros.
+- **division** : pour chaque flotte qui part de la case, « Diviser… » ouvre la saisie du nom de la nouvelle flotte et
+  du nombre de vaisseaux à détacher par plan. Une flotte déjà divisée ne propose que les vaisseaux qui lui restent ;
+  une flotte issue d'une division ne se divise pas.
+
+### flotte issue d'une division
+
+- Elle apparaît tout de suite sur la case de la flotte d'origine, numérotée `div.<n°>` (n° local à l'outil) : dans
+  le sélecteur de flottes (glisser-déposer), le panneau de la case et le tiroir.
+- Elle se déplace comme les autres et peut entrer dans une fusion. Son vrai numéro n'est connu qu'à l'import (la
+  console numérote les divisions) : son déplacement et ses fusions partent donc dans le schéma fusion / division,
+  avec la référence `div.<n°>` que la console remplace par `10000 + n° attribué` ; le schéma de déplacement ne
+  contient que les flottes du rapport.
+- Sa vitesse est celle de la flotte d'origine (le rapport ne donne pas la vitesse par vaisseau ; le jeu la recalcule
+  et elle ne peut pas être plus lente) ; la flotte d'origine perd les vaisseaux détachés, et disparaît si elle est vidée.
+- Les n° de division ne sont pas réutilisés tant qu'il existe des divisions plus récentes ; retirer une division
+  retire aussi le déplacement et les fusions de sa flotte.
+
+### tiroir « Déplacements »
+
+- Section « Fusions / divisions » sous les déplacements, une ligne par ordre avec × pour le retirer ; une fusion
+  devenue invalide (déplacement modifié, flotte hors de portée ou absente) est marquée ⚠ avec la raison en infobulle.
+- Bouton « Fusions / divisions » (affiché dès qu'il y a un ordre) : copie le schéma `flotte|base64` — un ordre
+  `table:param:…` par enregistrement (comme le schéma des revenus), séparés par `%#!%`, dans l'ordre :
+  - `diviser_flotte:<flotte>:<nom>:div.<n°>` puis ses `diviser_flotte_ajouter:div.<n°>:<plan>:<nombre>` ;
+  - `deplacer_flotte:div.<n°>:0_x_y:<directive>:<stratégie>` (flottes divisées seulement) ;
+  - `fusionner_flotte:<flotte gardée>:<flotte absorbée>:<directive>` (flotte = num rapport ou `div.<n°>`).
+  Import : `importerSchemaFlotte` de la console (`php/ordres/schemas.php`), qui valide tout avant d'insérer.
+
+### persistance
+
+- Clé `flottes_ordres_tour_<tour>` (`{ fusions, divisions }`), effacée au chargement d'un nouveau rapport, comme les
+  déplacements.

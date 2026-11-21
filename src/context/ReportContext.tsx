@@ -1,5 +1,6 @@
 import {clearPlanificationRevenu} from '../utils/planificationRevenuStorage';
 import {clearAllDeplacements} from '../storage/deplacementOrdersStorage';
+import {clearAllOrdresFlottes} from '../storage/ordresFlottesStorage';
 import React, {createContext, useContext, useEffect, useMemo, useRef, useState, useCallback} from 'react';
 import {GlobalData, Rapport, XY, SystemeDetecte, Note, CombatEvent, Zone} from '../types';
 import {parseRapportXml, addManualDetectedSystems, getCachedDetectedSystems} from '../parsers/parseRapport';
@@ -264,6 +265,7 @@ export function ReportProvider({children}: { children: React.ReactNode }) {
         await storeRapport(r);
         clearPlanificationRevenu(); // les choix de l'écran de planification des revenus sont à refaire sur le nouveau rapport
         clearAllDeplacements(); // idem pour les déplacements de flottes en attente sur la carte (tous les tours)
+        clearAllOrdresFlottes(); // et pour les fusions / divisions de flottes
         setImportCount(c => c + 1); // signale l'invalidation même si le rapport affiché ne change pas
         // Seul le rapport le plus récent est affiché ; un tour plus ancien ne fait qu'enrichir l'historique
         if (latest === undefined || r.tour >= latest) {
