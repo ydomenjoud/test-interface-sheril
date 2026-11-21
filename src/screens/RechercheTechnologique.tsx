@@ -15,30 +15,51 @@ function bornerPourcentage(percent: number): number {
 /**
  * Champ numérique saisi librement : la valeur n'est validée qu'à la sortie du champ ou sur Entrée
  * (Échap annule), pour ne pas recalculer la ligne à chaque chiffre tapé.
+ * Les flèches du champ (boutons ▲▼, flèches haut/bas du clavier, molette si le navigateur la gère) valident tout de suite :
+ * elles ne passent pas par une frappe au clavier.
  */
 function SaisieNombre({valeur, onValider, width, title, suffixe}: {
     valeur: number; onValider: (v: number) => void; width: number; title?: string; suffixe?: string;
 }) {
     const [brouillon, setBrouillon] = useState<string | null>(null);
-    const valider = () => {
-        if (brouillon === null) return;
-        const v = parseFloat(brouillon.replace(',', '.'));
+    // Vrai quand le prochain changement vient d'une frappe, d'un collage ou d'un glisser (saisie libre)
+    const saisieLibre = useRef(false);
+    const appliquer = (texte: string) => {
+        const v = parseFloat(texte.replace(',', '.'));
         if (Number.isFinite(v)) onValider(v);
         setBrouillon(null);
     };
+    const valider = () => {
+        if (brouillon !== null) appliquer(brouillon);
+    };
+    const marquerSaisieLibre = () => { saisieLibre.current = true; };
     return (<>
         <input
             type="number"
             min={0}
             title={title}
             value={brouillon ?? valeur}
-            onChange={e => setBrouillon(e.target.value)}
+            onChange={e => {
+                if (saisieLibre.current) {
+                    saisieLibre.current = false;
+                    setBrouillon(e.target.value);
+                } else {
+                    appliquer(e.target.value);
+                }
+            }}
             onFocus={e => e.target.select()}
             onBlur={valider}
+            onPaste={marquerSaisieLibre}
+            onCut={marquerSaisieLibre}
+            onDrop={marquerSaisieLibre}
             onKeyDown={e => {
                 if (e.key === 'Enter') valider();
-                if (e.key === 'Escape') setBrouillon(null);
+                else if (e.key === 'Escape') setBrouillon(null);
+                else if (!['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown'].includes(e.key)) marquerSaisieLibre();
             }}
+            // Le changement d'une frappe arrive entre keydown et keyup : une touche sans effet (Maj…)
+            // ne doit pas faire passer le clic suivant sur une flèche pour une saisie libre
+            onKeyUp={() => { saisieLibre.current = false; }}
             style={{width, textAlign: 'right'}}
         />{suffixe}
     </>);
