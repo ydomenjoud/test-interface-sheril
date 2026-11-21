@@ -78,7 +78,7 @@ const styleBoutonDeplacement: React.CSSProperties = {
 };
 
 export default function Carte() {
-  const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText, radarsAllies, clearRadarsAllies, allTags, selectedTags, setSelectedTags, zones, zoneLabels, hiddenZoneLabels, setHiddenZoneLabels, tours, selectTour, importCount } = useReport();
+  const { rapport, global, cellSize, setCellSize, center, setCenter, addDetectedSystemsFromText, radarsAllies, clearRadarsAllies, flottesImportees, clearFlottesImportees, allTags, selectedTags, setSelectedTags, zones, zoneLabels, hiddenZoneLabels, setHiddenZoneLabels, tours, selectTour, importCount } = useReport();
   const [zoneDialogRect, setZoneDialogRect] = useState<ZoneRect | undefined>(undefined);
   const [zonePreview, setZonePreview] = useState<Omit<Zone, 'id'> | undefined>(undefined);
   const closeZoneDialog = useCallback(() => {
@@ -224,13 +224,24 @@ export default function Carte() {
   // Contenu de l'export (mémorisé) : systèmes, radars
   const [exportSystemes, setExportSystemes] = useState<boolean>(() => localStorage.getItem('carte_export_systemes') !== 'false');
   const [exportRadars, setExportRadars] = useState<boolean>(() => localStorage.getItem('carte_export_radars') !== 'false');
+  // Détections propres : inutiles pour un allié (l'alliance les partage déjà), décochées par défaut
+  const [exportDetections, setExportDetections] = useState<boolean>(() => localStorage.getItem('carte_export_detections') === 'true');
+  const [exportDetectionsAlliance, setExportDetectionsAlliance] = useState<boolean>(() => localStorage.getItem('carte_export_detections_alliance') === 'true');
+  // Types d'objets partagés, pour toutes les sources : systèmes (par défaut) et flottes (décochées par défaut)
+  const [exportTypeSystemes, setExportTypeSystemes] = useState<boolean>(() => localStorage.getItem('carte_export_type_systemes') !== 'false');
+  const [exportTypeFlottes, setExportTypeFlottes] = useState<boolean>(() => localStorage.getItem('carte_export_type_flottes') === 'true');
   useEffect(() => {
     localStorage.setItem('carte_export_systemes', JSON.stringify(exportSystemes));
     localStorage.setItem('carte_export_radars', JSON.stringify(exportRadars));
-  }, [exportSystemes, exportRadars]);
+    localStorage.setItem('carte_export_detections', JSON.stringify(exportDetections));
+    localStorage.setItem('carte_export_detections_alliance', JSON.stringify(exportDetectionsAlliance));
+    localStorage.setItem('carte_export_type_systemes', JSON.stringify(exportTypeSystemes));
+    localStorage.setItem('carte_export_type_flottes', JSON.stringify(exportTypeFlottes));
+  }, [exportSystemes, exportRadars, exportDetections, exportDetectionsAlliance, exportTypeSystemes, exportTypeFlottes]);
   const exportText = useMemo(
-    () => (rapport ? exportSystemesJoueur(rapport, {systemes: exportSystemes, radars: exportRadars}) : ''),
-    [rapport, exportSystemes, exportRadars],
+    () => (rapport ? exportSystemesJoueur(rapport, {systemes: exportSystemes, radars: exportRadars, detections: exportDetections, detectionsAlliance: exportDetectionsAlliance,
+      typeSystemes: exportTypeSystemes, typeFlottes: exportTypeFlottes}) : ''),
+    [rapport, exportSystemes, exportRadars, exportDetections, exportDetectionsAlliance, exportTypeSystemes, exportTypeFlottes],
   );
   // Texte affiché, modifiable avant copie ; régénéré quand le texte généré change (cases, rapport)
   const [exportTexteEdite, setExportTexteEdite] = useState('');
@@ -1683,16 +1694,47 @@ par diplo
       {showExport && (
         <Modal title="Exporter mes systèmes" onClose={() => setShowExport(false)} panelStyle={{ minWidth: 600, maxWidth: '80%' }}>
           <p style={{ marginTop: 0 }}>
-            Transmettez ce texte à un allié (Discord, mail, Drive…) : il le colle dans « Importer systèmes ».
+            Transmettez ce texte à un allié ou à un autre commandant (Discord, mail, Drive…) : il le colle dans « Importer systèmes ».
           </p>
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}
+            title="Types d'objets envoyés, pour mes possessions, mes détections et celles de l'alliance"
+          >
+            <span>Envoyer :</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={exportTypeSystemes} onChange={(e) => { setExportTypeSystemes(e.target.checked); setExportFeedback(null); }} />
+              Systèmes
+            </label>
+            <label
+              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+              title="Flottes : numéro, nom, position, propriétaire, nombre de vaisseaux et puissance en toutes lettres (celle que voit un autre commandant, sans l'AS ni l'AP)"
+            >
+              <input type="checkbox" checked={exportTypeFlottes} onChange={(e) => { setExportTypeFlottes(e.target.checked); setExportFeedback(null); }} />
+              Flottes
+            </label>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
               <input type="checkbox" checked={exportSystemes} onChange={(e) => { setExportSystemes(e.target.checked); setExportFeedback(null); }} />
-              Mes systèmes (propriétaires, population, date du tour)
+              Mes systèmes et flottes (propriétaires, population, date du tour)
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
               <input type="checkbox" checked={exportRadars} onChange={(e) => { setExportRadars(e.target.checked); setExportFeedback(null); }} />
               Mes portées radar (systèmes et flottes, position à ce tour)
+            </label>
+            <label
+              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+              title="Systèmes détectés à ce tour par vos propres radars et scanners. Les détections de vos alliés sont écartées : utile pour un commandant hors de l'alliance (un allié les reçoit déjà)."
+            >
+              <input type="checkbox" checked={exportDetections} onChange={(e) => { setExportDetections(e.target.checked); setExportFeedback(null); }} />
+              Mes détections (systèmes vus par mes radars à ce tour, sans celles des alliés)
+            </label>
+            <label
+              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+              title="Systèmes détectés à ce tour hors de portée de vos radars : ils viennent des détections mises en commun par votre alliance."
+            >
+              <input type="checkbox" checked={exportDetectionsAlliance} onChange={(e) => { setExportDetectionsAlliance(e.target.checked); setExportFeedback(null); }} />
+              Détections de mon alliance (systèmes vus à ce tour par mes alliés seulement)
             </label>
           </div>
           <textarea
@@ -1741,7 +1783,8 @@ par diplo
             <br/>
             <code>nbpla=16; nom=Nb 9C; pop=3475; popMax=43547; pos=0_1_26; typeEtoile=1; proprios=4,1</code>
             <br/>
-            ou le texte produit par « Exporter systèmes » chez un allié (les lignes commençant par # sont ignorées).
+            ou le texte produit par « Exporter systèmes » chez un autre commandant (les lignes commençant par # sont ignorées ;
+            les lignes <code>flotte=…</code> ajoutent une flotte détectée à la carte de son tour).
           </p>
           <textarea
             value={pasteText}
@@ -1753,6 +1796,16 @@ par diplo
             <div style={{ marginTop: 8, color: '#4ade80' }}>{pasteFeedback}</div>
           )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+            {flottesImportees.length > 0 && (
+              <button
+                type="button"
+                style={{ marginRight: 'auto' }}
+                title="Les flottes importées sont montrées comme détectées sur la carte de leur tour"
+                onClick={() => { clearFlottesImportees(); setPasteFeedback('Flottes importées effacées'); }}
+              >
+                Effacer les flottes importées ({flottesImportees.length})
+              </button>
+            )}
             <button type="button" onClick={() => setShowPaste(false)}>Annuler</button>
             <button
               type="button"
@@ -1761,6 +1814,7 @@ par diplo
                 const msgParts = [] as string[];
                 if (res.added > 0) msgParts.push(`${res.added} ajouté(s)`);
                 if (res.radars > 0) msgParts.push(`${res.radars} radar(s)`);
+                if (res.flottes > 0) msgParts.push(`${res.flottes} flotte(s)`);
                 if (res.errors.length > 0) msgParts.push(`${res.errors.length} erreur(s)`);
                 setPasteFeedback(msgParts.join(' · ') || 'Aucune modification');
                 if (res.errors.length === 0) {
