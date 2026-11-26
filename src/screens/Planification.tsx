@@ -39,7 +39,7 @@ const pdcStyleModifie: React.CSSProperties = {
 
 export default function Planification() {
     const { global, rapport } = useReport();
-    const [sortBy, setSortBy] = useState<'nom' | 'pos' | 'pdc' | 'nbConstructions' | ''>('nom');
+    const [sortBy, setSortBy] = useState<'nom' | 'pos' | 'pdc' | 'nbConstructions' | ''>('pos');
     const [orderedSystems, setOrderedSystems] = useState<SystemeJoueur[]>([]);
     const [summaryExpanded, setSummaryExpanded] = useState(() => {
         const saved = localStorage.getItem('planification_summary_expanded');
